@@ -39,6 +39,7 @@ export class MockMarketDataProvider implements MarketDataProvider {
         const change = price - previousClose;
         return {
           symbol,
+          name: symbol,
           price,
           previousClose,
           change,

@@ -33,3 +33,23 @@ export const historyRangeSchema = z.object({
 });
 
 export const userIdSchema = z.string().uuid();
+
+export const searchSchema = z.object({
+  q: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/, "Unsupported query"),
+});
+
+export const watchlistAddSchema = z.object({
+  symbol: symbolSchema,
+  name: z.string().trim().max(120).optional(),
+  reason: z.string().trim().min(3).max(1000),
+});
+
+export const watchlistRemoveSchema = z.object({ symbol: symbolSchema });
+
+export const aiSchema = z.object({
+  mode: z.enum(["view", "rewrite"]),
+  symbol: symbolSchema.optional(),
+  name: z.string().trim().max(120).optional(),
+  reason: z.string().trim().max(1000).optional(),
+  draft: z.string().trim().max(2000).optional(),
+});

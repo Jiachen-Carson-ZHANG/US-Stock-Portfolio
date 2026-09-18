@@ -81,8 +81,8 @@ test.describe("dashboard", () => {
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
     await expect(page.getByText("Portfolio value")).toBeVisible();
     await expect(page.getByText("Unrealized P&L").first()).toBeVisible();
-    await expect(page.getByText("Cost basis")).toBeVisible();
-    await expect(page.getByText(/Last updated:/)).toBeVisible();
+    await expect(page.getByText("Total invested")).toBeVisible();
+    await expect(page.getByText(/Last updated/)).toBeVisible();
   });
 
   test("renders allocation and concentration", async ({ page }) => {

@@ -9,6 +9,8 @@ import {
   UserRows,
 } from "@/components/layout/settings-actions";
 import { Badge } from "@/components/ui/misc";
+import { FamilyActivity } from "@/components/layout/family-activity";
+import { activityByMember, mostViewedAssets } from "@/lib/activity";
 
 const CONNECT_OUTCOME: Record<string, { tone: "ok" | "bad"; message: string }> = {
   connected: { tone: "ok", message: "moomoo connected and holdings synced." },
@@ -66,6 +68,8 @@ export default async function SettingsPage({
   const { summary, positions } = await loadPortfolio();
   const users = readUsers();
   const connection = readConnectionStatus(getDb());
+  const mostViewed = mostViewedAssets(getDb());
+  const byMember = activityByMember(getDb());
   const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];
 
   return (
@@ -167,6 +171,8 @@ export default async function SettingsPage({
           <SyncButton />
         </div>
       </section>
+
+      <FamilyActivity mostViewed={mostViewed} byMember={byMember} />
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">Accounts</h2>

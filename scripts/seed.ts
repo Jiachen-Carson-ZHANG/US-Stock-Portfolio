@@ -23,6 +23,7 @@ const ACCOUNTS: SeedAccount[] = [
   { username: "father", displayName: "Father", role: "viewer", envVar: "SEED_FATHER_PASSWORD" },
   { username: "mother", displayName: "Mother", role: "viewer", envVar: "SEED_MOTHER_PASSWORD" },
   { username: "mile", displayName: "Mile", role: "viewer", envVar: "SEED_MILE_PASSWORD" },
+  { username: "zizhe", displayName: "Zizhe", role: "viewer", envVar: "SEED_ZIZHE_PASSWORD" },
 ];
 
 const SNAPSHOT_DAYS = 120;

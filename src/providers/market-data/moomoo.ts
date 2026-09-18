@@ -65,6 +65,7 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
         const change = snapshot.last_price - snapshot.prev_close_price;
         quotes.push({
           symbol: fromMoomooCode(snapshot.code),
+          name: snapshot.name,
           price: snapshot.last_price,
           previousClose: snapshot.prev_close_price,
           change,

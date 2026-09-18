@@ -24,6 +24,8 @@ const en = {
     password: "Password",
     signIn: "Sign in",
     signingIn: "Signing in…",
+    invalid: "Invalid username or password",
+    tooMany: "Too many attempts. Try again in a few minutes.",
     unreachable: "Cannot reach the server. Check your connection.",
   },
 
@@ -255,6 +257,8 @@ const zh: Dictionary = {
     password: "密码",
     signIn: "登录",
     signingIn: "登录中…",
+    invalid: "用户名或密码不正确",
+    tooMany: "尝试次数过多，请几分钟后再试。",
     unreachable: "无法连接服务器，请检查网络。",
   },
 

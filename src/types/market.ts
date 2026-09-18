@@ -2,6 +2,7 @@ export type MarketSession = "pre-market" | "regular" | "after-hours" | "closed";
 
 export type Quote = {
   symbol: string;
+  name?: string;
   price: number;
   previousClose: number;
   change: number;

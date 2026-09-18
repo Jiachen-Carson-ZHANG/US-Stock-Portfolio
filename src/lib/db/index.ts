@@ -95,6 +95,16 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions(traded_at DESC);
 
+CREATE TABLE IF NOT EXISTS watchlist (
+  id         TEXT PRIMARY KEY,
+  symbol     TEXT NOT NULL UNIQUE,
+  name       TEXT,
+  reason     TEXT NOT NULL,
+  added_by   TEXT NOT NULL,
+  ai_note    TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS quote_cache (
   symbol         TEXT PRIMARY KEY,
   price          REAL NOT NULL,
