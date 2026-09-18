@@ -11,6 +11,7 @@ const PUBLIC_PATHS = new Set(["/login", "/api/auth/login"]);
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (process.env.AUTH_MODE !== "password") return NextResponse.next();
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
 
   if (!request.cookies.has(SESSION_COOKIE)) {

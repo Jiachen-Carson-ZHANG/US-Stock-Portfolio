@@ -21,6 +21,9 @@ export default defineConfig({
     env: {
       DATABASE_URL: "file:./data/e2e.db",
       DATA_PROVIDER: "mock",
+      // The suite covers sign-in and role enforcement, so it runs the guarded
+      // path even though local development defaults to open access.
+      AUTH_MODE: "password",
       SEED_OWNER_PASSWORD: "e2e-owner-pass",
       SEED_FATHER_PASSWORD: "e2e-father-pass",
       SEED_MOTHER_PASSWORD: "e2e-mother-pass",

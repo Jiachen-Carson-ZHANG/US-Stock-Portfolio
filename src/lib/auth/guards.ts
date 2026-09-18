@@ -4,7 +4,24 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { SESSION_COOKIE, validateSession, type AuthUser } from "./session";
 
+/**
+ * With AUTH_MODE unset the app is open: no sign-in, everyone is the owner.
+ * That is fine on a laptop and not fine on a public URL, where a link is not
+ * access control — set AUTH_MODE=password before exposing the app.
+ */
+export function isOpenAccess(): boolean {
+  return process.env.AUTH_MODE !== "password";
+}
+
+const OPEN_ACCESS_USER: AuthUser = {
+  id: "open-access",
+  username: "family",
+  displayName: "Family",
+  role: "owner",
+};
+
 export async function getCurrentUser(): Promise<AuthUser | null> {
+  if (isOpenAccess()) return OPEN_ACCESS_USER;
   const cookieStore = await cookies();
   return validateSession(getDb(), cookieStore.get(SESSION_COOKIE)?.value);
 }

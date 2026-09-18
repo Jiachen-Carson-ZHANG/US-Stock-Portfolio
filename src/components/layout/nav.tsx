@@ -25,9 +25,11 @@ function isActive(pathname: string, href: string) {
 export function Sidebar({
   role,
   displayName,
+  canSignOut,
 }: {
   role: UserRole;
   displayName: string;
+  canSignOut: boolean;
 }) {
   const pathname = usePathname();
   const items = useVisibleItems(role);
@@ -61,9 +63,11 @@ export function Sidebar({
         </ul>
       </nav>
 
-      <div className="px-3 pb-4">
-        <SignOutButton />
-      </div>
+      {canSignOut && (
+        <div className="px-3 pb-4">
+          <SignOutButton />
+        </div>
+      )}
     </aside>
   );
 }
