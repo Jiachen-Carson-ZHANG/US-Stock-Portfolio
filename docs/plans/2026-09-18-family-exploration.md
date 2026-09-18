@@ -29,3 +29,20 @@
 - Run focused regression tests after each task, full Vitest, TypeScript, lint and production build.
 - Add desktop/mobile Playwright coverage of family mutations, performance data entry, error handling and route authorization using only isolated test databases.
 - Review final diff for spec compliance, security, correctness, accessibility and regressions; fix findings and rerun affected checks.
+
+## Completion checkpoint
+
+Implemented all four work streams. Review findings were resolved: source-currency
+labels, pre-close snapshot rejection, and reverse-proxy origin validation.
+Ended paper challenges are explicitly last-observed valuations, not final close
+settlements. Cash-flow timing uses the documented end-of-day convention.
+
+Validation: full 175-test unit suite passed; the later proxy regression and
+related route tests passed (20 focused tests). All 44 desktop/mobile browser
+checks passed; all 10 enrichment/family checks passed again on the final
+production build. TypeScript, ESLint and diff whitespace checks passed.
+
+Operational setup remains explicit: individual family identity requires password
+mode; benchmark/FX data are imported through the owner UI; unattended snapshots
+require a host scheduler and SNAPSHOT_CRON_SECRET. No deployment or real broker
+order was performed. Existing environment secrets were not edited.

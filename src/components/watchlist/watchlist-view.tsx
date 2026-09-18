@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useRef, useState } from "react";
 import { Search, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/misc";
-import { useT } from "@/lib/i18n/context";
+import { useT, useLocale } from "@/lib/i18n/context";
 import { cn, signClass } from "@/lib/utils";
 import type { WatchlistEntry } from "@/lib/watchlist";
 
@@ -26,11 +27,15 @@ function usd(value: number): string {
 export function WatchlistView({
   initial,
   aiEnabled,
+  canRemove,
 }: {
   initial: WatchlistEntry[];
   aiEnabled: boolean;
+  canRemove: boolean;
 }) {
   const t = useT();
+  const zh = useLocale() === "zh";
+  const pending = useRef(false);
   const [entries, setEntries] = useState(initial);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
@@ -39,112 +44,59 @@ export function WatchlistView({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  async function request<T>(url: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(url, init);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error ?? t.common.error);
+    return data as T;
+  }
+  async function run(key: string, action: () => Promise<void>) {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(key); setError(null);
+    try { await action(); }
+    catch (error) { setError(error instanceof Error ? error.message : t.common.error); }
+    finally { pending.current = false; setBusy(null); }
+  }
   async function search(event: React.FormEvent) {
     event.preventDefault();
     if (!query.trim()) return;
-
-    setBusy("search");
-    setError(null);
-    setResults(null);
-
-    const response = await fetch(
-      `/api/market/search?q=${encodeURIComponent(query.trim())}`,
-    );
-    const data = await response.json().catch(() => ({ results: [] }));
-    setResults(data.results ?? []);
-    setBusy(null);
+    await run("search", async () => {
+      setResults(null);
+      const data = await request<{results: SearchResult[]}>(`/api/market/search?q=${encodeURIComponent(query.trim())}`);
+      setResults(data.results ?? []);
+    });
   }
-
   async function add() {
     if (!selected) return;
-    if (reason.trim().length < 3) {
-      setError(t.watchlist.reasonRequired);
-      return;
-    }
-
-    setBusy("add");
-    setError(null);
-
-    const response = await fetch("/api/watchlist", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: selected.symbol,
-        name: selected.name,
-        reason: reason.trim(),
-      }),
+    if (reason.trim().length < 3) { setError(t.watchlist.reasonRequired); return; }
+    await run("add", async () => {
+      const data = await request<{entry: WatchlistEntry}>("/api/watchlist", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({symbol:selected.symbol,name:selected.name,reason:reason.trim()}),
+      });
+      setEntries(current => [{...data.entry,price:selected.price,changePercent:selected.changePercent},...current.filter(e=>e.symbol!==data.entry.symbol)]);
+      setSelected(null); setReason(""); setResults(null); setQuery("");
     });
-
-    const data = await response.json().catch(() => ({}));
-    setBusy(null);
-
-    if (!response.ok) {
-      setError(data.error ?? t.common.error);
-      return;
-    }
-
-    setEntries((current) => [
-      { ...data.entry, price: selected.price, changePercent: selected.changePercent },
-      ...current.filter((e) => e.symbol !== data.entry.symbol),
-    ]);
-    setSelected(null);
-    setReason("");
-    setResults(null);
-    setQuery("");
   }
-
   async function remove(symbol: string) {
-    setBusy(symbol);
-    await fetch(`/api/watchlist?symbol=${encodeURIComponent(symbol)}`, {
-      method: "DELETE",
+    await run(symbol, async () => {
+      await request(`/api/watchlist?symbol=${encodeURIComponent(symbol)}`, {method:"DELETE"});
+      setEntries(current => current.filter(e=>e.symbol!==symbol));
     });
-    setEntries((current) => current.filter((e) => e.symbol !== symbol));
-    setBusy(null);
   }
-
   async function askAi(entry: WatchlistEntry) {
-    setBusy(`ai-${entry.symbol}`);
-    setError(null);
-
-    const response = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: "view",
-        symbol: entry.symbol,
-        name: entry.name ?? undefined,
-        reason: entry.reason,
-      }),
+    await run(`ai-${entry.symbol}`, async () => {
+      const data = await request<{text:string}>("/api/ai", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"view",symbol:entry.symbol,name:entry.name??undefined,reason:entry.reason})});
+      setEntries(current=>current.map(e=>e.symbol===entry.symbol?{...e,aiNote:data.text}:e));
     });
-
-    const data = await response.json().catch(() => ({}));
-    setBusy(null);
-
-    if (!response.ok) {
-      setError(data.error ?? t.common.error);
-      return;
-    }
-
-    setEntries((current) =>
-      current.map((e) =>
-        e.symbol === entry.symbol ? { ...e, aiNote: data.text } : e,
-      ),
-    );
   }
-
   async function helpWrite() {
     if (reason.trim().length < 3) return;
-    setBusy("rewrite");
-
-    const response = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "rewrite", draft: reason.trim() }),
+    await run("rewrite", async () => {
+      const data=await request<{text:string}>("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"rewrite",draft:reason.trim()})});
+      setReason(data.text);
     });
-
-    const data = await response.json().catch(() => ({}));
-    setBusy(null);
-    if (response.ok && data.text) setReason(data.text);
   }
 
   return (
@@ -167,7 +119,7 @@ export function WatchlistView({
               autoCorrect="off"
             />
           </div>
-          <Button type="submit" disabled={busy === "search"}>
+          <Button type="submit" disabled={busy !== null}>
             <Search className="size-4" aria-hidden="true" />
             {busy === "search" ? t.watchlist.searching : t.watchlist.search}
           </Button>
@@ -183,6 +135,7 @@ export function WatchlistView({
               <li key={result.symbol}>
                 <button
                   type="button"
+                  disabled={busy !== null}
                   onClick={() => setSelected(result)}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
@@ -229,14 +182,14 @@ export function WatchlistView({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={add} disabled={busy === "add"}>
+              <Button onClick={add} disabled={busy !== null}>
                 {t.watchlist.add} — {selected.symbol}
               </Button>
               {aiEnabled && (
                 <Button
                   variant="outline"
                   onClick={helpWrite}
-                  disabled={busy === "rewrite"}
+                  disabled={busy !== null}
                 >
                   <Sparkles className="size-4" aria-hidden="true" />
                   {busy === "rewrite" ? t.watchlist.aiThinking : t.watchlist.helpWrite}
@@ -296,6 +249,8 @@ export function WatchlistView({
               </div>
 
               <p className="mt-3 text-sm">{entry.reason}</p>
+              {entry.notes?.length > 0 && <ul className="mt-3 space-y-2 border-l-2 border-border pl-4">{entry.notes.map(note => <li key={note.id} className="text-sm"><p className="text-xs text-muted-foreground">{note.author} · {note.createdAt.slice(0,10)}</p><p>{note.body}</p></li>)}</ul>}
+              <Link className="mt-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4" href={`/family?symbol=${encodeURIComponent(entry.symbol)}`}>{zh ? "在家庭空间讨论" : "Discuss in Family Room"}</Link>
 
               {entry.aiNote && (
                 <div className="mt-4 rounded-lg border border-border bg-muted/40 p-4">
@@ -315,7 +270,7 @@ export function WatchlistView({
                     variant="outline"
                     size="sm"
                     onClick={() => askAi(entry)}
-                    disabled={busy === `ai-${entry.symbol}`}
+                    disabled={busy !== null}
                   >
                     <Sparkles className="size-4" aria-hidden="true" />
                     {busy === `ai-${entry.symbol}`
@@ -323,15 +278,15 @@ export function WatchlistView({
                       : t.watchlist.askAi}
                   </Button>
                 )}
-                <Button
+                {canRemove && <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => remove(entry.symbol)}
-                  disabled={busy === entry.symbol}
+                  disabled={busy !== null}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                   {t.watchlist.remove}
-                </Button>
+                </Button>}
               </div>
             </li>
           ))}

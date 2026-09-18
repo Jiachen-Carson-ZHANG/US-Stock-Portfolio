@@ -50,7 +50,7 @@ export function LiveDashboard({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <UnrealizedPnLBars positions={data.positions} />
-        <ConcentrationTiles data={concentration} />
+        <ConcentrationTiles data={data.concentration ?? concentration} />
       </div>
 
       <section className="space-y-3">

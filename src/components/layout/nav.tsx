@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutGrid,
+  MessagesSquare,
   LineChart,
   Languages,
   Receipt,
@@ -23,6 +24,7 @@ const ITEMS = [
   { href: "/performance", key: "performance", icon: LineChart, ownerOnly: false },
   { href: "/transactions", key: "transactions", icon: Receipt, ownerOnly: false },
   { href: "/watchlist", key: "watchlist", icon: Star, ownerOnly: false },
+  { href: "/family", key: "family", icon: MessagesSquare, ownerOnly: false },
   { href: "/settings", key: "settings", icon: Settings, ownerOnly: true },
 ] as const;
 
@@ -118,9 +120,9 @@ export function BottomNav({ role }: { role: UserRole }) {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-      <ul className="flex">
+      <ul className="flex overflow-x-auto">
         {items.map((item) => (
-          <li key={item.href} className="min-w-0 flex-1">
+          <li key={item.href} className="min-w-16 flex-1">
             <Link
               href={item.href}
               aria-current={isActive(pathname, item.href) ? "page" : undefined}

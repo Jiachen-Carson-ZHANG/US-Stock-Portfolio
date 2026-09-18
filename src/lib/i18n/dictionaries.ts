@@ -8,6 +8,7 @@ const en = {
 
   nav: {
     overview: "Overview",
+    family: "Family Room",
     holdings: "Holdings",
     performance: "Performance",
     transactions: "Transactions",
@@ -241,6 +242,7 @@ const zh: Dictionary = {
 
   nav: {
     overview: "总览",
+    family: "家庭空间",
     holdings: "持仓",
     performance: "业绩表现",
     transactions: "交易记录",

@@ -17,12 +17,12 @@ export function readSnapshots(db: DB, limit = 400): PortfolioSnapshot[] {
       `SELECT snapshot_date, total_market_value, total_cost,
               total_unrealized_pnl, cash_value
        FROM portfolio_snapshots
-       ORDER BY snapshot_date ASC
+       ORDER BY snapshot_date DESC
        LIMIT ?`,
     )
     .all(limit) as SnapshotRow[];
 
-  return rows.map((row) => ({
+  return rows.reverse().map((row) => ({
     snapshotDate: row.snapshot_date,
     totalMarketValue: row.total_market_value,
     totalCost: row.total_cost,
@@ -85,7 +85,16 @@ export function maybeCreateSnapshot(
   positionsJson: string,
   now: Date = new Date(),
 ): boolean {
-  if (!isAfterMarketClose(now)) return false;
+  if (!isAfterMarketClose(now) || summary.isStale || !summary.dataTimestamp)
+    return false;
+  const timestamp = new Date(summary.dataTimestamp);
+  if (
+    !Number.isFinite(timestamp.getTime()) ||
+    timestamp > now ||
+    !isAfterMarketClose(timestamp) ||
+    marketDateString(timestamp) !== marketDateString(now)
+  )
+    return false;
   const date = marketDateString(now);
   if (hasSnapshot(db, date)) return false;
   writeSnapshot(db, date, summary, positionsJson, now);

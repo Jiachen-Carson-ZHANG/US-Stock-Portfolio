@@ -24,6 +24,7 @@ export default defineConfig({
       // The suite covers sign-in and role enforcement, so it runs the guarded
       // path even though local development defaults to open access.
       AUTH_MODE: "password",
+      SNAPSHOT_CRON_SECRET: "e2e-snapshot-secret",
       SEED_OWNER_PASSWORD: "e2e-owner-pass",
       SEED_FATHER_PASSWORD: "e2e-father-pass",
       SEED_MOTHER_PASSWORD: "e2e-mother-pass",

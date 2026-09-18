@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { quotePollIntervalMs } from "@/lib/market-hours";
 import type {
   AllocationSlice,
+  Concentration,
   MoneyDTO,
   PortfolioSummary,
   PositionView,
@@ -11,6 +12,7 @@ import type {
 import type { OptionGroupDTO } from "@/lib/portfolio/options";
 
 export type LivePortfolio = {
+  concentration?: Concentration;
   summary: PortfolioSummary;
   positions: PositionView[];
   allocations: {

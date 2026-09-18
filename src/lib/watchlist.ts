@@ -9,6 +9,7 @@ export type WatchlistEntry = {
   addedBy: string;
   aiNote: string | null;
   createdAt: string;
+  notes: { id: string; author: string; body: string; createdAt: string }[];
   price?: number;
   changePercent?: number;
 };
@@ -32,14 +33,25 @@ function toEntry(row: Row): WatchlistEntry {
     addedBy: row.added_by,
     aiNote: row.ai_note,
     createdAt: row.created_at,
+    notes: [],
   };
 }
 
+function ensureNotes(db: DB) {
+  db.exec(`CREATE TABLE IF NOT EXISTS watchlist_notes (
+    id TEXT PRIMARY KEY, symbol TEXT NOT NULL REFERENCES watchlist(symbol) ON DELETE CASCADE,
+    author TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL
+  )`);
+}
+function withNotes(db: DB, row: Row): WatchlistEntry {
+  return {...toEntry(row), notes: db.prepare('SELECT id,author,body,created_at AS createdAt FROM watchlist_notes WHERE symbol=? ORDER BY created_at,id').all(row.symbol) as WatchlistEntry['notes']};
+}
 export function readWatchlist(db: DB): WatchlistEntry[] {
+  ensureNotes(db);
   const rows = db
     .prepare(`SELECT * FROM watchlist ORDER BY created_at DESC`)
     .all() as Row[];
-  return rows.map(toEntry);
+  return rows.map(row => withNotes(db, row));
 }
 
 export function addToWatchlist(
@@ -47,28 +59,17 @@ export function addToWatchlist(
   entry: { symbol: string; name?: string; reason: string; addedBy: string },
   now: Date = new Date(),
 ): WatchlistEntry {
-  const id = randomUUID();
-
-  db.prepare(
-    `INSERT INTO watchlist (id, symbol, name, reason, added_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(symbol) DO UPDATE SET
-       reason = excluded.reason,
-       added_by = excluded.added_by,
-       name = excluded.name`,
-  ).run(
-    id,
-    entry.symbol.toUpperCase(),
-    entry.name ?? null,
-    entry.reason,
-    entry.addedBy,
-    now.toISOString(),
-  );
-
-  const row = db
-    .prepare(`SELECT * FROM watchlist WHERE symbol = ?`)
-    .get(entry.symbol.toUpperCase()) as Row;
-  return toEntry(row);
+  ensureNotes(db);
+  const symbol = entry.symbol.toUpperCase();
+  return db.transaction(() => {
+    const original = db.prepare('SELECT * FROM watchlist WHERE symbol=?').get(symbol) as Row | undefined;
+    if (original) {
+      db.prepare('INSERT INTO watchlist_notes VALUES(?,?,?,?,?)').run(randomUUID(),symbol,entry.addedBy,entry.reason,now.toISOString());
+    } else {
+      db.prepare('INSERT INTO watchlist (id,symbol,name,reason,added_by,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(),symbol,entry.name??null,entry.reason,entry.addedBy,now.toISOString());
+    }
+    return withNotes(db, db.prepare('SELECT * FROM watchlist WHERE symbol=?').get(symbol) as Row);
+  })();
 }
 
 export function removeFromWatchlist(db: DB, symbol: string): boolean {

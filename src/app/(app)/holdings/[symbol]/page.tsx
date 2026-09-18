@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { currentLocale } from "@/lib/i18n/server";
+import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
@@ -66,6 +68,7 @@ export default async function PositionDetailPage({
   params: Promise<{ symbol: string }>;
 }) {
   await requireUser();
+  const zh = (await currentLocale()) === "zh";
 
   const raw = decodeURIComponent((await params).symbol);
   const parsed = symbolSchema.safeParse(raw);
@@ -153,6 +156,8 @@ export default async function PositionDetailPage({
         <Facts position={position} />
       </section>
 
+      <Link className="inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted" href={`/family?symbol=${encodeURIComponent(position.symbol)}`}>{zh ? "在家庭空间讨论这项持仓" : "Discuss this holding in the Family Room"}</Link>
+      <PayoffExplorer positions={[position]} />
       <ValueLine
         title="Price history"
         note={`Last ${HISTORY_DAYS} days.`}

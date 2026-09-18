@@ -7,8 +7,8 @@ import { WatchlistView } from "@/components/watchlist/watchlist-view";
 export const dynamic = "force-dynamic";
 
 export default async function WatchlistPage() {
-  await requireUser();
+  const user = await requireUser();
   const entries = readWatchlist(getDb());
 
-  return <WatchlistView initial={entries} aiEnabled={isDeepSeekConfigured()} />;
+  return <WatchlistView initial={entries} aiEnabled={isDeepSeekConfigured()} canRemove={user.role === "owner"} />;
 }

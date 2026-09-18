@@ -43,10 +43,10 @@ describe("volatility", () => {
 describe("series stats", () => {
   it("summarises a snapshot series", () => {
     const stats = statsFor([
-      snapshot("2026-01-01", 100),
-      snapshot("2026-01-02", 110),
-      snapshot("2026-01-03", 99),
-    ]);
+      snapshot("2026-01-05", 100),
+      snapshot("2026-01-06", 110),
+      snapshot("2026-01-07", 99),
+    ], [], { from: "2026-01-05", to: "2026-01-07" });
 
     expect(stats.periodReturnPercent).toBeCloseTo(-1, 6);
     expect(stats.maxDrawdownPercent).toBeCloseTo(10, 6);

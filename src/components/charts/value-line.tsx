@@ -34,12 +34,14 @@ export function ValueLine({
   data,
   height = 280,
   valueLabel = "Value",
+  currency = "USD",
 }: {
   title: string;
   note?: string;
   data: LinePoint[];
   height?: number;
   valueLabel?: string;
+  currency?: string;
 }) {
   if (data.length === 0) {
     return (
@@ -49,6 +51,7 @@ export function ValueLine({
     );
   }
 
+  const formatValue = (value: number) => currency === "USD" ? exactUsd(value) : new Intl.NumberFormat("en-US", {style:"currency",currency}).format(value);
   const values = data.map((d) => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -69,7 +72,7 @@ export function ValueLine({
           />
           <YAxis
             domain={[min - pad, max + pad]}
-            tickFormatter={makeCurrencyTick(min, max)}
+            tickFormatter={currency === "USD" ? makeCurrencyTick(min, max) : value => new Intl.NumberFormat("en-US", {style:"currency",currency,notation:"compact"}).format(value)}
             tick={AXIS_TICK}
             axisLine={false}
             tickLine={false}
@@ -86,7 +89,7 @@ export function ValueLine({
                   rows={[
                     {
                       name: valueLabel,
-                      value: exactUsd(point.value),
+                      value: formatValue(point.value),
                       color: seriesColor(0),
                     },
                   ]}

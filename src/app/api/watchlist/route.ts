@@ -1,4 +1,5 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
+import { rejectCrossOrigin } from '@/lib/http/origin';
+import { authenticateRequest, requireApiOwner, unauthorized } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { recordActivity } from "@/lib/activity";
@@ -39,6 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const originError=rejectCrossOrigin(request); if(originError) return originError;
   const user = await authenticateRequest();
   if (!user) return unauthorized();
 
@@ -77,8 +79,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  const originError=rejectCrossOrigin(request); if(originError) return originError;
+  const auth = await requireApiOwner();
+  if ("response" in auth) return auth.response;
+  const user = auth.user;
 
   const parsed = watchlistRemoveSchema.safeParse({
     symbol: new URL(request.url).searchParams.get("symbol") ?? "",
