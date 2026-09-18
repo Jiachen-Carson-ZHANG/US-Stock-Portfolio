@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --font-sans: var(--font-stack);
+  --font-mono: var(--font-mono-stack);
+}
+
+:root {
+  /* No remote font is loaded — these resolve against locally installed faces
+     so the app renders identically behind the mainland-China firewall (§26). */
+  --font-stack: Inter, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB",
+    system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono-stack: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  --background: #fafaf9;
+  --surface: #ffffff;
+  --foreground: #1c1917;
+  --muted: #f5f5f4;
+  --muted-foreground: #78716c;
+  --border: #e7e5e4;
+  --accent: #1c1917;
+  --positive: #047857;
+  --negative: #b91c1c;
+
+  /* Categorical slots in validated adjacent order. Paired with a labelled
+     legend and the holdings table, which is the relief for the sub-3:1 slots. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+
+  --chart-grid: #e7e5e4;
+  --chart-axis: #a8a29e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0c0a09;
+    --surface: #171514;
+    --foreground: #fafaf9;
+    --muted: #1c1917;
+    --muted-foreground: #a8a29e;
+    --border: #292524;
+    --accent: #fafaf9;
+    --positive: #34d399;
+    --negative: #f87171;
+
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
+    --chart-5: #d55181;
+    --chart-6: #008300;
+
+    --chart-grid: #292524;
+    --chart-axis: #78716c;
+  }
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-stack);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Only where digits must align vertically — table columns and axis ticks.
+   Large standalone figures keep proportional digits so they don't read loose. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
