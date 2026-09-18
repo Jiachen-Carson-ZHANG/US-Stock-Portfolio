@@ -1,0 +1,30 @@
+# Coze deployment manifest. Coze reads this at the repo root to learn which
+# runtime to provision and which commands build and start the app.
+# sub_id is issued by Coze when the project is created there — paste it below.
+[project]
+sub_id = ""
+name = "us-portfolio-dashboard"
+requires = ["nodejs-24"]
+project_type = "web"
+entrypoint = "server.js"
+
+[preview]
+preview_enable = "enabled"
+
+[dev]
+build = ["bash", "scripts/coze-preview-build.sh"]
+run = ["bash", "scripts/coze-preview-run.sh"]
+
+[deploy]
+build = ["bash", ".cozeproj/scripts/deploy_build.sh"]
+run = ["bash", ".cozeproj/scripts/deploy_run.sh"]
+
+[deploy.profile]
+kind = "service"
+flavor = "web"
+
+[deploy.backend]
+enabled = true
+
+[subprojects]
+path = ["."]

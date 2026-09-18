@@ -23,6 +23,20 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "@node-rs/argon2"],
   poweredByHeader: false,
+  experimental: {
+    // Coze terminates TLS on its own domain and proxies to us, so a Server
+    // Action arrives with an Origin that does not match Host. Next rejects
+    // that as a forgery unless the host is named here — without it, signing in
+    // fails on Coze while working perfectly in local dev.
+    serverActions: {
+      allowedOrigins: [
+        "*.coze.site",
+        "*.dev.coze.site",
+        "*.sandbox-dev.coze-coding.bytedance.net",
+        ...(process.env.PUBLIC_ORIGIN ? [process.env.PUBLIC_ORIGIN] : []),
+      ],
+    },
+  },
   async headers() {
     return [
       {
