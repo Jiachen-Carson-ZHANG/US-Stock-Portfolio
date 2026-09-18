@@ -139,6 +139,14 @@ export function summarize(
   positions: Position[],
   currency: string,
   market: { status: MarketSession; dataTimestamp: string | null; isStale: boolean },
+  /**
+   * Cash actually paid into the account, when it is known. Worth stating
+   * explicitly because the alternative — inferring it from the broker's
+   * realized P&L — is only right if that figure covers every position ever
+   * held, and moomoo's does not: it omits names closed outright, and the fills
+   * that would reveal them age out of the API after about 90 days.
+   */
+  netDeposits?: Money | null,
 ): PortfolioSummary {
   const total = totalMarketValue(positions, currency);
   const cost = sum(positions.map(costBasis), currency);
@@ -154,12 +162,19 @@ export function summarize(
     positions.map((p) => money(p.reportedRealizedPnL ?? 0, currency)),
     currency,
   );
-  const totalReturn = add(pnl, realized);
-  // Capital in = what the portfolio is worth less everything it has made. It is
-  // the base that makes value / capital - 1 equal the return, exactly.
-  const capitalIn = subtract(total, totalReturn);
+  // With deposits known, the whole-journey result is simply what the account is
+  // worth less what was put into it — no reliance on the broker's realized
+  // figure at all. Otherwise fall back to inferring the capital base, which
+  // makes value / capital - 1 equal the return exactly but inherits whatever
+  // the broker's realized P&L leaves out.
+  const hasDeposits = netDeposits != null && netDeposits.amount.greaterThan(0);
+  const totalReturn = hasDeposits
+    ? subtract(total, netDeposits)
+    : add(pnl, realized);
+  const capitalIn = hasDeposits ? netDeposits : subtract(total, add(pnl, realized));
 
   return {
+    netDeposits: hasDeposits ? toDTO(netDeposits) : null,
     totalMarketValue: toDTO(total),
     totalCostBasis: toDTO(cost),
     totalUnrealizedPnL: toDTO(pnl),

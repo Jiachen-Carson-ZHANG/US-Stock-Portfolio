@@ -75,8 +75,13 @@ export function SummaryCards({
         sub={formatPercent(summary.totalReturnPercent, { signed: true })}
         tone={signClass(totalReturn)}
       >
+        {/* Naming the base makes the headline checkable: value less deposits
+            is the return. Without a configured figure the base is inferred
+            from the broker's realized P&L, so that is what gets shown. */}
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {t.summary.realized} {formatMoney(summary.realizedPnL, { signed: true })}
+          {summary.netDeposits
+            ? `${t.summary.netDeposits} ${formatMoney(summary.netDeposits)}`
+            : `${t.summary.realized} ${formatMoney(summary.realizedPnL, { signed: true })}`}
         </p>
       </Stat>
 

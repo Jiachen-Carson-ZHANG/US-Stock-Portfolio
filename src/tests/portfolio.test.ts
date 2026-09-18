@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Position } from "@/types/portfolio";
+import { money } from "@/lib/money";
 import {
   allocationByAssetType,
   allocationByPosition,
@@ -319,6 +320,31 @@ describe("total return", () => {
       Number(summary.totalMarketValue.amount) - Number(summary.totalReturn.amount);
     const grown = capitalIn * (1 + (summary.totalReturnPercent ?? 0) / 100);
     expect(grown).toBeCloseTo(Number(summary.totalMarketValue.amount), 2);
+  });
+
+  it("measures against stated deposits when they are known", () => {
+    // The whole point: no reliance on the broker's realized figure, which
+    // omits positions closed outright.
+    const withDeposits = summarize([held], "USD", MARKET, money(22100, "USD"));
+    expect(Number(withDeposits.totalReturn.amount)).toBeCloseTo(
+      20187.61 - 22100,
+      2,
+    );
+    expect(withDeposits.totalReturnPercent).toBeCloseTo(
+      (20187.61 / 22100 - 1) * 100,
+      6,
+    );
+    expect(withDeposits.netDeposits?.amount).toBe("22100");
+  });
+
+  it("ignores a zero or negative deposit figure and infers instead", () => {
+    const zero = summarize([held], "USD", MARKET, money(0, "USD"));
+    expect(zero.netDeposits).toBeNull();
+    expect(Number(zero.totalReturn.amount)).toBeCloseTo(-868.8, 2);
+  });
+
+  it("reports no deposits when none are configured", () => {
+    expect(summary.netDeposits).toBeNull();
   });
 
   it("equals unrealized P&L when nothing has been realized", () => {

@@ -82,9 +82,14 @@ export type PortfolioSummary = {
   shortExposure: MoneyDTO;
   /** Gains already banked, as reported by the broker. */
   realizedPnL: MoneyDTO;
-  /** Realized plus unrealized: the whole-journey result. */
+  /**
+   * Cash paid into the account, when configured. Null means it is unknown and
+   * totalReturn is inferred from the broker's realized figure instead.
+   */
+  netDeposits: MoneyDTO | null;
+  /** The whole-journey result: value less deposits, or realized plus unrealized. */
   totalReturn: MoneyDTO;
-  /** totalReturn against the capital that produced it (value less the return). */
+  /** totalReturn against the capital that produced it. */
   totalReturnPercent: number | null;
   positionCount: number;
   marketStatus: MarketSession;

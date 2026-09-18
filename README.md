@@ -41,6 +41,12 @@ cp .env.example .env.local
 | `DATABASE_URL` | `file:./data/portfolio.db` |
 | `AUTH_MODE` | `password` to require sign-in. See [Access mode](#5-access-mode) |
 
+### Recommended
+
+| Variable | What it does |
+|---|---|
+| `TOTAL_DEPOSITS` | Cash paid into the broker account, less withdrawals, e.g. `22100`. Without it the whole-journey return is inferred from the broker's realized P&L — which excludes positions closed outright, and so overstates losses. moomoo's fills API only serves ~90 days, so the missing trades cannot be recovered; stating the figure is the only exact fix |
+
 If `TOKEN_ENCRYPTION_KEY` changes, the stored broker token can no longer be
 decrypted and the account must be reconnected. Back it up.
 
@@ -296,3 +302,70 @@ each call, without ever printing a token:
 ```bash
 npx tsx scripts/moomoo-doctor.ts
 ```
+
+## Family Room and analysis
+
+Open **Family Room** to post questions (optionally about a ticker), reply, react,
+vote for a company to explore, take the learning quiz, save date-locked prediction
+capsules, and record shared savings goals. Holdings and watchlist entries link to
+related discussions. Each member's contributions are preserved. Only the owner
+can remove a shared watchlist entry. Password mode is needed for separate member
+identities; open access uses one shared Family identity. For a reverse-proxy
+deployment, set `APP_URL` to the public site URL (or `PUBLIC_ORIGIN` to its exact
+origin) so browser mutations can validate the public origin.
+
+The virtual portfolio challenge uses imaginary money only. It never calls a
+broker order endpoint. It has a fixed end date, equal starting balances and
+server-validated prices; its displayed valuation dates and sampled drawdown are
+part of the result. Demo and live prices are kept separate. Savings contributions
+are also an independent ledger, not money moved into or out of the brokerage.
+
+**Performance** now includes a period selector, cash-flow-adjusted growth index,
+value-change waterfall, observed monthly returns, imported benchmark comparison,
+USD/CNY account-value decomposition and an options expiration payoff explorer.
+
+Before publishing returns, an owner opens **Manage analysis data**, records all
+external deposits/withdrawals (positive/negative, in the portfolio currency), then
+confirms the reviewed date range. Security transfers should be recorded at fair
+value. Purchases/sales inside the account are not external flows. Editing the
+ledger clears its review. The calculation assumes flows occur at end of day;
+this is an approximation when large flows occur intraday. A flow on a missing
+valuation date prevents return calculation. Missing weekdays suppress daily
+best/worst and volatility statistics, including market holidays conservatively.
+Drawdown and monthly figures describe observed periods only, not unobserved days.
+
+For benchmark comparison, paste `date,value` CSV (at least two rows) with a named
+source for a **USD total-return index including dividends**. The existing quote
+provider is not assumed to supply total-return history. The two curves normalize
+to 100 on their first common date. For RMB decomposition import historical
+USD/CNY rates (RMB per dollar) in the same CSV format. Both selected endpoints
+must match; no rate is invented or carried forward. Each import replaces that
+series atomically. RMB decomposition describes account-value changes including
+cash flows, not investment returns.
+
+Options scenarios combine only matching underlying/expiration/currency legs.
+Verify premiums: a broker's adjusted cost may differ from the original premium.
+Enter total scenario fees. This shows expiration payoff, not current option
+valuation, and excludes early assignment and taxes.
+
+### Independent daily snapshots
+
+History reads the latest 400 observations in chronological order. Snapshots can
+still be captured by a page request, but unattended capture is available through
+`POST /api/cron/snapshot`. Configure a separate `SNAPSHOT_CRON_SECRET` and a host
+scheduler to send `Authorization: Bearer <secret>` every 15 minutes. Keep the
+secret in the scheduler's secret storage. The endpoint does not need a login
+cookie; it always verifies its bearer secret, even in open-access mode.
+
+The handler is a no-op before 16:00 US Eastern and on weekends, and skips a day
+already recorded. It refuses stale, pre-close or previous-day data and returns 503 so the
+scheduler can retry. This records the first fresh observed valuation after
+regular-session close, not a reconstructed official closing valuation. It cannot
+recover missed historical valuations. Market holidays/early closes are not fully
+modelled. No scheduler is installed automatically by this repository; enable it
+on the host running the app, with persistent SQLite storage.
+
+All new tables are created additively on first use. Existing holdings, history,
+accounts and original watchlist notes are preserved. Back up the SQLite database
+before deployment. Optional AI watchlist opinions are generated model output,
+not verified portfolio facts; the factual analytics do not depend on AI.

@@ -1,10 +1,15 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { getMarketDataProvider } from "@/providers";
-import { marketSession } from "@/lib/market-hours";
+import {
+  marketSession,
+  isAfterMarketClose,
+  marketDateString,
+} from "@/lib/market-hours";
 import type {
   AllocationSlice,
   Concentration,
+  Money,
   MoneyDTO,
   PortfolioSnapshot,
   PortfolioSummary,
@@ -29,7 +34,7 @@ import {
   totalInvested,
   type OptionGroupDTO,
 } from "./options";
-import { toDTO } from "@/lib/money";
+import { money, toDTO } from "@/lib/money";
 import { getQuotes } from "./quotes";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
@@ -60,6 +65,23 @@ export type PortfolioData = {
 
 export function baseCurrency(): string {
   return process.env.PORTFOLIO_BASE_CURRENCY ?? "USD";
+}
+
+/**
+ * Total cash paid into the broker account, less anything withdrawn. Set it and
+ * the whole-journey return is measured against what was actually contributed
+ * rather than inferred from the broker's realized P&L, which omits positions
+ * closed outright. Unset, the app falls back to that inference.
+ */
+export function netDeposits(currency: string): Money | null {
+  const raw = process.env.TOTAL_DEPOSITS;
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    logger.warn("config.total_deposits.invalid", { value: raw });
+    return null;
+  }
+  return money(parsed, currency);
 }
 
 function positionTtlSeconds(): number {
@@ -121,18 +143,26 @@ async function pricedPositions(now: Date): Promise<{
     };
   });
 
-  return { positions, dataTimestamp, isStale };
+  const synced = lastSyncedAt(db);
+  const brokerStale =
+    activeProvider() === "moomoo" &&
+    (!synced ||
+      now.getTime() - new Date(synced).getTime() > positionTtlSeconds() * 1000);
+  return { positions, dataTimestamp, isStale: isStale || brokerStale };
 }
 
-export async function loadPortfolio(now: Date = new Date()): Promise<PortfolioData> {
+export async function loadPortfolio(
+  now: Date = new Date(),
+): Promise<PortfolioData> {
   const currency = baseCurrency();
   const { positions, dataTimestamp, isStale } = await pricedPositions(now);
 
-  const summary = summarize(positions, currency, {
-    status: marketSession(now),
-    dataTimestamp,
-    isStale,
-  });
+  const summary = summarize(
+    positions,
+    currency,
+    { status: marketSession(now), dataTimestamp, isStale },
+    netDeposits(currency),
+  );
 
   const invested = totalInvested(positions, currency);
   const views = buildPositionViews(positions, currency).map((view) => ({
@@ -145,7 +175,18 @@ export async function loadPortfolio(now: Date = new Date()): Promise<PortfolioDa
           .toNumber(),
   }));
 
-  if (positions.length > 0) {
+  const brokerMarksAfterClose =
+    activeProvider() !== "moomoo" ||
+    positions.every((position) => {
+      const updated = new Date(position.lastUpdatedAt);
+      return (
+        Number.isFinite(updated.getTime()) &&
+        updated <= now &&
+        isAfterMarketClose(updated) &&
+        marketDateString(updated) === marketDateString(now)
+      );
+    });
+  if (positions.length > 0 && brokerMarksAfterClose) {
     maybeCreateSnapshot(getDb(), summary, JSON.stringify(views), now);
   }
 
@@ -191,7 +232,8 @@ export async function loadTransactions(now: Date = new Date()): Promise<{
   if (activeProvider() === "moomoo") {
     const synced = lastTransactionSync(db);
     const stale =
-      !synced || now.getTime() - new Date(synced).getTime() > TRANSACTION_TTL_MS;
+      !synced ||
+      now.getTime() - new Date(synced).getTime() > TRANSACTION_TTL_MS;
 
     if (stale) {
       try {
