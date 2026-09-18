@@ -10,28 +10,21 @@ import {
   viewPrompt,
 } from "@/lib/deepseek";
 import { saveAiNote } from "@/lib/watchlist";
-import { loadPortfolio } from "@/lib/portfolio/service";
-import { formatMoney } from "@/lib/money";
+import { buildAiContext, GROUNDING_RULES } from "@/lib/ai/context";
 
-/** A short factual summary so the model reasons about the real portfolio. */
-async function portfolioContext(): Promise<string> {
+/**
+ * The whole portfolio, or nothing. A partial context is worse than none: the
+ * model fills the gaps with invented figures that read exactly like the real
+ * ones. If the snapshot cannot be built the note is refused instead.
+ */
+async function portfolioContext(): Promise<string | null> {
   try {
-    const { summary, positions } = await loadPortfolio();
-    const top = positions
-      .filter((p) => p.instrumentType !== "cash")
-      .slice(0, 6)
-      .map((p) => p.symbol)
-      .join(", ");
-
-    return [
-      `Portfolio value ${formatMoney(summary.totalMarketValue)}`,
-      `cash ${formatMoney(summary.cashValue)}`,
-      top ? `largest holdings: ${top}` : "",
-    ]
-      .filter(Boolean)
-      .join("; ");
-  } catch {
-    return "";
+    return await buildAiContext();
+  } catch (error) {
+    logger.error("ai.context.failure", {
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return null;
   }
 }
 
@@ -76,18 +69,32 @@ export async function POST(request: Request) {
       return Response.json({ error: "Symbol required" }, { status: 400 });
     }
 
+    const context = await portfolioContext();
+    if (context === null) {
+      return Response.json(
+        { error: "Portfolio data is unavailable, so no grounded view can be given." },
+        { status: 503 },
+      );
+    }
+
     const text = await deepSeekChat(
       viewPrompt({
         symbol: parsed.data.symbol,
         name: parsed.data.name,
         reason: parsed.data.reason ?? "",
-        context: await portfolioContext(),
+        context,
+        rules: GROUNDING_RULES,
         locale,
       }),
+      { maxTokens: 6000 },
     );
 
     saveAiNote(getDb(), parsed.data.symbol, text);
-    logger.info("ai.view", { symbol: parsed.data.symbol, by: user.username });
+    logger.info("ai.view", {
+      symbol: parsed.data.symbol,
+      by: user.username,
+      contextChars: context.length,
+    });
 
     return Response.json({ text });
   } catch (error) {

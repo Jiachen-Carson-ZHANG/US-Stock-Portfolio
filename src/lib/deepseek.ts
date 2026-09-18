@@ -102,6 +102,8 @@ export function viewPrompt(params: {
   name?: string | null;
   reason: string;
   context: string;
+  /** Grounding rules, supplied by the caller that built the context. */
+  rules?: string;
   locale: "en" | "zh";
 }): ChatMessage[] {
   return [
@@ -111,7 +113,9 @@ export function viewPrompt(params: {
         "You are helping a family think about their own investment watchlist.",
         "Give a direct, concrete opinion — including whether the idea looks attractive or not, and why.",
         "Be specific about what would have to be true for it to work, and what would break it.",
-        "Never invent prices, figures or dates. If you do not know something, say so.",
+        "Relate it to what they already hold: overlap, concentration, and how it would sit beside the existing positions.",
+        params.rules ??
+          "Never invent prices, figures or dates. If you do not know something, say so.",
         "Keep it under 200 words. No disclaimers; the interface adds its own.",
         LANGUAGE[params.locale],
       ].join(" "),
@@ -119,12 +123,15 @@ export function viewPrompt(params: {
     {
       role: "user",
       content: [
+        // The portfolio comes first and the question last: the bulk of the
+        // prompt is then a stable prefix that the provider can cache.
+        params.context,
+        "",
         `Ticker: ${params.symbol}${params.name ? ` (${params.name})` : ""}`,
         `Why a family member is watching it: ${params.reason}`,
-        params.context ? `Portfolio context: ${params.context}` : "",
         "Give your view.",
       ]
-        .filter(Boolean)
+        .filter((part) => part !== undefined && part !== null)
         .join("\n"),
     },
   ];
