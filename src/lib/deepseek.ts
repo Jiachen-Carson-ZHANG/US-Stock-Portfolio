@@ -1,5 +1,7 @@
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
-const DEFAULT_MODEL = "deepseek-chat";
+// Current id for DeepSeek-V4.1-Flash. The older deepseek-chat / deepseek-reasoner
+// names are legacy and scheduled for discontinuation.
+const DEFAULT_MODEL = "deepseek-flash";
 
 /**
  * Any OpenAI-compatible endpoint works, so the provider and model are

@@ -72,6 +72,8 @@ Leaving one blank makes the seed generate a random password and print it once.
 | Variable | Default | What it does |
 |---|---|---|
 | `DEEPSEEK_API_KEY` | — | Enables the AI view and writing help on the watchlist. Without it those buttons are hidden |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | Any OpenAI-compatible API host |
+| `DEEPSEEK_MODEL` | `deepseek-flash` | DeepSeek-V4.1-Flash. `deepseek-chat` is legacy and being retired |
 | `PORTFOLIO_BASE_CURRENCY` | `USD` | Display currency |
 | `QUOTE_CACHE_SECONDS` | `15` | Server-side quote cache; one upstream call serves every viewer |
 | `POSITION_CACHE_SECONDS` | `60` | How often holdings re-sync from the broker |
@@ -278,6 +280,15 @@ check the logs for `broker.sync.failure`.
 **Nothing on the page is clickable** — the client bundle did not load. In
 development this is usually a blocked HMR WebSocket; build and run production
 (`npm run build && npm start`) to confirm.
+
+**AI buttons missing or failing** — check the provider, model and key:
+
+```bash
+npm run ai:test
+```
+
+It prints the endpoint and model, sends one prompt, and shows the provider's
+own error. The key is never printed.
 
 **Diagnosing the broker connection** — prints exactly what moomoo returns for
 each call, without ever printing a token:
