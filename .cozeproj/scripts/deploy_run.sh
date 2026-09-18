@@ -8,9 +8,11 @@ cd "$PROJECT_DIR"
 export PORT="${DEPLOY_RUN_PORT:-5000}"
 export HOSTNAME="0.0.0.0"
 
-# Next's standalone server chdirs into its own directory, so a relative SQLite
-# path would resolve inside .next/standalone and the app would silently come up
-# against an empty database — every sign-in rejected, no error anywhere.
+# State lives in Postgres, so DATABASE_URL is normally a postgres:// URL and
+# this does nothing. It stays for the SQLite fallback: Next's standalone server
+# chdirs into its own directory, so a relative file: path would resolve inside
+# .next/standalone and the app would come up against an empty database — every
+# sign-in rejected, nothing in the logs.
 case "${DATABASE_URL:-}" in
   file:/*) ;;
   file:*) export DATABASE_URL="file:${PROJECT_DIR}/${DATABASE_URL#file:./}" ;;

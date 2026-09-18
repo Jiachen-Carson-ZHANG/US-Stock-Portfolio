@@ -85,8 +85,8 @@ export class MoomooBrokerProvider implements BrokerProvider {
 
   /** Resolves the account once and remembers it, so sync is a single call path. */
   private async accountId(): Promise<string> {
-    const db = getDb();
-    const stored = readConnection(db)?.accountId;
+    const db = await getDb();
+    const stored = (await readConnection(db))?.accountId;
     if (stored) return stored;
 
     const accounts = await this.getAccounts();

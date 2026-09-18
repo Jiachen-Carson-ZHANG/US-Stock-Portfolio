@@ -16,7 +16,7 @@ export async function POST(
     return Response.json({ error: "Invalid user id" }, { status: 400 });
   }
 
-  const revoked = revokeAllSessionsForUser(getDb(), parsed.data);
+  const revoked = await revokeAllSessionsForUser(await getDb(), parsed.data);
   logger.info("admin.sessions_revoked", {
     targetUserId: parsed.data,
     revoked,

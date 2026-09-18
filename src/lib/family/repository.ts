@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DB } from "@/lib/db";
 import { symbolSchema } from "@/lib/schemas";
-import { ensureFamilySchema } from "./schema";
 export type FamilyUser = {
   id: string;
   displayName: string;
@@ -132,11 +131,10 @@ type State = {
   read: Record<string, string>;
   quizzes: Record<string, { score: number; at: string }>;
 };
-function load(db: DB): State {
-  ensureFamilySchema(db);
-  const row = db
-    .prepare("SELECT payload FROM family_state WHERE id=1")
-    .get() as { payload: string } | undefined;
+async function load(db: DB): Promise<State> {
+  const row = await db.get<{ payload: string }>(
+    "SELECT payload FROM family_state WHERE id=1",
+  );
   return row
     ? JSON.parse(row.payload)
     : {
@@ -155,8 +153,8 @@ export function weekKey(now: Date) {
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d.toISOString().slice(0, 10);
 }
-export function readFamily(db: DB, user: FamilyUser, now = new Date()) {
-  const s = load(db),
+export async function readFamily(db: DB, user: FamilyUser, now = new Date()) {
+  const s = await load(db),
     week = weekKey(now);
   const challenge = s.challenges.at(-1);
   return {
@@ -206,8 +204,8 @@ export function readFamily(db: DB, user: FamilyUser, now = new Date()) {
       : null,
   };
 }
-export type FamilyState = ReturnType<typeof readFamily>;
-export function familyAction(
+export type FamilyState = Awaited<ReturnType<typeof readFamily>>;
+export async function familyAction(
   db: DB,
   user: FamilyUser,
   input: unknown,
@@ -222,9 +220,8 @@ export function familyAction(
   marketMode: "live" | "demo" = "live",
 ) {
   const a = familyActionSchema.parse(input);
-  ensureFamilySchema(db);
-  db.transaction(() => {
-    const s = load(db),
+  await db.transaction(async (tx) => {
+    const s = await load(tx),
       at = now.toISOString(),
       week = weekKey(now),
       base = (): Base => ({
@@ -445,9 +442,10 @@ export function familyAction(
         break;
       }
     }
-    db.prepare(
+    await tx.run(
       "INSERT INTO family_state(id,payload) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-    ).run(JSON.stringify(s));
-  }).immediate();
+      [JSON.stringify(s)],
+    );
+  });
   return readFamily(db, user, now);
 }

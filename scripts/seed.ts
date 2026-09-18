@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import Decimal from "decimal.js";
-import { getDb } from "../src/lib/db";
+import { closeDb, getDb } from "../src/lib/db";
 import { hashPassword } from "../src/lib/auth/password";
 import { syncPositions, readPositions } from "../src/lib/portfolio/sync";
 import { writeSnapshot } from "../src/lib/portfolio/snapshots";
@@ -33,13 +33,14 @@ const SNAPSHOT_DAYS = 120;
 const RESET_PASSWORDS = process.argv.includes("--reset-passwords");
 
 async function seedUsers() {
-  const db = getDb();
+  const db = await getDb();
   const generated: { username: string; password: string }[] = [];
 
   for (const account of ACCOUNTS) {
-    const existing = db
-      .prepare(`SELECT id FROM users WHERE username = ?`)
-      .get(account.username) as { id: string } | undefined;
+    const existing = await db.get<{ id: string }>(
+      `SELECT id FROM users WHERE username = ?`,
+      [account.username],
+    );
 
     if (existing && RESET_PASSWORDS) {
       const password = process.env[account.envVar];
@@ -47,9 +48,10 @@ async function seedUsers() {
         console.log(`  ${account.username.padEnd(7)} skipped — ${account.envVar} is empty`);
         continue;
       }
-      db.prepare(
+      await db.run(
         `UPDATE users SET password_hash = ?, display_name = ?, role = ? WHERE id = ?`,
-      ).run(await hashPassword(password), account.displayName, account.role, existing.id);
+        [await hashPassword(password), account.displayName, account.role, existing.id],
+      );
       console.log(`  ${account.username.padEnd(7)} password reset`);
       continue;
     }
@@ -63,16 +65,17 @@ async function seedUsers() {
     const password = fromEnv && fromEnv.length > 0 ? fromEnv : randomBytes(9).toString("base64url");
     if (!fromEnv) generated.push({ username: account.username, password });
 
-    db.prepare(
+    await db.run(
       `INSERT INTO users (id, username, display_name, password_hash, role, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(
-      randomUUID(),
-      account.username,
-      account.displayName,
-      await hashPassword(password),
-      account.role,
-      new Date().toISOString(),
+      [
+        randomUUID(),
+        account.username,
+        account.displayName,
+        await hashPassword(password),
+        account.role,
+        new Date().toISOString(),
+      ],
     );
     console.log(`  ${account.username.padEnd(7)} created (${account.role})`);
   }
@@ -87,7 +90,7 @@ async function seedUsers() {
 }
 
 async function seedPositions() {
-  const db = getDb();
+  const db = await getDb();
   const count = await syncPositions(db, new MockBrokerProvider(), "mock");
   console.log(`  synced ${count} mock positions`);
 }
@@ -97,8 +100,8 @@ async function seedPositions() {
  * a fresh install. Mock mode only — real deployments accumulate real snapshots.
  */
 async function seedSnapshots() {
-  const db = getDb();
-  const positions = readPositions(db);
+  const db = await getDb();
+  const positions = await readPositions(db);
   if (positions.length === 0) return;
 
   const market = new MockMarketDataProvider();
@@ -144,7 +147,7 @@ async function seedSnapshots() {
       );
     }
 
-    writeSnapshot(
+    await writeSnapshot(
       db,
       date,
       {
@@ -168,9 +171,8 @@ async function main() {
 
   // Synthetic holdings would overwrite the real ones and pollute the snapshot
   // history, so the portfolio is only seeded while no broker is connected.
-  const connected = getDb()
-    .prepare(`SELECT 1 FROM broker_connections LIMIT 1`)
-    .get();
+  const db = await getDb();
+  const connected = await db.get(`SELECT 1 FROM broker_connections LIMIT 1`);
 
   if (connected) {
     console.log("\nPortfolio: broker connected — real holdings left untouched.");
@@ -181,6 +183,7 @@ async function main() {
   }
 
   console.log("\nDone.\n");
+  await closeDb();
 }
 
 main().catch((error) => {

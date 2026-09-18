@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { createTestDb } from "@/lib/db";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createTestDb } from "@/lib/db/testing";
 import {
   readSnapshots,
   writeSnapshot,
@@ -23,7 +23,7 @@ const snap = (date: string, value: number): PortfolioSnapshot => ({
 });
 const review = { from: "2026-09-01", to: "2026-09-30" };
 describe("trustworthy analysis", () => {
-  it("does not mistake a deposit for investment profit", () => {
+  it("does not mistake a deposit for investment profit", async () => {
     const result = adjustedSeries(
       [snap("2026-09-14", 100), snap("2026-09-15", 160)],
       [{ date: "2026-09-15", amount: 50 }],
@@ -32,7 +32,7 @@ describe("trustworthy analysis", () => {
     expect(result.points[1].index).toBeCloseTo(110);
     expect(result.gain).toBeCloseTo(10);
   });
-  it("does not publish returns before cash flows are reviewed", () => {
+  it("does not publish returns before cash flows are reviewed", async () => {
     expect(
       adjustedSeries(
         [snap("2026-09-14", 100), snap("2026-09-15", 160)],
@@ -41,7 +41,7 @@ describe("trustworthy analysis", () => {
       ).points,
     ).toEqual([]);
   });
-  it("does not turn a multiday gap into a best day or daily volatility", () => {
+  it("does not turn a multiday gap into a best day or daily volatility", async () => {
     const result = adjustedSeries(
       [
         snap("2026-09-14", 100),
@@ -54,7 +54,7 @@ describe("trustworthy analysis", () => {
     expect(analysisStats(result).bestDayPercent).toBeNull();
     expect(analysisStats(result).annualisedVolatilityPercent).toBeNull();
   });
-  it("withholds a return if a cash flow has no matching closing valuation", () => {
+  it("withholds a return if a cash flow has no matching closing valuation", async () => {
     expect(
       adjustedSeries(
         [snap("2026-09-14", 100), snap("2026-09-16", 160)],
@@ -63,12 +63,12 @@ describe("trustworthy analysis", () => {
       ).points,
     ).toEqual([]);
   });
-  it("decomposes USD and FX effects without losing the cross term", () => {
+  it("decomposes USD and FX effects without losing the cross term", async () => {
     const result = fxDecomposition(100, 110, 7, 7.2);
     expect(result.total).toBeCloseTo(92);
     expect(result.investment + result.currency).toBeCloseTo(result.total);
   });
-  it("calculates a debit call spread payoff and fees", () => {
+  it("calculates a debit call spread payoff and fees", async () => {
     const legs = [
       {
         type: "call" as const,
@@ -88,7 +88,7 @@ describe("trustworthy analysis", () => {
     expect(expirationPayoff(legs, 120, 4)).toBe(496);
     expect(expirationPayoff(legs, 90, 4)).toBe(-504);
   });
-  it("rejects invalid dates and negative FX rates", () => {
+  it("rejects invalid dates and negative FX rates", async () => {
     expect(
       analysisInputSchema.safeParse({
         action: "flow",
@@ -108,8 +108,8 @@ describe("trustworthy analysis", () => {
   });
 });
 describe("history and collaboration regressions", () => {
-  it("returns newest snapshots in chronological order", () => {
-    const db = createTestDb();
+  it("returns newest snapshots in chronological order", async () => {
+    const db = await createTestDb();
     const summary = {
       totalMarketValue: { amount: "100", currency: "USD" },
       totalCostBasis: { amount: "100", currency: "USD" },
@@ -117,17 +117,17 @@ describe("history and collaboration regressions", () => {
       cashValue: { amount: "0", currency: "USD" },
     };
     for (const date of ["2026-09-14", "2026-09-15", "2026-09-16"])
-      writeSnapshot(db, date, summary, "[]");
-    expect(readSnapshots(db, 2).map((s) => s.snapshotDate)).toEqual([
+      await writeSnapshot(db, date, summary, "[]");
+    expect((await readSnapshots(db, 2)).map((s) => s.snapshotDate)).toEqual([
       "2026-09-15",
       "2026-09-16",
     ]);
     db.close();
   });
-  it("does not capture stale or previous-day data as today", () => {
-    const db = createTestDb();
+  it("does not capture stale or previous-day data as today", async () => {
+    const db = await createTestDb();
     expect(
-      maybeCreateSnapshot(
+      await maybeCreateSnapshot(
         db,
         { isStale: true } as PortfolioSummary,
         "[]",
@@ -136,19 +136,19 @@ describe("history and collaboration regressions", () => {
     ).toBe(false);
     db.close();
   });
-  it("preserves the original note and appends another member contribution", () => {
-    const db = createTestDb();
-    addToWatchlist(db, {
+  it("preserves the original note and appends another member contribution", async () => {
+    const db = await createTestDb();
+    await addToWatchlist(db, {
       symbol: "AAPL",
       reason: "Original idea",
       addedBy: "Father",
     });
-    addToWatchlist(db, {
+    await addToWatchlist(db, {
       symbol: "aapl",
       reason: "Another view",
       addedBy: "Mother",
     });
-    const entry = readWatchlist(db)[0];
+    const entry = (await readWatchlist(db))[0];
     expect(entry.addedBy).toBe("Father");
     expect(entry.reason).toBe("Original idea");
     expect(entry.notes).toEqual(
@@ -161,8 +161,8 @@ describe("history and collaboration regressions", () => {
 });
 
 describe("snapshot timestamp integrity", () => {
-  it("rejects intraday data received after the market closes", () => {
-    const db = createTestDb();
+  it("rejects intraday data received after the market closes", async () => {
+    const db = await createTestDb();
     const summary = {
       isStale: false,
       dataTimestamp: "2026-09-15T19:45:00Z",
@@ -172,7 +172,7 @@ describe("snapshot timestamp integrity", () => {
       cashValue: { amount: "0", currency: "USD" },
     } as PortfolioSummary;
     expect(
-      maybeCreateSnapshot(db, summary, "[]", new Date("2026-09-15T20:05:00Z")),
+      await maybeCreateSnapshot(db, summary, "[]", new Date("2026-09-15T20:05:00Z")),
     ).toBe(false);
     db.close();
   });
@@ -181,30 +181,30 @@ describe("snapshot timestamp integrity", () => {
 describe("analysis data lifecycle", () => {
   it("requires new confirmation after changing or removing a cash flow", async () => {
     const { saveAnalysis, readAnalysis } = await import("@/lib/analysis/store");
-    const db = createTestDb();
-    saveAnalysis(
+    const db = await createTestDb();
+    await saveAnalysis(
       db,
       { action: "review", from: "2026-01-01", to: "2026-01-02" },
       "owner",
     );
-    expect(readAnalysis(db).coverage).not.toBeNull();
-    const after = saveAnalysis(
+    expect((await readAnalysis(db)).coverage).not.toBeNull();
+    const after = await saveAnalysis(
       db,
       { action: "flow", date: "2026-01-02", amount: 100, note: "deposit" },
       "owner",
     );
     expect(after.coverage).toBeNull();
-    saveAnalysis(
+    await saveAnalysis(
       db,
       { action: "review", from: "2026-01-01", to: "2026-01-02" },
       "owner",
     );
     expect(
-      saveAnalysis(
+      (await saveAnalysis(
         db,
         { action: "removeFlow", id: after.flows[0].id! },
         "owner",
-      ).coverage,
+      )).coverage,
     ).toBeNull();
     db.close();
   });

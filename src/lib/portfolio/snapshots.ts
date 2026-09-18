@@ -11,16 +11,18 @@ type SnapshotRow = {
   cash_value: string;
 };
 
-export function readSnapshots(db: DB, limit = 400): PortfolioSnapshot[] {
-  const rows = db
-    .prepare(
-      `SELECT snapshot_date, total_market_value, total_cost,
-              total_unrealized_pnl, cash_value
+export async function readSnapshots(
+  db: DB,
+  limit = 400,
+): Promise<PortfolioSnapshot[]> {
+  const rows = await db.all<SnapshotRow>(
+    `SELECT snapshot_date, total_market_value, total_cost,
+            total_unrealized_pnl, cash_value
        FROM portfolio_snapshots
-       ORDER BY snapshot_date DESC
-       LIMIT ?`,
-    )
-    .all(limit) as SnapshotRow[];
+      ORDER BY snapshot_date DESC
+      LIMIT ?`,
+    [limit],
+  );
 
   return rows.reverse().map((row) => ({
     snapshotDate: row.snapshot_date,
@@ -31,7 +33,7 @@ export function readSnapshots(db: DB, limit = 400): PortfolioSnapshot[] {
   }));
 }
 
-export function writeSnapshot(
+export async function writeSnapshot(
   db: DB,
   date: string,
   summary: Pick<
@@ -40,8 +42,8 @@ export function writeSnapshot(
   >,
   positionsJson: string,
   now: Date = new Date(),
-): void {
-  db.prepare(
+): Promise<void> {
+  await db.run(
     `INSERT INTO portfolio_snapshots
        (id, snapshot_date, total_market_value, total_cost,
         total_unrealized_pnl, cash_value, positions_json, created_at)
@@ -52,26 +54,29 @@ export function writeSnapshot(
        total_unrealized_pnl = excluded.total_unrealized_pnl,
        cash_value = excluded.cash_value,
        positions_json = excluded.positions_json`,
-  ).run(
-    randomUUID(),
-    date,
-    summary.totalMarketValue.amount,
-    summary.totalCostBasis.amount,
-    summary.totalUnrealizedPnL.amount,
-    summary.cashValue.amount,
-    positionsJson,
-    now.toISOString(),
+    [
+      randomUUID(),
+      date,
+      summary.totalMarketValue.amount,
+      summary.totalCostBasis.amount,
+      summary.totalUnrealizedPnL.amount,
+      summary.cashValue.amount,
+      positionsJson,
+      now.toISOString(),
+    ],
   );
 }
 
-export function clearSnapshots(db: DB): number {
-  return db.prepare(`DELETE FROM portfolio_snapshots`).run().changes;
+export async function clearSnapshots(db: DB): Promise<number> {
+  const result = await db.run(`DELETE FROM portfolio_snapshots`);
+  return result.changes;
 }
 
-export function hasSnapshot(db: DB, date: string): boolean {
-  const row = db
-    .prepare(`SELECT 1 FROM portfolio_snapshots WHERE snapshot_date = ?`)
-    .get(date);
+export async function hasSnapshot(db: DB, date: string): Promise<boolean> {
+  const row = await db.get(
+    `SELECT 1 FROM portfolio_snapshots WHERE snapshot_date = ?`,
+    [date],
+  );
   return row !== undefined;
 }
 
@@ -79,12 +84,12 @@ export function hasSnapshot(db: DB, date: string): boolean {
  * Records today's close once the regular session has ended, triggered by the
  * first authenticated dashboard request rather than a platform cron (§21).
  */
-export function maybeCreateSnapshot(
+export async function maybeCreateSnapshot(
   db: DB,
   summary: PortfolioSummary,
   positionsJson: string,
   now: Date = new Date(),
-): boolean {
+): Promise<boolean> {
   if (!isAfterMarketClose(now) || summary.isStale || !summary.dataTimestamp)
     return false;
   const timestamp = new Date(summary.dataTimestamp);
@@ -96,7 +101,7 @@ export function maybeCreateSnapshot(
   )
     return false;
   const date = marketDateString(now);
-  if (hasSnapshot(db, date)) return false;
-  writeSnapshot(db, date, summary, positionsJson, now);
+  if (await hasSnapshot(db, date)) return false;
+  await writeSnapshot(db, date, summary, positionsJson, now);
   return true;
 }

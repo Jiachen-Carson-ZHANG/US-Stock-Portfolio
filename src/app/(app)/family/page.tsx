@@ -10,11 +10,10 @@ export default async function FamilyPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const snapshots = getDb()
-    .prepare(
-      "SELECT snapshot_date, total_market_value, positions_json FROM portfolio_snapshots ORDER BY snapshot_date DESC LIMIT 30",
-    )
-    .all() as {
+  const db = await getDb();
+  const snapshots = (await db.all(
+    "SELECT snapshot_date, total_market_value, positions_json FROM portfolio_snapshots ORDER BY snapshot_date DESC LIMIT 30",
+  )) as {
     snapshot_date: string;
     total_market_value: string;
     positions_json: string;
@@ -40,7 +39,7 @@ export default async function FamilyPage({
     : null;
   return (
     <FamilyRoom
-      initial={readFamily(getDb(), user)}
+      initial={await readFamily(db, user)}
       openAccess={isOpenAccess()}
       symbol={params.symbol?.slice(0, 32)}
       postcard={postcard}

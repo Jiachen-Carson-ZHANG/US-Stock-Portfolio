@@ -94,17 +94,17 @@ function positionTtlSeconds(): number {
  * rather than one each. A failure leaves the previous holdings in place.
  */
 async function ensureFreshPositions(now: Date): Promise<void> {
-  if (activeProvider() !== "moomoo") return;
+  if ((await activeProvider()) !== "moomoo") return;
 
-  const db = getDb();
-  const synced = lastSyncedAt(db);
+  const db = await getDb();
+  const synced = await lastSyncedAt(db);
   if (synced) {
     const age = now.getTime() - new Date(synced).getTime();
     if (age < positionTtlSeconds() * 1000) return;
   }
 
   try {
-    await syncPositions(db, getBrokerProvider(), "moomoo", now);
+    await syncPositions(db, await getBrokerProvider(), "moomoo", now);
   } catch (error) {
     logger.error("broker.sync.failure", {
       provider: "moomoo",
@@ -118,9 +118,9 @@ async function pricedPositions(now: Date): Promise<{
   dataTimestamp: string | null;
   isStale: boolean;
 }> {
-  const db = getDb();
+  const db = await getDb();
   await ensureFreshPositions(now);
-  const stored = readPositions(db);
+  const stored = await readPositions(db);
   if (stored.length === 0) {
     return { positions: [], dataTimestamp: null, isStale: false };
   }
@@ -128,7 +128,7 @@ async function pricedPositions(now: Date): Promise<{
   const { quotes, isStale, dataTimestamp } = await getQuotes(
     db,
     [...new Set(stored.map((p) => p.symbol))],
-    getMarketDataProvider(),
+    await getMarketDataProvider(),
     now,
   );
 
@@ -143,9 +143,9 @@ async function pricedPositions(now: Date): Promise<{
     };
   });
 
-  const synced = lastSyncedAt(db);
+  const synced = await lastSyncedAt(db);
   const brokerStale =
-    activeProvider() === "moomoo" &&
+    (await activeProvider()) === "moomoo" &&
     (!synced ||
       now.getTime() - new Date(synced).getTime() > positionTtlSeconds() * 1000);
   return { positions, dataTimestamp, isStale: isStale || brokerStale };
@@ -176,7 +176,7 @@ export async function loadPortfolio(
   }));
 
   const brokerMarksAfterClose =
-    activeProvider() !== "moomoo" ||
+    (await activeProvider()) !== "moomoo" ||
     positions.every((position) => {
       const updated = new Date(position.lastUpdatedAt);
       return (
@@ -187,7 +187,7 @@ export async function loadPortfolio(
       );
     });
   if (positions.length > 0 && brokerMarksAfterClose) {
-    maybeCreateSnapshot(getDb(), summary, JSON.stringify(views), now);
+    await maybeCreateSnapshot(await getDb(), summary, JSON.stringify(views), now);
   }
 
   return {
@@ -216,8 +216,8 @@ export async function loadPosition(
   return positions.find((p) => p.symbol === symbol) ?? null;
 }
 
-export function loadHistory(): PortfolioSnapshot[] {
-  return readSnapshots(getDb());
+export async function loadHistory(): Promise<PortfolioSnapshot[]> {
+  return readSnapshots(await getDb());
 }
 
 const TRANSACTION_TTL_MS = 15 * 60_000;
@@ -227,17 +227,17 @@ export async function loadTransactions(now: Date = new Date()): Promise<{
   transactions: StoredTransaction[];
   totals: TransactionTotals;
 }> {
-  const db = getDb();
+  const db = await getDb();
 
-  if (activeProvider() === "moomoo") {
-    const synced = lastTransactionSync(db);
+  if ((await activeProvider()) === "moomoo") {
+    const synced = await lastTransactionSync(db);
     const stale =
       !synced ||
       now.getTime() - new Date(synced).getTime() > TRANSACTION_TTL_MS;
 
     if (stale) {
       try {
-        await syncTransactions(db, getBrokerProvider(), now);
+        await syncTransactions(db, await getBrokerProvider(), now);
       } catch (error) {
         logger.error("broker.transactions.failure", {
           provider: "moomoo",
@@ -247,6 +247,6 @@ export async function loadTransactions(now: Date = new Date()): Promise<{
     }
   }
 
-  const transactions = readTransactions(db);
+  const transactions = await readTransactions(db);
   return { transactions, totals: transactionTotals(transactions) };
 }

@@ -11,7 +11,7 @@ import type { Quote } from "@/types/market";
 export async function GET() {
   const user = await authenticateRequest();
   if (!user) return unauthorized();
-  return Response.json(readFamily(getDb(), user), {
+  return Response.json(await readFamily(await getDb(), user), {
     headers: { "Cache-Control": "no-store" },
   });
 }
@@ -35,10 +35,10 @@ export async function POST(request: Request) {
   try {
     let quote: Quote | undefined;
     let quotes: Quote[] = [];
-    const db = getDb();
-    const mode = activeProvider() === "mock" ? "demo" : "live";
+    const db = await getDb();
+    const mode = (await activeProvider()) === "mock" ? "demo" : "live";
     if (parsed.data.action === "trade" || parsed.data.action === "mark") {
-      const challenge = readFamily(db, user).challenge;
+      const challenge = (await readFamily(db, user)).challenge;
       if (challenge && challenge.mode !== mode)
         return Response.json(
           {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
         );
       if (parsed.data.action === "trade") {
         const symbol = parsed.data.symbol;
-        quote = (await getMarketDataProvider().getQuotes([symbol])).find(
+        quote = (await (await getMarketDataProvider()).getQuotes([symbol])).find(
           (q) => q.symbol === symbol,
         );
         if (!quote)
@@ -66,11 +66,11 @@ export async function POST(request: Request) {
           ),
         ];
         if (symbols.length)
-          quotes = await getMarketDataProvider().getQuotes(symbols);
+          quotes = await (await getMarketDataProvider()).getQuotes(symbols);
       }
     }
     return Response.json(
-      familyAction(db, user, parsed.data, new Date(), quote, quotes, mode),
+      await familyAction(db, user, parsed.data, new Date(), quote, quotes, mode),
     );
   } catch (error) {
     return Response.json(

@@ -21,13 +21,13 @@ export async function POST(request: Request) {
   const now = new Date();
   if (!isAfterMarketClose(now))
     return Response.json({ captured: false, reason: "Outside capture window" });
-  const date = marketDateString(now),
-    db = getDb();
-  if (hasSnapshot(db, date))
+  const date = marketDateString(now);
+  const db = await getDb();
+  if (await hasSnapshot(db, date))
     return Response.json({ captured: false, reason: "Already recorded", date });
   try {
     await loadPortfolio(now);
-    const captured = hasSnapshot(db, date);
+    const captured = await hasSnapshot(db, date);
     return Response.json(
       {
         captured,

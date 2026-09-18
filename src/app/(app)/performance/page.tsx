@@ -11,7 +11,7 @@ export default async function PerformancePage() {
   const user = await requireUser();
   const { t } = await serverDictionary();
   const portfolio = await loadPortfolio();
-  const snapshots = loadHistory();
+  const snapshots = await loadHistory();
   return (
     <div className="space-y-6">
       <header>
@@ -25,7 +25,7 @@ export default async function PerformancePage() {
       <AssetClassSplit data={portfolio.byAssetClass} />
       <PerformanceExplorer
         snapshots={snapshots}
-        initial={readAnalysis(getDb())}
+        initial={await readAnalysis(await getDb())}
         owner={user.role === "owner"}
         currency={portfolio.summary.totalMarketValue.currency}
       />

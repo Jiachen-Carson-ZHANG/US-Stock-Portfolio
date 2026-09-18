@@ -38,18 +38,20 @@ function toQuote(row: QuoteRow): Quote {
   };
 }
 
-function readCache(db: DB, symbols: string[]): Map<string, QuoteRow> {
+async function readCache(db: DB, symbols: string[]): Promise<Map<string, QuoteRow>> {
   if (symbols.length === 0) return new Map();
-  const placeholders = symbols.map(() => "?").join(",");
-  const rows = db
-    .prepare(`SELECT * FROM quote_cache WHERE symbol IN (${placeholders})`)
-    .all(...symbols) as QuoteRow[];
+  // `= ANY($1)` takes the whole list as one array parameter, so the statement
+  // text stays constant however many symbols are held — Postgres can then reuse
+  // its plan instead of seeing a new query for each portfolio size.
+  const rows = await db.all<QuoteRow>(
+    `SELECT * FROM quote_cache WHERE symbol = ANY(?)`,
+    [symbols],
+  );
   return new Map(rows.map((row) => [row.symbol, row]));
 }
 
-function writeCache(db: DB, quotes: Quote[], now: Date): void {
-  const statement = db.prepare(
-    `INSERT INTO quote_cache
+async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
+  const sql = `INSERT INTO quote_cache
        (symbol, price, previous_close, change, change_percent,
         market_status, data_timestamp, source, cached_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -61,12 +63,11 @@ function writeCache(db: DB, quotes: Quote[], now: Date): void {
        market_status = excluded.market_status,
        data_timestamp = excluded.data_timestamp,
        source = excluded.source,
-       cached_at = excluded.cached_at`,
-  );
+       cached_at = excluded.cached_at`;
 
-  const writeAll = db.transaction((items: Quote[]) => {
-    for (const quote of items) {
-      statement.run(
+  await db.transaction(async (tx) => {
+    for (const quote of quotes) {
+      await tx.run(sql, [
         quote.symbol,
         quote.price,
         quote.previousClose,
@@ -76,11 +77,9 @@ function writeCache(db: DB, quotes: Quote[], now: Date): void {
         quote.dataTimestamp,
         quote.source,
         now.toISOString(),
-      );
+      ]);
     }
   });
-
-  writeAll(quotes);
 }
 
 /**
@@ -94,7 +93,7 @@ export async function getQuotes(
   provider: MarketDataProvider,
   now: Date = new Date(),
 ): Promise<QuoteResult> {
-  const cached = readCache(db, symbols);
+  const cached = await readCache(db, symbols);
   const ttlMs = cacheTtlSeconds() * 1000;
 
   const expired = symbols.filter((symbol) => {
@@ -108,7 +107,7 @@ export async function getQuotes(
   if (expired.length > 0) {
     try {
       const fresh = await provider.getQuotes(expired);
-      writeCache(db, fresh, now);
+      await writeCache(db, fresh, now);
       for (const quote of fresh) {
         cached.set(quote.symbol, {
           symbol: quote.symbol,

@@ -51,22 +51,22 @@ function toPosition(row: PositionRow): Position {
   };
 }
 
-export function lastSyncedAt(db: DB): string | null {
-  const row = db
-    .prepare(`SELECT MAX(synced_at) AS synced_at FROM positions`)
-    .get() as { synced_at: string | null };
+export async function lastSyncedAt(db: DB): Promise<string | null> {
+  const row = await db.get<{ synced_at: string | null }>(
+    `SELECT MAX(synced_at) AS synced_at FROM positions`,
+  );
   return row?.synced_at ?? null;
 }
 
-export function storedBrokers(db: DB): string[] {
-  const rows = db
-    .prepare(`SELECT DISTINCT broker FROM positions`)
-    .all() as { broker: string }[];
+export async function storedBrokers(db: DB): Promise<string[]> {
+  const rows = await db.all<{ broker: string }>(
+    `SELECT DISTINCT broker FROM positions`,
+  );
   return rows.map((row) => row.broker);
 }
 
-export function readPositions(db: DB): Position[] {
-  const rows = db.prepare(`SELECT * FROM positions`).all() as PositionRow[];
+export async function readPositions(db: DB): Promise<Position[]> {
+  const rows = await db.all<PositionRow>(`SELECT * FROM positions`);
   return rows.map(toPosition);
 }
 
@@ -83,19 +83,17 @@ export async function syncPositions(
   const positions = await broker.getPositions();
   const syncedAt = now.toISOString();
 
-  const insert = db.prepare(
-    `INSERT INTO positions
+  const insert = `INSERT INTO positions
        (id, broker, instrument_type, symbol, underlying_symbol, name, sector,
         quantity, average_cost, currency, option_type, strike, expiration_date,
         contract_multiplier, reported_price, reported_market_value, reported_unrealized_pnl,
         reported_today_pnl, reported_realized_pnl, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  const replaceAll = db.transaction(() => {
-    db.prepare(`DELETE FROM positions`).run();
+  await db.transaction(async (tx) => {
+    await tx.run(`DELETE FROM positions`);
     for (const position of positions) {
-      insert.run(
+      await tx.run(insert, [
         randomUUID(),
         brokerName,
         position.instrumentType,
@@ -116,10 +114,9 @@ export async function syncPositions(
         position.reportedTodayPnL ?? null,
         position.reportedRealizedPnL ?? null,
         syncedAt,
-      );
+      ]);
     }
   });
 
-  replaceAll();
   return positions.length;
 }

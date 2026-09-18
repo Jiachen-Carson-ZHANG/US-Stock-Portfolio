@@ -12,7 +12,7 @@ import {
 } from "@/lib/analysis/store";
 export async function GET() {
   if (!(await authenticateRequest())) return unauthorized();
-  return Response.json(readAnalysis(getDb()));
+  return Response.json(await readAnalysis(await getDb()));
 }
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   try {
-    return Response.json(saveAnalysis(getDb(), parsed.data, auth.user.id));
+    return Response.json(await saveAnalysis(await getDb(), parsed.data, auth.user.id));
   } catch {
     return Response.json(
       { error: "Could not save. Check dates and values." },

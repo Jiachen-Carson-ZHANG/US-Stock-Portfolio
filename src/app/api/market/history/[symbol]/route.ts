@@ -25,7 +25,7 @@ export async function GET(
   const to = new Date();
   const from = new Date(to.getTime() - parsedRange.data.days * 86_400_000);
 
-  const prices = await getMarketDataProvider().getHistoricalPrices(
+  const prices = await (await getMarketDataProvider()).getHistoricalPrices(
     parsedSymbol.data,
     { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
   );

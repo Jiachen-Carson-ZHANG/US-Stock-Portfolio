@@ -51,8 +51,8 @@ async function accessToken(): Promise<string> {
     return cachedAccessToken.token;
   }
 
-  const db = getDb();
-  const connection = readConnection(db);
+  const db = await getDb();
+  const connection = await readConnection(db);
   if (!connection) throw new MoomooNotConnectedError();
 
   try {
@@ -65,7 +65,7 @@ async function accessToken(): Promise<string> {
       token: tokens.access_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
     };
-    markRefreshed(db);
+    await markRefreshed(db);
     logger.info("broker.token.refreshed", { provider: "moomoo" });
     return tokens.access_token;
   } catch (error) {

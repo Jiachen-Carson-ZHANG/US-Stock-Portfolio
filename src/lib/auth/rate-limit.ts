@@ -12,18 +12,17 @@ function windowStart(now: Date): string {
   return new Date(now.getTime() - COOLDOWN_MINUTES * 60_000).toISOString();
 }
 
-export function checkRateLimit(
+export async function checkRateLimit(
   db: DB,
   username: string,
   now: Date = new Date(),
-): RateLimitState {
-  const rows = db
-    .prepare(
-      `SELECT attempted_at FROM login_attempts
-       WHERE username = ? AND attempted_at > ?
-       ORDER BY attempted_at ASC`,
-    )
-    .all(username, windowStart(now)) as { attempted_at: string }[];
+): Promise<RateLimitState> {
+  const rows = await db.all<{ attempted_at: string }>(
+    `SELECT attempted_at FROM login_attempts
+      WHERE username = ? AND attempted_at > ?
+      ORDER BY attempted_at ASC`,
+    [username, windowStart(now)],
+  );
 
   if (rows.length < MAX_FAILED_ATTEMPTS) {
     return { blocked: false, retryAfterSeconds: 0 };
@@ -37,17 +36,17 @@ export function checkRateLimit(
   };
 }
 
-export function recordFailedAttempt(
+export async function recordFailedAttempt(
   db: DB,
   username: string,
   now: Date = new Date(),
-): void {
-  db.prepare(`INSERT INTO login_attempts (username, attempted_at) VALUES (?, ?)`).run(
+): Promise<void> {
+  await db.run(`INSERT INTO login_attempts (username, attempted_at) VALUES (?, ?)`, [
     username,
     now.toISOString(),
-  );
+  ]);
 }
 
-export function clearFailedAttempts(db: DB, username: string): void {
-  db.prepare(`DELETE FROM login_attempts WHERE username = ?`).run(username);
+export async function clearFailedAttempts(db: DB, username: string): Promise<void> {
+  await db.run(`DELETE FROM login_attempts WHERE username = ?`, [username]);
 }

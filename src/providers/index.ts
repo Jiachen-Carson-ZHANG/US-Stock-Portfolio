@@ -14,27 +14,27 @@ export type ProviderName = "mock" | "moomoo";
  * switches quotes and holdings over immediately. Otherwise the app would sit in
  * a half-state: real positions priced by the mock quote feed.
  */
-export function activeProvider(): ProviderName {
+export async function activeProvider(): Promise<ProviderName> {
   if (process.env.DATA_PROVIDER === "moomoo") return "moomoo";
-  return hasBrokerConnection() ? "moomoo" : "mock";
+  return (await hasBrokerConnection()) ? "moomoo" : "mock";
 }
 
-function hasBrokerConnection(): boolean {
+async function hasBrokerConnection(): Promise<boolean> {
   try {
-    return readConnectionStatus(getDb()) !== null;
+    return (await readConnectionStatus(await getDb())) !== null;
   } catch {
     return false;
   }
 }
 
-export function getBrokerProvider(): BrokerProvider {
-  return activeProvider() === "moomoo"
+export async function getBrokerProvider(): Promise<BrokerProvider> {
+  return (await activeProvider()) === "moomoo"
     ? new MoomooBrokerProvider()
     : new MockBrokerProvider();
 }
 
-export function getMarketDataProvider(): MarketDataProvider {
-  return activeProvider() === "moomoo"
+export async function getMarketDataProvider(): Promise<MarketDataProvider> {
+  return (await activeProvider()) === "moomoo"
     ? new MoomooMarketDataProvider()
     : new MockMarketDataProvider();
 }

@@ -33,14 +33,14 @@ function encryptionKey(): Buffer {
   return parseKey(raw);
 }
 
-export function saveConnection(
+export async function saveConnection(
   db: DB,
   params: { refreshToken: string; scope: string; accountId: string | null },
   now: Date = new Date(),
-): void {
+): Promise<void> {
   const payload = encrypt(params.refreshToken, encryptionKey());
 
-  db.prepare(
+  await db.run(
     `INSERT INTO broker_connections
        (id, provider, encrypted_refresh_token, iv, auth_tag, scope,
         account_id, connected_at, last_refresh_at, status)
@@ -53,22 +53,23 @@ export function saveConnection(
        account_id = excluded.account_id,
        last_refresh_at = excluded.last_refresh_at,
        status = 'connected'`,
-  ).run(
-    CONNECTION_ID,
-    payload.ciphertext,
-    payload.iv,
-    payload.authTag,
-    params.scope,
-    params.accountId,
-    now.toISOString(),
-    now.toISOString(),
+    [
+      CONNECTION_ID,
+      payload.ciphertext,
+      payload.iv,
+      payload.authTag,
+      params.scope,
+      params.accountId,
+      now.toISOString(),
+      now.toISOString(),
+    ],
   );
 }
 
-export function readConnection(db: DB): BrokerConnection | null {
-  const row = db
-    .prepare(`SELECT * FROM broker_connections WHERE id = ?`)
-    .get(CONNECTION_ID) as Row | undefined;
+export async function readConnection(db: DB): Promise<BrokerConnection | null> {
+  const row = await db.get<Row>(`SELECT * FROM broker_connections WHERE id = ?`, [
+    CONNECTION_ID,
+  ]);
 
   if (!row) return null;
 
@@ -90,16 +91,14 @@ export function readConnection(db: DB): BrokerConnection | null {
 }
 
 /** Connection metadata for the owner's settings screen — never the token. */
-export function readConnectionStatus(db: DB): Omit<
-  BrokerConnection,
-  "refreshToken"
-> | null {
-  const row = db
-    .prepare(
-      `SELECT scope, account_id, status, connected_at, last_refresh_at
+export async function readConnectionStatus(
+  db: DB,
+): Promise<Omit<BrokerConnection, "refreshToken"> | null> {
+  const row = await db.get<Row>(
+    `SELECT scope, account_id, status, connected_at, last_refresh_at
        FROM broker_connections WHERE id = ?`,
-    )
-    .get(CONNECTION_ID) as Row | undefined;
+    [CONNECTION_ID],
+  );
 
   if (!row) return null;
 
@@ -112,26 +111,27 @@ export function readConnectionStatus(db: DB): Omit<
   };
 }
 
-export function markStatus(db: DB, status: ConnectionStatus): void {
-  db.prepare(`UPDATE broker_connections SET status = ? WHERE id = ?`).run(
+export async function markStatus(db: DB, status: ConnectionStatus): Promise<void> {
+  await db.run(`UPDATE broker_connections SET status = ? WHERE id = ?`, [
     status,
     CONNECTION_ID,
+  ]);
+}
+
+export async function markRefreshed(db: DB, now: Date = new Date()): Promise<void> {
+  await db.run(
+    `UPDATE broker_connections SET last_refresh_at = ?, status = 'connected' WHERE id = ?`,
+    [now.toISOString(), CONNECTION_ID],
   );
 }
 
-export function markRefreshed(db: DB, now: Date = new Date()): void {
-  db.prepare(
-    `UPDATE broker_connections SET last_refresh_at = ?, status = 'connected' WHERE id = ?`,
-  ).run(now.toISOString(), CONNECTION_ID);
-}
-
-export function setAccountId(db: DB, accountId: string): void {
-  db.prepare(`UPDATE broker_connections SET account_id = ? WHERE id = ?`).run(
+export async function setAccountId(db: DB, accountId: string): Promise<void> {
+  await db.run(`UPDATE broker_connections SET account_id = ? WHERE id = ?`, [
     accountId,
     CONNECTION_ID,
-  );
+  ]);
 }
 
-export function deleteConnection(db: DB): void {
-  db.prepare(`DELETE FROM broker_connections WHERE id = ?`).run(CONNECTION_ID);
+export async function deleteConnection(db: DB): Promise<void> {
+  await db.run(`DELETE FROM broker_connections WHERE id = ?`, [CONNECTION_ID]);
 }

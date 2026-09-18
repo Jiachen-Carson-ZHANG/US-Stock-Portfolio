@@ -46,66 +46,56 @@ export type AnalysisData = {
   fx: Observation[];
   sources: { benchmark: string; fx: string };
 };
-function init(db: DB) {
-  db.exec(`CREATE TABLE IF NOT EXISTS analysis_flows(id TEXT PRIMARY KEY,date TEXT NOT NULL,amount REAL NOT NULL,note TEXT NOT NULL,created_by TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS analysis_config(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS analysis_observations(kind TEXT NOT NULL,date TEXT NOT NULL,value REAL NOT NULL,PRIMARY KEY(kind,date));`);
-}
-export function readAnalysis(db: DB): AnalysisData {
-  init(db);
-  const config = Object.fromEntries(
-    (
-      db.prepare("SELECT key,value FROM analysis_config").all() as {
-        key: string;
-        value: string;
-      }[]
-    ).map((r) => [r.key, r.value]),
-  );
-  const observations = (kind: string) =>
-    db
-      .prepare(
-        "SELECT date,value FROM analysis_observations WHERE kind=? ORDER BY date",
-      )
-      .all(kind) as Observation[];
+// The tables live in the central schema (src/lib/db/index.ts), applied once at
+// startup under an advisory lock, rather than being re-created on every read.
+
+export async function readAnalysis(db: DB): Promise<AnalysisData> {
+  const [configRows, flows, benchmark, fx] = await Promise.all([
+    db.all<{ key: string; value: string }>("SELECT key,value FROM analysis_config"),
+    db.all<CashFlow>("SELECT id,date,amount,note FROM analysis_flows ORDER BY date,id"),
+    db.all<Observation>(
+      "SELECT date,value FROM analysis_observations WHERE kind=? ORDER BY date",
+      ["benchmark"],
+    ),
+    db.all<Observation>(
+      "SELECT date,value FROM analysis_observations WHERE kind=? ORDER BY date",
+      ["fx"],
+    ),
+  ]);
+  const config = Object.fromEntries(configRows.map((r) => [r.key, r.value]));
   return {
-    flows: db
-      .prepare(
-        "SELECT id,date,amount,note FROM analysis_flows ORDER BY date,id",
-      )
-      .all() as CashFlow[],
+    flows,
     coverage: config.review ? JSON.parse(config.review) : null,
-    benchmark: observations("benchmark"),
-    fx: observations("fx"),
+    benchmark,
+    fx,
     sources: { benchmark: config.benchmark ?? "", fx: config.fx ?? "" },
   };
 }
-export function saveAnalysis(
+
+export async function saveAnalysis(
   db: DB,
   input: z.infer<typeof analysisInputSchema>,
   userId: string,
-) {
-  init(db);
-  db.transaction(() => {
+): Promise<AnalysisData> {
+  await db.transaction(async (tx) => {
     const config = (key: string, value: string) =>
-      db
-        .prepare(
-          "INSERT INTO analysis_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        )
-        .run(key, value);
+      tx.run(
+        "INSERT INTO analysis_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        [key, value],
+      );
     switch (input.action) {
       case "flow":
-        db.prepare("INSERT INTO analysis_flows VALUES(?,?,?,?,?)").run(
-          randomUUID(),
-          input.date,
-          input.amount,
-          input.note,
-          userId,
+        await tx.run(
+          "INSERT INTO analysis_flows (id,date,amount,note,created_by) VALUES(?,?,?,?,?)",
+          [randomUUID(), input.date, input.amount, input.note, userId],
         );
-        db.prepare("DELETE FROM analysis_config WHERE key='review'").run();
+        // A new flow invalidates the reviewed window: the ledger it was signed
+        // off against no longer matches.
+        await tx.run("DELETE FROM analysis_config WHERE key='review'");
         break;
       case "removeFlow":
-        db.prepare("DELETE FROM analysis_flows WHERE id=?").run(input.id);
-        db.prepare("DELETE FROM analysis_config WHERE key='review'").run();
+        await tx.run("DELETE FROM analysis_flows WHERE id=?", [input.id]);
+        await tx.run("DELETE FROM analysis_config WHERE key='review'");
         break;
       case "review":
         if (
@@ -115,21 +105,18 @@ export function saveAnalysis(
           throw new Error(
             "Review dates must be ordered and cannot extend into the future.",
           );
-        config("review", JSON.stringify({ from: input.from, to: input.to }));
+        await config("review", JSON.stringify({ from: input.from, to: input.to }));
         break;
       case "observations":
-        db.prepare("DELETE FROM analysis_observations WHERE kind=?").run(
-          input.kind,
-        );
+        await tx.run("DELETE FROM analysis_observations WHERE kind=?", [input.kind]);
         for (const row of input.rows)
-          db.prepare("INSERT INTO analysis_observations VALUES(?,?,?)").run(
-            input.kind,
-            row.date,
-            row.value,
+          await tx.run(
+            "INSERT INTO analysis_observations (kind,date,value) VALUES(?,?,?)",
+            [input.kind, row.date, row.value],
           );
-        config(input.kind, input.source);
+        await config(input.kind, input.source);
         break;
     }
-  })();
+  });
   return readAnalysis(db);
 }

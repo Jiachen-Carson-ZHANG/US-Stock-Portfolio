@@ -15,7 +15,7 @@ a connection that comes back carrying a write scope is refused and discarded.
 | | |
 |---|---|
 | Node.js | 20.9 or newer (developed on 22) |
-| Disk | A persistent, writable directory for the SQLite database |
+| Database | PostgreSQL 14 or newer (managed or self-hosted) |
 | Network | Outbound HTTPS to `webapi.moomoo.com` (and `api.deepseek.com` if AI is enabled) |
 
 No CDN, Google Font, or analytics script is fetched at runtime, so the app loads
@@ -31,6 +31,13 @@ Copy the template and fill it in:
 cp .env.example .env.local
 ```
 
+Need a database to develop against? This starts a throwaway Postgres on port
+55432, matching the `DATABASE_URL` in the template:
+
+```bash
+npm run db:dev:up      # docker; npm run db:dev:down to remove it
+```
+
 ### Required
 
 | Variable | What it does |
@@ -38,7 +45,7 @@ cp .env.example .env.local
 | `APP_URL` | The site's own base URL. **Must exactly match** the moomoo redirect URI, e.g. `https://portfolio.example.com` |
 | `SESSION_SECRET` | Random 32 bytes. `openssl rand -base64 32` |
 | `TOKEN_ENCRYPTION_KEY` | Random 32 bytes, **different** from the above. Encrypts the broker refresh token at rest |
-| `DATABASE_URL` | `file:./data/portfolio.db` |
+| `DATABASE_URL` | Postgres connection string, e.g. `postgres://user:pass@host:5432/portfolio?sslmode=require` |
 | `AUTH_MODE` | `password` to require sign-in. See [Access mode](#5-access-mode) |
 
 ### Recommended
@@ -194,41 +201,109 @@ This is **not** a static site. Every page is server-rendered and calls moomoo,
 so a static-file host or an export will not work. The host needs:
 
 1. A long-running **Node.js 20.9+** process
-2. A **persistent writable disk** for `data/`, or a Postgres instance instead
+2. A reachable **PostgreSQL 14+** database
 3. **Environment secrets**
 4. **HTTPS on a fixed hostname** — moomoo's redirect URI must match exactly
 5. Reachability from wherever the family is
 
+The container itself is disposable — all state is in Postgres, so a redeploy
+loses nothing and no persistent volume is needed.
+
 ### Persistence matters
 
-Positions and quotes re-sync from the broker, and accounts can be re-seeded.
-**Daily `portfolio_snapshots` cannot be rebuilt** — they accumulate one row per
-trading day and are the entire performance history.
+Positions and quotes re-sync from the broker and accounts can be re-seeded, but
+**daily `portfolio_snapshots` cannot be rebuilt** — they accumulate one row per
+trading day and are the entire performance history. Transaction history is
+similarly one-way: moomoo only serves a 90-day window, so fills that age out
+survive only in this database.
 
-Test this before relying on a host: deploy, sign in, redeploy, then reload. If
-you are still signed in, the disk persists. If you are bounced to `/login`, it
-does not — move to Postgres.
+Keep the database backed up. On a managed provider, turn on automated backups.
+
+### Moving an existing SQLite database across
+
+Earlier versions stored everything in `data/portfolio.db`. To carry that data
+into Postgres, stop the app, point `DATABASE_URL` at the new database, and run:
+
+```bash
+npm run db:migrate-from-sqlite            # defaults to ./data/portfolio.db
+npm run db:migrate-from-sqlite -- path/to/portfolio.db
+```
+
+It writes with `ON CONFLICT DO NOTHING`, so existing rows always win and the
+script is safe to run twice. The encrypted broker token copies across intact,
+so the moomoo connection survives and does not need re-authorizing.
 
 ### Deploying to coze.cn
 
-Coze is primarily an AI agent platform. Confirm it can host a **Node.js web
-application** — not just an agent or workflow — before planning around it. In
-its console look for a project type offering "deploy from GitHub", a Node
-runtime, or a custom web service. If all you can create is an agent, bot or
-workflow, it cannot run this app and you should use the Docker route below.
+Coze 编程 (`code.coze.cn`) hosts Node.js web applications. It runs on 火山引擎
+(Volcengine) underneath, but that is not a separate step you perform — you
+deploy to Coze and Coze allocates the Volcengine resources. Volcengine Ark, the
+AI model API, is an unrelated product and is not used by this app.
 
-If it does host Node apps, it will need:
+Everything Coze needs is already committed:
 
-- **Repository**: `Jiachen-Carson-ZHANG/US-Stock-Portfolio`, branch `main`
-- **Build command**: `npm ci && npm run build`
-- **Start command**: `npm start`
-- **Node version**: 22
-- **Port**: from `PORT`, default 3000
-- **Persistent volume** mounted at `/app/data`
-- **Environment variables**: everything in section 1
+| File | Purpose |
+|---|---|
+| `.coze` | Project manifest: runtime, build and run commands |
+| `.cozeproj/scripts/deploy_build.sh` | `npm ci`, build, assemble the standalone bundle |
+| `.cozeproj/scripts/deploy_run.sh` | Seed the database, start the server |
+| `scripts/coze-preview-*.sh` | The same for Coze's preview environment |
 
-After the first deploy, run `npm run db:seed` once in its shell, then set
-`APP_URL` to the real URL and re-run `moomoo:register` so the redirect matches.
+**Step 1 — create the project.** In the Coze console create a web application
+project and connect this repository. Coze issues a project id; paste it into the
+`sub_id` field at the top of `.coze` and commit.
+
+**Step 2 — create the database.** Enable Coze's built-in PostgreSQL and copy its
+connection string. Nothing else is needed: the app creates its own schema on
+first boot and seeds its accounts, so an empty database is the correct starting
+point.
+
+**Step 3 — set the environment variables.** Use Coze's encrypted environment
+variable panel, never a file in the repository.
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | The connection string from step 2 |
+| `DATABASE_SSL` | Only if the connection fails on TLS — try `no-verify` |
+| `AUTH_MODE` | `password` |
+| `APP_URL` | The URL Coze assigns, e.g. `https://xxx.coze.site` |
+| `SESSION_SECRET` | `openssl rand -base64 32` |
+| `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32`, different from the above |
+| `MOOMOO_CLIENT_ID` | From `npm run moomoo:register` |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Optional, for the AI notes |
+| `SEED_OWNER_PASSWORD` and the other `SEED_*` | The family's sign-in passwords |
+
+**Step 4 — allow the deployed origin.** Sign-in is a Server Action, and Next
+rejects one whose `Origin` does not match `Host`. Coze proxies from its own
+domain, so its hostname must be listed in `experimental.serverActions
+.allowedOrigins` in `next.config.ts`. The dev and sandbox hosts are already
+there; if sign-in fails on the deployed URL while working locally, add that
+exact hostname (or set `PUBLIC_ORIGIN` to it) and redeploy. **This is the most
+likely first failure and it produces no obvious error message.**
+
+**Step 5 — deploy, then point moomoo at it.** After the first successful deploy,
+set `APP_URL` to the real URL and re-run `npm run moomoo:register` so the OAuth
+redirect URI matches exactly. moomoo compares it character for character.
+
+**Step 6 — carry your data across**, if you are moving from the SQLite version:
+stop the app, set `DATABASE_URL` locally to the Coze database, and run
+`npm run db:migrate-from-sqlite`. See the previous section.
+
+#### Verifying the deployment
+
+1. `/login` renders **with styling** — unstyled means the standalone bundle is
+   missing `.next/static`, so check `deploy_build.sh` ran fully
+2. A wrong password is rejected; the right one signs in — if it hangs or fails
+   silently, revisit step 4
+3. `/dashboard` shows holdings, and `/settings` reports the broker connection
+4. Redeploy, then reload: you should stay signed in, because the session lives
+   in Postgres rather than on the container's disk
+
+#### Custom domain
+
+Coze can bind a domain, but a mainland-hosted one requires ICP 备案, which takes
+weeks. The Coze-provided URL needs no filing and is the fastest path to having
+the family actually using it.
 
 ### Docker (works on any VPS)
 
@@ -239,14 +314,14 @@ docker build -t family-portfolio .
 docker run -d --name portfolio \
   -p 3000:3000 \
   --env-file .env.local \
-  -v portfolio-data:/app/data \
   --restart unless-stopped \
   family-portfolio
 
 docker exec portfolio ./node_modules/.bin/tsx scripts/seed.ts
 ```
 
-The named volume is what preserves the database across image rebuilds.
+No volume is needed — all state lives in the Postgres instance `DATABASE_URL`
+points at, so the container can be rebuilt freely.
 
 Put a TLS terminator in front (Caddy or nginx) so the site is HTTPS — session
 cookies are `Secure` in production and will not be stored over plain HTTP.

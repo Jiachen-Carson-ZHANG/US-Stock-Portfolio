@@ -1,5 +1,6 @@
-import { beforeEach, expect, it, vi } from "vitest";
-import { createTestDb, resetDbForTests } from "@/lib/db";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { resetDbForTests } from "@/lib/db";
+import { createTestDb, type TestDb } from "@/lib/db/testing";
 const mocks = vi.hoisted(() => ({
   user: null as null | {
     id: string;
@@ -28,8 +29,8 @@ const post = (body: unknown) =>
       body: JSON.stringify(body),
     }),
   );
-beforeEach(() => {
-  resetDbForTests(createTestDb());
+beforeEach(async () => {
+  resetDbForTests(await createTestDb());
   mocks.user = {
     id: "owner",
     username: "owner",

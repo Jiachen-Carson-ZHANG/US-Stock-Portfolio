@@ -18,6 +18,6 @@ export async function GET(request: Request) {
     .toISOString()
     .slice(0, 10);
 
-  const snapshots = loadHistory().filter((s) => s.snapshotDate >= cutoff);
+  const snapshots = (await loadHistory()).filter((s) => s.snapshotDate >= cutoff);
   return Response.json({ snapshots });
 }

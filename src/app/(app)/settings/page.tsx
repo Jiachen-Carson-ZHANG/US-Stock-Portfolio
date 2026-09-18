@@ -43,18 +43,19 @@ type UserRow = {
   active_sessions: number;
 };
 
-function readUsers() {
-  return getDb()
-    .prepare(
-      `SELECT u.id, u.username, u.display_name, u.role,
-              (SELECT COUNT(*) FROM sessions s
-                WHERE s.user_id = u.id
-                  AND s.revoked_at IS NULL
-                  AND s.expires_at > ?) AS active_sessions
+async function readUsers(): Promise<UserRow[]> {
+  const db = await getDb();
+  // COUNT is bigint, which the driver returns as a string unless it is cast.
+  return db.all<UserRow>(
+    `SELECT u.id, u.username, u.display_name, u.role,
+            (SELECT COUNT(*) FROM sessions s
+              WHERE s.user_id = u.id
+                AND s.revoked_at IS NULL
+                AND s.expires_at > ?)::int AS active_sessions
        FROM users u
-       ORDER BY CASE u.role WHEN 'owner' THEN 0 ELSE 1 END, u.username`,
-    )
-    .all(new Date().toISOString()) as UserRow[];
+      ORDER BY CASE u.role WHEN 'owner' THEN 0 ELSE 1 END, u.username`,
+    [new Date().toISOString()],
+  );
 }
 
 export default async function SettingsPage({
@@ -64,12 +65,13 @@ export default async function SettingsPage({
 }) {
   await requireOwner();
 
-  const provider = activeProvider();
+  const provider = await activeProvider();
   const { summary, positions } = await loadPortfolio();
-  const users = readUsers();
-  const connection = readConnectionStatus(getDb());
-  const mostViewed = mostViewedAssets(getDb());
-  const byMember = activityByMember(getDb());
+  const db = await getDb();
+  const users = await readUsers();
+  const connection = await readConnectionStatus(db);
+  const mostViewed = await mostViewedAssets(db);
+  const byMember = await activityByMember(db);
   const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];
 
   return (

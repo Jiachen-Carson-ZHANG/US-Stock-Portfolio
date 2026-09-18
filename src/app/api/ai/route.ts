@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       { maxTokens: 6000 },
     );
 
-    saveAiNote(getDb(), parsed.data.symbol, text);
+    await saveAiNote(await getDb(), parsed.data.symbol, text);
     logger.info("ai.view", {
       symbol: parsed.data.symbol,
       by: user.username,
