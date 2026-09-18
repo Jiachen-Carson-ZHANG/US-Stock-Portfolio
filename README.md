@@ -229,24 +229,75 @@ so the moomoo connection survives and does not need re-authorizing.
 
 ### Deploying to coze.cn
 
-Coze is primarily an AI agent platform. Confirm it can host a **Node.js web
-application** — not just an agent or workflow — before planning around it. In
-its console look for a project type offering "deploy from GitHub", a Node
-runtime, or a custom web service. If all you can create is an agent, bot or
-workflow, it cannot run this app and you should use the Docker route below.
+Coze 编程 (`code.coze.cn`) hosts Node.js web applications. It runs on 火山引擎
+(Volcengine) underneath, but that is not a separate step you perform — you
+deploy to Coze and Coze allocates the Volcengine resources. Volcengine Ark, the
+AI model API, is an unrelated product and is not used by this app.
 
-If it does host Node apps, it will need:
+Everything Coze needs is already committed:
 
-- **Repository**: `Jiachen-Carson-ZHANG/US-Stock-Portfolio`, branch `main`
-- **Build command**: `npm ci && npm run build`
-- **Start command**: `npm start`
-- **Node version**: 22
-- **Port**: from `PORT`, default 3000
-- **Persistent volume** mounted at `/app/data`
-- **Environment variables**: everything in section 1
+| File | Purpose |
+|---|---|
+| `.coze` | Project manifest: runtime, build and run commands |
+| `.cozeproj/scripts/deploy_build.sh` | `npm ci`, build, assemble the standalone bundle |
+| `.cozeproj/scripts/deploy_run.sh` | Seed the database, start the server |
+| `scripts/coze-preview-*.sh` | The same for Coze's preview environment |
 
-After the first deploy, run `npm run db:seed` once in its shell, then set
-`APP_URL` to the real URL and re-run `moomoo:register` so the redirect matches.
+**Step 1 — create the project.** In the Coze console create a web application
+project and connect this repository. Coze issues a project id; paste it into the
+`sub_id` field at the top of `.coze` and commit.
+
+**Step 2 — create the database.** Enable Coze's built-in PostgreSQL and copy its
+connection string. Nothing else is needed: the app creates its own schema on
+first boot and seeds its accounts, so an empty database is the correct starting
+point.
+
+**Step 3 — set the environment variables.** Use Coze's encrypted environment
+variable panel, never a file in the repository.
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | The connection string from step 2 |
+| `DATABASE_SSL` | Only if the connection fails on TLS — try `no-verify` |
+| `AUTH_MODE` | `password` |
+| `APP_URL` | The URL Coze assigns, e.g. `https://xxx.coze.site` |
+| `SESSION_SECRET` | `openssl rand -base64 32` |
+| `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32`, different from the above |
+| `MOOMOO_CLIENT_ID` | From `npm run moomoo:register` |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Optional, for the AI notes |
+| `SEED_OWNER_PASSWORD` and the other `SEED_*` | The family's sign-in passwords |
+
+**Step 4 — allow the deployed origin.** Sign-in is a Server Action, and Next
+rejects one whose `Origin` does not match `Host`. Coze proxies from its own
+domain, so its hostname must be listed in `experimental.serverActions
+.allowedOrigins` in `next.config.ts`. The dev and sandbox hosts are already
+there; if sign-in fails on the deployed URL while working locally, add that
+exact hostname (or set `PUBLIC_ORIGIN` to it) and redeploy. **This is the most
+likely first failure and it produces no obvious error message.**
+
+**Step 5 — deploy, then point moomoo at it.** After the first successful deploy,
+set `APP_URL` to the real URL and re-run `npm run moomoo:register` so the OAuth
+redirect URI matches exactly. moomoo compares it character for character.
+
+**Step 6 — carry your data across**, if you are moving from the SQLite version:
+stop the app, set `DATABASE_URL` locally to the Coze database, and run
+`npm run db:migrate-from-sqlite`. See the previous section.
+
+#### Verifying the deployment
+
+1. `/login` renders **with styling** — unstyled means the standalone bundle is
+   missing `.next/static`, so check `deploy_build.sh` ran fully
+2. A wrong password is rejected; the right one signs in — if it hangs or fails
+   silently, revisit step 4
+3. `/dashboard` shows holdings, and `/settings` reports the broker connection
+4. Redeploy, then reload: you should stay signed in, because the session lives
+   in Postgres rather than on the container's disk
+
+#### Custom domain
+
+Coze can bind a domain, but a mainland-hosted one requires ICP 备案, which takes
+weeks. The Coze-provided URL needs no filing and is the fastest path to having
+the family actually using it.
 
 ### Docker (works on any VPS)
 
@@ -257,14 +308,14 @@ docker build -t family-portfolio .
 docker run -d --name portfolio \
   -p 3000:3000 \
   --env-file .env.local \
-  -v portfolio-data:/app/data \
   --restart unless-stopped \
   family-portfolio
 
 docker exec portfolio ./node_modules/.bin/tsx scripts/seed.ts
 ```
 
-The named volume is what preserves the database across image rebuilds.
+No volume is needed — all state lives in the Postgres instance `DATABASE_URL`
+points at, so the container can be rebuilt freely.
 
 Put a TLS terminator in front (Caddy or nginx) so the site is HTTPS — session
 cookies are `Secure` in production and will not be stored over plain HTTP.
