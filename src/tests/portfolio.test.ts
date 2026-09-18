@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { Position } from "@/types/portfolio";
 import {
   allocationByAssetType,
+  allocationByPosition,
   buildPositionViews,
   concentration,
   contractMultiplier,
   costBasis,
   daysToExpiration,
   marketValue,
+  shortExposure,
   summarize,
   todayPnL,
   totalMarketValue,
@@ -165,6 +167,126 @@ describe("portfolio aggregation", () => {
     const slices = allocationByAssetType(positions, "USD");
     expect(slices.map((s) => s.key)).toEqual(["stock", "cash"]);
     expect(slices[0].percent).toBeCloseTo(83.3333, 3);
+  });
+});
+
+describe("broker-reported figures", () => {
+  // Real moomoo data: NVIDIA, partly sold, so realized proceeds have driven
+  // cost_price negative. Deriving cost from it reports total P&L (+196) as if
+  // it were unrealized; the true unrealized figure is +80.
+  const partlySold = position({
+    id: "nvda",
+    symbol: "NVDA",
+    quantity: 0.435,
+    averageCost: -229.8851,
+    currentPrice: 221.072,
+    previousClose: 220,
+    reportedPrice: 221.072,
+    reportedMarketValue: 96.17,
+    reportedUnrealizedPnL: 80.3362,
+    reportedTodayPnL: 0.7533,
+    reportedRealizedPnL: 115.83,
+  });
+
+  it("derives cost from the broker's own market value and unrealized P&L", () => {
+    expect(Number(costBasis(partlySold).amount)).toBeCloseTo(15.8338, 4);
+  });
+
+  it("never reports realized gains as unrealized", () => {
+    const unrealized = Number(unrealizedPnL(partlySold).amount);
+    expect(unrealized).toBeCloseTo(80.33, 1);
+    expect(unrealized).toBeLessThan(100);
+  });
+
+  it("prefers the broker's stated figure for today", () => {
+    expect(Number(todayPnL(partlySold).amount)).toBeCloseTo(0.7533, 4);
+  });
+
+  it("falls back to the broker's market value when no quote has arrived", () => {
+    const unpriced = { ...partlySold, currentPrice: undefined };
+    expect(Number(marketValue(unpriced).amount)).toBeCloseTo(96.17, 2);
+  });
+
+  it("still derives cost from averageCost when the broker states nothing", () => {
+    const plain = position({ quantity: 10, averageCost: 100 });
+    expect(costBasis(plain).amount.toFixed()).toBe("1000");
+  });
+});
+
+describe("short positions", () => {
+  const shortCall = position({
+    id: "short",
+    symbol: "VRT270319C280000",
+    instrumentType: "option",
+    optionType: "call",
+    quantity: -1,
+    contractMultiplier: 100,
+    averageCost: 28.93,
+    currentPrice: 28.775,
+    previousClose: 29,
+    reportedPrice: 28.775,
+    reportedMarketValue: -2877.52,
+    reportedUnrealizedPnL: 15.48,
+    reportedTodayPnL: 0,
+  });
+
+  const longStock = position({
+    id: "long",
+    symbol: "AAA",
+    quantity: 10,
+    averageCost: 100,
+    currentPrice: 110,
+    previousClose: 105,
+  });
+
+  const cash = position({
+    id: "cash",
+    symbol: "USD.CASH",
+    instrumentType: "cash",
+    quantity: 1000,
+    averageCost: 1,
+    currentPrice: undefined,
+    previousClose: undefined,
+  });
+
+  const book = [longStock, shortCall, cash];
+
+  it("values a written call as negative market value", () => {
+    expect(Number(marketValue(shortCall).amount)).toBeCloseTo(-2877.5, 1);
+  });
+
+  it("shows a gain on a written call whose price has fallen", () => {
+    expect(Number(unrealizedPnL(shortCall).amount)).toBeCloseTo(15.5, 1);
+  });
+
+  it("reports short exposure separately", () => {
+    expect(Number(shortExposure(book, "USD").amount)).toBeCloseTo(-2877.5, 1);
+  });
+
+  it("reports zero short exposure for a long-only book", () => {
+    expect(shortExposure([longStock, cash], "USD").amount.toFixed()).toBe("0");
+  });
+
+  // A part-to-whole chart cannot render a negative slice, and a short leg in
+  // the denominator pushes concentration above 100%.
+  it("keeps shorts out of the allocation breakdown", () => {
+    const slices = allocationByPosition(book, "USD");
+    expect(slices.map((s) => s.key)).not.toContain("VRT270319C280000");
+    expect(slices.every((s) => Number(s.value) > 0)).toBe(true);
+  });
+
+  it("keeps allocation percentages summing to 100", () => {
+    const total = allocationByPosition(book, "USD").reduce(
+      (acc, s) => acc + s.percent,
+      0,
+    );
+    expect(total).toBeCloseTo(100, 6);
+  });
+
+  it("keeps concentration at or below 100 percent", () => {
+    const result = concentration(book, "USD");
+    expect(result.top1Percent).toBeCloseTo(100, 6);
+    expect(result.top5Percent).toBeLessThanOrEqual(100);
   });
 });
 

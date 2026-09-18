@@ -19,8 +19,10 @@ import {
   summarize,
 } from ".";
 import { getQuotes } from "./quotes";
-import { readPositions } from "./sync";
+import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
+import { activeProvider, getBrokerProvider } from "@/providers";
+import { logger } from "@/lib/logger";
 
 export type PortfolioData = {
   summary: PortfolioSummary;
@@ -37,12 +39,42 @@ export function baseCurrency(): string {
   return process.env.PORTFOLIO_BASE_CURRENCY ?? "USD";
 }
 
+function positionTtlSeconds(): number {
+  return Number(process.env.POSITION_CACHE_SECONDS ?? 60);
+}
+
+/**
+ * Re-pulls holdings once they age past their TTL (§15). The result is shared,
+ * so several family members opening the dashboard together trigger one sync
+ * rather than one each. A failure leaves the previous holdings in place.
+ */
+async function ensureFreshPositions(now: Date): Promise<void> {
+  if (activeProvider() !== "moomoo") return;
+
+  const db = getDb();
+  const synced = lastSyncedAt(db);
+  if (synced) {
+    const age = now.getTime() - new Date(synced).getTime();
+    if (age < positionTtlSeconds() * 1000) return;
+  }
+
+  try {
+    await syncPositions(db, getBrokerProvider(), "moomoo", now);
+  } catch (error) {
+    logger.error("broker.sync.failure", {
+      provider: "moomoo",
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+  }
+}
+
 async function pricedPositions(now: Date): Promise<{
   positions: Position[];
   dataTimestamp: string | null;
   isStale: boolean;
 }> {
   const db = getDb();
+  await ensureFreshPositions(now);
   const stored = readPositions(db);
   if (stored.length === 0) {
     return { positions: [], dataTimestamp: null, isStale: false };
@@ -59,7 +91,9 @@ async function pricedPositions(now: Date): Promise<{
     const quote = quotes.get(position.symbol);
     return {
       ...position,
-      currentPrice: quote?.price,
+      // The broker's own mark wins: it is the number shown in their app, and it
+      // is consistent with the market value and quantity beside it.
+      currentPrice: position.reportedPrice ?? quote?.price,
       previousClose: quote?.previousClose,
     };
   });

@@ -18,6 +18,11 @@ type PositionRow = {
   strike: number | null;
   expiration_date: string | null;
   contract_multiplier: number | null;
+  reported_price: number | null;
+  reported_market_value: number | null;
+  reported_unrealized_pnl: number | null;
+  reported_today_pnl: number | null;
+  reported_realized_pnl: number | null;
   synced_at: string;
 };
 
@@ -37,8 +42,20 @@ function toPosition(row: PositionRow): Position {
     strike: row.strike ?? undefined,
     expirationDate: row.expiration_date ?? undefined,
     contractMultiplier: row.contract_multiplier ?? undefined,
+    reportedPrice: row.reported_price ?? undefined,
+    reportedMarketValue: row.reported_market_value ?? undefined,
+    reportedUnrealizedPnL: row.reported_unrealized_pnl ?? undefined,
+    reportedTodayPnL: row.reported_today_pnl ?? undefined,
+    reportedRealizedPnL: row.reported_realized_pnl ?? undefined,
     lastUpdatedAt: row.synced_at,
   };
+}
+
+export function lastSyncedAt(db: DB): string | null {
+  const row = db
+    .prepare(`SELECT MAX(synced_at) AS synced_at FROM positions`)
+    .get() as { synced_at: string | null };
+  return row?.synced_at ?? null;
 }
 
 export function storedBrokers(db: DB): string[] {
@@ -70,8 +87,9 @@ export async function syncPositions(
     `INSERT INTO positions
        (id, broker, instrument_type, symbol, underlying_symbol, name, sector,
         quantity, average_cost, currency, option_type, strike, expiration_date,
-        contract_multiplier, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        contract_multiplier, reported_price, reported_market_value, reported_unrealized_pnl,
+        reported_today_pnl, reported_realized_pnl, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
 
   const replaceAll = db.transaction(() => {
@@ -92,6 +110,11 @@ export async function syncPositions(
         position.strike ?? null,
         position.expirationDate ?? null,
         position.contractMultiplier ?? null,
+        position.reportedPrice ?? null,
+        position.reportedMarketValue ?? null,
+        position.reportedUnrealizedPnL ?? null,
+        position.reportedTodayPnL ?? null,
+        position.reportedRealizedPnL ?? null,
         syncedAt,
       );
     }

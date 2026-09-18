@@ -29,7 +29,14 @@ export function LiveDashboard({
       <SummaryCards summary={data.summary} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AllocationDonut slices={data.allocations.byPosition} />
+        <AllocationDonut
+          slices={data.allocations.byPosition}
+          note={
+            Number(data.summary.shortExposure.amount) !== 0
+              ? "Long positions only. Short positions are listed in Holdings."
+              : undefined
+          }
+        />
         <div className="space-y-4">
           <ShareBar title="Asset type" slices={data.allocations.byAssetType} />
           <ShareBar title="Sector" slices={data.allocations.bySector} />

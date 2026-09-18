@@ -3,7 +3,21 @@ import { logger } from "@/lib/logger";
 import { MOOMOO_API_BASE, refreshAccessToken } from "./oauth";
 import { markRefreshed, markStatus, readConnection } from "./tokens";
 
-type Envelope<T> = { s: "ok"; d: T } | { s: "error"; errcode: number; errmsg: string };
+/** Trading endpoints answer with {s,d}; quote endpoints with {ret_code,data}. */
+type Envelope<T> =
+  | { s: "ok"; d: T }
+  | { s: "error"; errcode: number; errmsg: string }
+  | { ret_code: number; ret_msg: string; data: T };
+
+/**
+ * moomoo account IDs are uint64 and exceed Number.MAX_SAFE_INTEGER, so parsing
+ * them as JSON numbers silently rounds off the last digits and produces a valid
+ * looking ID for an account that does not exist. Quoting any integer of 16+
+ * digits before parsing keeps them exact as strings.
+ */
+export function parseJsonPreservingBigInts(text: string): unknown {
+  return JSON.parse(text.replace(/:\s*(-?\d{16,})(?=\s*[,}\]])/g, ':"$1"'));
+}
 
 /** Access tokens live ~2h; caching avoids a refresh round trip per request. */
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
@@ -103,12 +117,19 @@ export async function moomooRequest<T>(
     throw new Error(`moomoo ${path} returned HTTP ${response.status}`);
   }
 
-  const body = JSON.parse(text) as Envelope<T>;
-  if (body.s !== "ok") {
-    throw new Error(`moomoo ${path} error ${body.errcode}: ${body.errmsg}`);
+  const body = parseJsonPreservingBigInts(text) as Envelope<T>;
+
+  if ("s" in body) {
+    if (body.s !== "ok") {
+      throw new Error(`moomoo ${path} error ${body.errcode}: ${body.errmsg}`);
+    }
+    return body.d;
   }
 
-  return body.d;
+  if (body.ret_code !== 0) {
+    throw new Error(`moomoo ${path} error ${body.ret_code}: ${body.ret_msg}`);
+  }
+  return body.data;
 }
 
 export function moomooGet<T>(path: string): Promise<T> {

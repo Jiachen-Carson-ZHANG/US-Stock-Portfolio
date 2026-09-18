@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS positions (
   strike              REAL,
   expiration_date     TEXT,
   contract_multiplier REAL,
+  reported_price           REAL,
+  reported_market_value    REAL,
+  reported_unrealized_pnl  REAL,
+  reported_today_pnl       REAL,
+  reported_realized_pnl    REAL,
   synced_at           TEXT NOT NULL
 );
 
@@ -115,12 +120,24 @@ export function getDb(): DB {
 
 /** Adds columns introduced after a database was first created. */
 function migrate(db: DB): void {
-  const columns = db
-    .prepare(`PRAGMA table_info(broker_connections)`)
-    .all() as { name: string }[];
+  addColumn(db, "broker_connections", "account_id", "TEXT");
+  for (const column of [
+    "reported_price",
+    "reported_market_value",
+    "reported_unrealized_pnl",
+    "reported_today_pnl",
+    "reported_realized_pnl",
+  ]) {
+    addColumn(db, "positions", column, "REAL");
+  }
+}
 
-  if (!columns.some((c) => c.name === "account_id")) {
-    db.exec(`ALTER TABLE broker_connections ADD COLUMN account_id TEXT`);
+function addColumn(db: DB, table: string, column: string, type: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as {
+    name: string;
+  }[];
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
 }
 

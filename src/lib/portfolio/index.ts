@@ -22,22 +22,43 @@ export function contractMultiplier(position: Position): Decimal {
   return new Decimal(position.contractMultiplier ?? DEFAULT_CONTRACT_MULTIPLIER);
 }
 
+/** Live quote when one is available, else the broker's value from last sync. */
 export function marketValue(position: Position): Money {
   if (position.instrumentType === "cash") {
     return money(position.quantity, position.currency);
   }
-  if (position.currentPrice === undefined) return zero(position.currency);
-  return money(
-    new Decimal(position.quantity)
-      .times(position.currentPrice)
-      .times(contractMultiplier(position)),
-    position.currency,
-  );
+  if (position.currentPrice !== undefined) {
+    return money(
+      new Decimal(position.quantity)
+        .times(position.currentPrice)
+        .times(contractMultiplier(position)),
+      position.currency,
+    );
+  }
+  if (position.reportedMarketValue !== undefined) {
+    return money(position.reportedMarketValue, position.currency);
+  }
+  return zero(position.currency);
 }
 
+/**
+ * Brokers net realized proceeds against cost, which can drive averageCost
+ * negative — deriving from it then reports total P&L as if it were unrealized.
+ * Where the broker states both a market value and an unrealized figure, their
+ * difference is the only cost that reconciles with the account.
+ */
 export function costBasis(position: Position): Money {
   if (position.instrumentType === "cash") {
     return money(position.quantity, position.currency);
+  }
+  if (
+    position.reportedMarketValue !== undefined &&
+    position.reportedUnrealizedPnL !== undefined
+  ) {
+    return money(
+      new Decimal(position.reportedMarketValue).minus(position.reportedUnrealizedPnL),
+      position.currency,
+    );
   }
   if (position.averageCost === undefined) return zero(position.currency);
   return money(
@@ -53,31 +74,34 @@ export function unrealizedPnL(position: Position): Money {
   return subtract(marketValue(position), costBasis(position));
 }
 
+/**
+ * The broker's own figure first. Deriving it instead would subtract a quote
+ * feed's previous close from the broker's mark — two different bases, which on
+ * a thinly traded option shows a multi-percent move that never happened.
+ */
 export function todayPnL(position: Position): Money {
   if (position.instrumentType === "cash") return zero(position.currency);
-  if (position.currentPrice === undefined || position.previousClose === undefined) {
-    return zero(position.currency);
+  if (position.reportedTodayPnL !== undefined) {
+    return money(position.reportedTodayPnL, position.currency);
   }
-  return money(
-    new Decimal(position.currentPrice)
-      .minus(position.previousClose)
-      .times(position.quantity)
-      .times(contractMultiplier(position)),
-    position.currency,
-  );
+  if (position.currentPrice !== undefined && position.previousClose !== undefined) {
+    return money(
+      new Decimal(position.currentPrice)
+        .minus(position.previousClose)
+        .times(position.quantity)
+        .times(contractMultiplier(position)),
+      position.currency,
+    );
+  }
+  return zero(position.currency);
 }
 
+/** What the position was worth at the previous close, by definition. */
 function previousCloseValue(position: Position): Money {
   if (position.instrumentType === "cash") {
     return money(position.quantity, position.currency);
   }
-  if (position.previousClose === undefined) return zero(position.currency);
-  return money(
-    new Decimal(position.quantity)
-      .times(position.previousClose)
-      .times(contractMultiplier(position)),
-    position.currency,
-  );
+  return subtract(marketValue(position), todayPnL(position));
 }
 
 export function metricsFor(position: Position, totalValue: Money): PositionMetrics {
@@ -135,6 +159,7 @@ export function summarize(
     todayPnLPercent: percentOf(today, previousTotal),
     cashValue: toDTO(cash),
     cashPercent: percentOf(cash, total) ?? 0,
+    shortExposure: toDTO(shortExposure(positions, currency)),
     positionCount: positions.filter((p) => p.instrumentType !== "cash").length,
     marketStatus: market.status,
     dataTimestamp: market.dataTimestamp,
@@ -142,12 +167,29 @@ export function summarize(
   };
 }
 
+/** Positions carrying positive market value — i.e. excluding written/short ones. */
+export function longPositions(positions: Position[]): Position[] {
+  return positions.filter((p) => marketValue(p).amount.greaterThan(0));
+}
+
+/** Net market value of positions held short, as a negative figure. */
+export function shortExposure(positions: Position[], currency: string): Money {
+  return sum(
+    positions.filter((p) => marketValue(p).amount.isNegative()).map(marketValue),
+    currency,
+  );
+}
+
 /**
  * Factual share of portfolio value held in the largest N positions. Cash is
- * excluded so the figure describes invested concentration, not idle balance.
+ * excluded so the figure describes invested concentration, not idle balance,
+ * and short positions are excluded because a negative leg would push the
+ * percentages above 100.
  */
 export function concentration(positions: Position[], currency: string): Concentration {
-  const invested = positions.filter((p) => p.instrumentType !== "cash");
+  const invested = longPositions(positions).filter(
+    (p) => p.instrumentType !== "cash",
+  );
   const total = totalMarketValue(invested, currency);
   if (total.amount.isZero()) {
     return { top1Percent: 0, top3Percent: 0, top5Percent: 0 };
@@ -177,13 +219,20 @@ function toSlices(
     .sort((a, b) => Number(b.value) - Number(a.value));
 }
 
+/**
+ * Composition is only meaningful over positive value — a part-to-whole chart
+ * cannot represent a negative slice. Short positions are reported separately
+ * via shortExposure rather than folded in here.
+ */
 function groupBy(
   positions: Position[],
   currency: string,
   keyOf: (p: Position) => { key: string; label: string } | null,
 ): AllocationSlice[] {
+  const included = longPositions(positions);
   const groups = new Map<string, { label: string; value: Money }>();
-  for (const position of positions) {
+
+  for (const position of included) {
     const group = keyOf(position);
     if (!group) continue;
     const existing = groups.get(group.key);
@@ -194,7 +243,8 @@ function groupBy(
         : marketValue(position),
     });
   }
-  return toSlices(groups, totalMarketValue(positions, currency));
+
+  return toSlices(groups, totalMarketValue(included, currency));
 }
 
 export function allocationByPosition(

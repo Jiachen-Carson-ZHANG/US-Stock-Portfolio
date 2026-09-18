@@ -6,9 +6,9 @@ import { readConnection, setAccountId } from "@/lib/moomoo/tokens";
 import { deriveContractMultiplier, parseSymbol } from "@/lib/moomoo/symbols";
 
 type MoomooAccount = {
-  // uint64 in the API. Values above 2^53 would already be mangled by JSON.parse;
-  // that fails loudly on the next call rather than returning another account.
-  account_id: number;
+  // uint64, routinely beyond Number.MAX_SAFE_INTEGER — the client keeps it as
+  // an exact string so the ID is not silently rounded into a different account.
+  account_id: string;
   security_firm: string;
   acc_type: string;
   account_card_number?: string;
@@ -24,7 +24,16 @@ type MoomooPosition = {
   cost_price: string;
   cost_price_valid: boolean;
   market_val: string;
+  unrealized_pl: string;
+  realized_pl: string;
+  today_pl_val: string;
 };
+
+function numberOrUndefined(value: string | undefined): number | undefined {
+  if (value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 type MoomooFunds = {
   cash: string;
@@ -88,6 +97,13 @@ export class MoomooBrokerProvider implements BrokerProvider {
           quantity,
           averageCost: row.cost_price_valid ? Number(row.cost_price) : 0,
           currency: row.currency || BASE_CURRENCY(),
+          // Taken verbatim: moomoo nets realized proceeds against cost, so these
+          // are the only figures that reconcile with the account itself.
+          reportedPrice: numberOrUndefined(row.nominal_price),
+          reportedMarketValue: numberOrUndefined(row.market_val),
+          reportedUnrealizedPnL: numberOrUndefined(row.unrealized_pl),
+          reportedTodayPnL: numberOrUndefined(row.today_pl_val),
+          reportedRealizedPnL: numberOrUndefined(row.realized_pl),
         };
 
         if (parsed.instrumentType !== "option") return base;

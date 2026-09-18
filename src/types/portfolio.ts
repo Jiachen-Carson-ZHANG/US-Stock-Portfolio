@@ -37,6 +37,20 @@ export type Position = {
   expirationDate?: string;
   contractMultiplier?: number;
 
+  /**
+   * Figures the broker states directly. Preferred over deriving from cost and
+   * price: a broker reduces cost basis by realized proceeds, so a position that
+   * has been partly sold can carry a negative cost_price, and deriving from it
+   * silently reports total P&L under the unrealized label.
+   */
+  /** The broker's own mark. Preferred over a quote feed so displayed price,
+   *  quantity and market value agree with each other and with the broker app. */
+  reportedPrice?: number;
+  reportedMarketValue?: number;
+  reportedUnrealizedPnL?: number;
+  reportedTodayPnL?: number;
+  reportedRealizedPnL?: number;
+
   lastUpdatedAt: string;
 };
 
@@ -61,6 +75,8 @@ export type PortfolioSummary = {
   todayPnLPercent: number | null;
   cashValue: MoneyDTO;
   cashPercent: number;
+  /** Net value of written/short positions. Zero when none are held. */
+  shortExposure: MoneyDTO;
   positionCount: number;
   marketStatus: MarketSession;
   dataTimestamp: string | null;

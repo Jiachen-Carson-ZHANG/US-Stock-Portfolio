@@ -19,7 +19,9 @@ const CONNECT_OUTCOME: Record<string, { tone: "ok" | "bad"; message: string }> =
   write_scope: {
     tone: "bad",
     message:
-      "Connection refused: a write scope was granted. Reconnect and approve only read access.",
+      "Connection refused: a write permission was granted, so nothing was saved. " +
+      "On moomoo's screen tick only Market Data and Accounts & Orders. " +
+      "Watchlists and Trade Execution both grant write access.",
   },
   state_mismatch: {
     tone: "bad",

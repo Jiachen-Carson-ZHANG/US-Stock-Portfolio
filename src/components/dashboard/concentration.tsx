@@ -17,7 +17,7 @@ export function ConcentrationTiles({ data }: { data: Concentration }) {
         Concentration
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        Share of invested market value, excluding cash.
+        Share of long invested market value, excluding cash and short positions.
       </p>
 
       <dl className="mt-4 grid grid-cols-3 gap-4">

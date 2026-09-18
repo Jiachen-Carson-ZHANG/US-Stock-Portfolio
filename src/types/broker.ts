@@ -20,6 +20,12 @@ export type BrokerPosition = {
   strike?: number;
   expirationDate?: string;
   contractMultiplier?: number;
+
+  reportedPrice?: number;
+  reportedMarketValue?: number;
+  reportedUnrealizedPnL?: number;
+  reportedTodayPnL?: number;
+  reportedRealizedPnL?: number;
 };
 
 export type AccountSummary = {

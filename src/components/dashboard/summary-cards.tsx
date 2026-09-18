@@ -31,13 +31,22 @@ function Stat({
 export function SummaryCards({ summary }: { summary: PortfolioSummary }) {
   const today = Number(summary.todayPnL.amount);
   const unrealized = Number(summary.totalUnrealizedPnL.amount);
+  const short = Number(summary.shortExposure.amount);
+
+  const composition = [
+    `${summary.positionCount} positions`,
+    `${summary.cashPercent.toFixed(1)}% cash`,
+    short !== 0 ? `${formatMoney(summary.shortExposure)} short` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Stat
         label="Portfolio value"
         value={formatMoney(summary.totalMarketValue)}
-        sub={`${summary.positionCount} positions · ${summary.cashPercent.toFixed(1)}% cash`}
+        sub={composition}
       />
       <Stat
         label="Today"

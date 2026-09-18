@@ -30,7 +30,13 @@ function fold(slices: AllocationSlice[]): AllocationSlice[] {
   ];
 }
 
-export function AllocationDonut({ slices }: { slices: AllocationSlice[] }) {
+export function AllocationDonut({
+  slices,
+  note,
+}: {
+  slices: AllocationSlice[];
+  note?: string;
+}) {
   const data = fold(slices);
   const items = data.map((slice, index) => ({
     label: shortSymbol(slice.label),
@@ -40,7 +46,7 @@ export function AllocationDonut({ slices }: { slices: AllocationSlice[] }) {
   }));
 
   return (
-    <ChartFrame title="Portfolio allocation" height={280}>
+    <ChartFrame title="Portfolio allocation" note={note} height={280}>
       <div className="grid h-full grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="h-[180px] sm:h-full">
           <ResponsiveContainer width="100%" height="100%">

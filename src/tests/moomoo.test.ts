@@ -9,6 +9,7 @@ import {
   writeScopesIn,
 } from "@/lib/moomoo/oauth";
 import { deriveContractMultiplier, parseSymbol } from "@/lib/moomoo/symbols";
+import { parseJsonPreservingBigInts } from "@/lib/moomoo/client";
 import {
   deleteConnection,
   markStatus,
@@ -77,6 +78,43 @@ describe("authorize URL", () => {
 
   it("never asks for a write scope", () => {
     expect(url.searchParams.get("scope")).not.toContain("write");
+  });
+});
+
+describe("big integer JSON parsing", () => {
+  // moomoo account IDs exceed Number.MAX_SAFE_INTEGER. JSON.parse rounds them
+  // to a valid looking ID for an account that does not exist, which the API
+  // then rejects with "No permission to access this account".
+  it("keeps an oversized account id exact", () => {
+    const parsed = parseJsonPreservingBigInts(
+      '{"s":"ok","d":{"accounts":[{"account_id":283726804710975704}]}}',
+    ) as { d: { accounts: { account_id: string }[] } };
+
+    expect(parsed.d.accounts[0].account_id).toBe("283726804710975704");
+  });
+
+  it("shows why the raw parser cannot be used", () => {
+    const naive = JSON.parse('{"account_id":283726804710975704}');
+    expect(String(naive.account_id)).not.toBe("283726804710975704");
+  });
+
+  it("leaves ordinary numbers as numbers", () => {
+    const parsed = parseJsonPreservingBigInts(
+      '{"price":337,"volume":1876507,"listing_date":345445200000}',
+    ) as Record<string, unknown>;
+
+    expect(parsed.price).toBe(337);
+    expect(parsed.volume).toBe(1876507);
+    expect(parsed.listing_date).toBe(345445200000);
+  });
+
+  it("leaves strings untouched", () => {
+    const parsed = parseJsonPreservingBigInts(
+      '{"card":"1008256316165115","qty":"-1"}',
+    ) as Record<string, unknown>;
+
+    expect(parsed.card).toBe("1008256316165115");
+    expect(parsed.qty).toBe("-1");
   });
 });
 
