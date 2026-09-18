@@ -64,6 +64,10 @@ export function writeSnapshot(
   );
 }
 
+export function clearSnapshots(db: DB): number {
+  return db.prepare(`DELETE FROM portfolio_snapshots`).run().changes;
+}
+
 export function hasSnapshot(db: DB, date: string): boolean {
   const row = db
     .prepare(`SELECT 1 FROM portfolio_snapshots WHERE snapshot_date = ?`)

@@ -45,6 +45,51 @@ export function SyncButton() {
   );
 }
 
+export function MoomooConnection({ connected }: { connected: boolean }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function connect() {
+    setPending(true);
+    setError(null);
+
+    const response = await fetch("/api/broker/moomoo/connect", { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data.authorizeUrl) {
+      setError(data.error ?? "Could not start the moomoo connection.");
+      setPending(false);
+      return;
+    }
+
+    window.location.href = data.authorizeUrl;
+  }
+
+  async function disconnect() {
+    setPending(true);
+    await fetch("/api/broker/moomoo/disconnect", { method: "POST" });
+    setPending(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button onClick={connect} disabled={pending}>
+        {pending ? "Opening moomoo…" : connected ? "Reconnect moomoo" : "Connect moomoo"}
+      </Button>
+
+      {connected && (
+        <Button variant="ghost" onClick={disconnect} disabled={pending}>
+          Disconnect
+        </Button>
+      )}
+
+      {error && <p className="text-sm text-negative">{error}</p>}
+    </div>
+  );
+}
+
 export function UserRows({ users }: { users: AdminUser[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, string>>({});

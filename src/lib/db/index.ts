@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS broker_connections (
   iv                      TEXT NOT NULL,
   auth_tag                TEXT NOT NULL,
   scope                   TEXT NOT NULL,
+  account_id              TEXT,
   connected_at            TEXT NOT NULL,
   last_refresh_at         TEXT,
   status                  TEXT NOT NULL
@@ -106,9 +107,21 @@ export function getDb(): DB {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
+  migrate(db);
 
   instance = db;
   return db;
+}
+
+/** Adds columns introduced after a database was first created. */
+function migrate(db: DB): void {
+  const columns = db
+    .prepare(`PRAGMA table_info(broker_connections)`)
+    .all() as { name: string }[];
+
+  if (!columns.some((c) => c.name === "account_id")) {
+    db.exec(`ALTER TABLE broker_connections ADD COLUMN account_id TEXT`);
+  }
 }
 
 /** Fresh in-memory database for tests — never touches the on-disk file. */

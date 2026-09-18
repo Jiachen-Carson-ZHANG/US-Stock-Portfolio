@@ -41,6 +41,13 @@ function toPosition(row: PositionRow): Position {
   };
 }
 
+export function storedBrokers(db: DB): string[] {
+  const rows = db
+    .prepare(`SELECT DISTINCT broker FROM positions`)
+    .all() as { broker: string }[];
+  return rows.map((row) => row.broker);
+}
+
 export function readPositions(db: DB): Position[] {
   const rows = db.prepare(`SELECT * FROM positions`).all() as PositionRow[];
   return rows.map(toPosition);

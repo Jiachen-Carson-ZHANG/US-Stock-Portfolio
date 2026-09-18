@@ -2,8 +2,32 @@ import { requireOwner } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { activeProvider } from "@/providers";
 import { loadPortfolio } from "@/lib/portfolio/service";
-import { SyncButton, UserRows } from "@/components/layout/settings-actions";
+import { readConnectionStatus } from "@/lib/moomoo/tokens";
+import {
+  MoomooConnection,
+  SyncButton,
+  UserRows,
+} from "@/components/layout/settings-actions";
 import { Badge } from "@/components/ui/misc";
+
+const CONNECT_OUTCOME: Record<string, { tone: "ok" | "bad"; message: string }> = {
+  connected: { tone: "ok", message: "moomoo connected and holdings synced." },
+  connected_sync_failed: {
+    tone: "bad",
+    message: "Connected, but the first sync failed. Try Sync holdings now.",
+  },
+  write_scope: {
+    tone: "bad",
+    message:
+      "Connection refused: a write scope was granted. Reconnect and approve only read access.",
+  },
+  state_mismatch: {
+    tone: "bad",
+    message: "Authorization could not be verified. Start the connection again.",
+  },
+  denied: { tone: "bad", message: "Authorization was cancelled." },
+  failed: { tone: "bad", message: "Could not connect to moomoo." },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +53,18 @@ function readUsers() {
     .all(new Date().toISOString()) as UserRow[];
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ moomoo?: string }>;
+}) {
   await requireOwner();
 
   const provider = activeProvider();
   const { summary, positions } = await loadPortfolio();
   const users = readUsers();
+  const connection = readConnectionStatus(getDb());
+  const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];
 
   return (
     <div className="space-y-6">
@@ -42,6 +72,56 @@ export default async function SettingsPage() {
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner only.</p>
       </header>
+
+      {outcome && (
+        <p
+          role="status"
+          className={`rounded-lg border border-border px-4 py-3 text-sm ${
+            outcome.tone === "ok" ? "text-positive" : "text-negative"
+          }`}
+        >
+          {outcome.message}
+        </p>
+      )}
+
+      <section className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-medium">Broker connection</h2>
+          <Badge>{connection ? connection.status : "not connected"}</Badge>
+        </div>
+
+        {connection ? (
+          <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+              <dt className="text-xs text-muted-foreground">Granted scopes</dt>
+              <dd className="mt-1 text-sm font-medium">{connection.scope || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Account</dt>
+              <dd className="mt-1 text-sm font-medium">
+                {connection.accountId ? `••••${connection.accountId.slice(-4)}` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Token refreshed</dt>
+              <dd className="mt-1 text-sm font-medium">
+                {connection.lastRefreshAt
+                  ? new Date(connection.lastRefreshAt).toLocaleString()
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Connect a moomoo account to replace the synthetic holdings. Only
+            read access is requested, and a write grant is refused.
+          </p>
+        )}
+
+        <div className="mt-5">
+          <MoomooConnection connected={connection !== null} />
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -76,7 +156,8 @@ export default async function SettingsPage() {
 
         {provider === "mock" && (
           <p className="mt-4 text-xs text-muted-foreground">
-            Showing synthetic holdings. Broker connection is not implemented yet.
+            Showing synthetic holdings. Connecting a moomoo account switches
+            this over automatically.
           </p>
         )}
 
