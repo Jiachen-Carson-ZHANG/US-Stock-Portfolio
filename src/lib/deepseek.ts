@@ -48,7 +48,9 @@ export async function deepSeekChat(
     body: JSON.stringify({
       model: aiModel(),
       messages,
-      max_tokens: options.maxTokens ?? 700,
+      // Generous, because reasoning models spend most of this before writing a
+      // word. The visible answer is still capped by the prompt's word limit.
+      max_tokens: options.maxTokens ?? 4000,
       temperature: 0.4,
       stream: false,
     }),
@@ -62,11 +64,27 @@ export async function deepSeekChat(
   }
 
   const body = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
+    choices?: {
+      finish_reason?: string;
+      message?: { content?: string; reasoning_content?: string };
+    }[];
   };
 
-  const text = body.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error("DeepSeek returned no content.");
+  const choice = body.choices?.[0];
+  const text = choice?.message?.content?.trim();
+
+  if (!text) {
+    // A reasoning model emits its thinking first and only then the answer. Run
+    // the budget out during thinking and content comes back empty, which looks
+    // like a provider fault but is really a max_tokens that is too small.
+    if (choice?.finish_reason === "length") {
+      throw new Error(
+        "The model used its whole token budget on reasoning and produced no answer. Raise maxTokens.",
+      );
+    }
+    throw new Error("The model returned no content.");
+  }
+
   return text;
 }
 

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       }
       const text = await deepSeekChat(
         rewritePrompt({ draft: parsed.data.draft, locale }),
-        { maxTokens: 400 },
+        { maxTokens: 2500 },
       );
       return Response.json({ text });
     }
