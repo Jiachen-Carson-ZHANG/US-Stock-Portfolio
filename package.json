@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed.ts",
+    "db:reset-passwords": "tsx scripts/seed.ts --reset-passwords",
     "moomoo:register": "tsx scripts/moomoo-register.ts"
   },
   "dependencies": {

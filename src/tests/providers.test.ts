@@ -76,6 +76,7 @@ describe("position sync", () => {
       getAccountSummary: async () => {
         throw new Error("broker unavailable");
       },
+      getTransactions: async () => [],
     };
 
     await expect(syncPositions(db, failing, "mock")).rejects.toThrow();

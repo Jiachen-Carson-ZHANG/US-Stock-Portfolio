@@ -5,9 +5,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { Card, CardContent } from "@/components/ui/card";
+import { useT } from "@/lib/i18n/context";
 
 export function LoginForm() {
   const router = useRouter();
+  const t = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function LoginForm() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setError(data.error ?? "Sign in failed");
+        setError(data.error ?? t.common.error);
         setPending(false);
         return;
       }
@@ -35,7 +37,7 @@ export function LoginForm() {
       router.replace("/dashboard");
       router.refresh();
     } catch {
-      setError("Cannot reach the server. Check your connection.");
+      setError(t.login.unreachable);
       setPending(false);
     }
   }
@@ -45,7 +47,7 @@ export function LoginForm() {
       <CardContent className="pt-5">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">{t.login.username}</Label>
             <Input
               id="username"
               name="username"
@@ -59,7 +61,7 @@ export function LoginForm() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t.login.password}</Label>
             <Input
               id="password"
               name="password"
@@ -78,7 +80,7 @@ export function LoginForm() {
           )}
 
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Signing in…" : "Sign in"}
+            {pending ? t.login.signingIn : t.login.signIn}
           </Button>
         </form>
       </CardContent>

@@ -1,7 +1,13 @@
 import Decimal from "decimal.js";
-import type { AllocationSlice, Money, Position } from "@/types/portfolio";
-import { add, money, sum, zero } from "@/lib/money";
-import { contractMultiplier, costBasis, marketValue, todayPnL, unrealizedPnL } from ".";
+import type { AllocationSlice, Money, MoneyDTO, Position } from "@/types/portfolio";
+import { add, money, sum, toDTO, zero } from "@/lib/money";
+import {
+  contractMultiplier,
+  costBasis,
+  marketValue,
+  todayPnL,
+  unrealizedPnL,
+} from ".";
 
 export type OptionStrategy =
   | "call-spread"
@@ -218,8 +224,47 @@ export function groupOptions(positions: Position[]): {
   return { groups, nonOptions };
 }
 
-export function optionStrategyLabel(strategy: OptionStrategy): string {
-  return strategy;
+/** Wire shape: Decimal is not JSON-safe, so amounts cross as strings. */
+export type OptionGroupDTO = {
+  id: string;
+  underlying: string;
+  expirationDate?: string;
+  strategy: OptionStrategy;
+  legs: Position[];
+  netCost: MoneyDTO;
+  netMarketValue: MoneyDTO;
+  unrealizedPnL: MoneyDTO;
+  todayPnL: MoneyDTO;
+  maxProfit: MoneyDTO | null;
+  maxLoss: MoneyDTO | null;
+  breakEven: number | null;
+  weightPercent: number;
+};
+
+export function toOptionGroupDTO(
+  group: OptionGroup,
+  investedTotal: Money,
+): OptionGroupDTO {
+  return {
+    id: group.id,
+    underlying: group.underlying,
+    expirationDate: group.expirationDate,
+    strategy: group.strategy,
+    legs: group.legs,
+    netCost: toDTO(group.netCost),
+    netMarketValue: toDTO(group.netMarketValue),
+    unrealizedPnL: toDTO(group.unrealizedPnL),
+    todayPnL: toDTO(group.todayPnL),
+    maxProfit: group.maxProfit ? toDTO(group.maxProfit) : null,
+    maxLoss: group.maxLoss ? toDTO(group.maxLoss) : null,
+    breakEven: group.breakEven,
+    weightPercent: investedTotal.amount.isZero()
+      ? 0
+      : group.netCost.amount
+          .dividedBy(investedTotal.amount)
+          .times(100)
+          .toNumber(),
+  };
 }
 
 /**
@@ -266,6 +311,64 @@ export function allocationByInvestedCapital(
       percent: entry.value.amount.dividedBy(total.amount).times(100).toNumber(),
     }))
     .sort((a, b) => Number(b.value) - Number(a.value));
+}
+
+export type AssetClassPerformance = {
+  key: "stocks" | "options";
+  invested: MoneyDTO;
+  marketValue: MoneyDTO;
+  unrealizedPnL: MoneyDTO;
+  returnPercent: number | null;
+};
+
+/**
+ * Stocks and options answer different questions, and netting them hides which
+ * one is actually carrying the portfolio. Options are measured per spread so a
+ * hedged position is not counted twice.
+ */
+export function performanceByAssetClass(
+  positions: Position[],
+  currency: string,
+): AssetClassPerformance[] {
+  const { groups, nonOptions } = groupOptions(positions);
+  const equities = nonOptions.filter((p) => p.instrumentType !== "cash");
+
+  const stockInvested = equities
+    .map((p) => investedCapital(p, currency))
+    .reduce((acc, m) => add(acc, m), zero(currency));
+  const stockValue = sum(equities.map(marketValue), currency);
+  const stockPnL = sum(equities.map(unrealizedPnL), currency);
+
+  const optionInvested = groups
+    .map((g) => g.netCost)
+    .filter((c) => c.amount.greaterThan(0))
+    .reduce((acc, m) => add(acc, m), zero(currency));
+  const optionValue = groups
+    .map((g) => g.netMarketValue)
+    .reduce((acc, m) => add(acc, m), zero(currency));
+  const optionPnL = groups
+    .map((g) => g.unrealizedPnL)
+    .reduce((acc, m) => add(acc, m), zero(currency));
+
+  const ratio = (pnl: Money, base: Money) =>
+    base.amount.isZero() ? null : pnl.amount.dividedBy(base.amount).times(100).toNumber();
+
+  return [
+    {
+      key: "stocks" as const,
+      invested: toDTO(stockInvested),
+      marketValue: toDTO(stockValue),
+      unrealizedPnL: toDTO(stockPnL),
+      returnPercent: ratio(stockPnL, stockInvested),
+    },
+    {
+      key: "options" as const,
+      invested: toDTO(optionInvested),
+      marketValue: toDTO(optionValue),
+      unrealizedPnL: toDTO(optionPnL),
+      returnPercent: ratio(optionPnL, optionInvested),
+    },
+  ];
 }
 
 /** Capital committed to a position: what was paid, not what it is worth now. */

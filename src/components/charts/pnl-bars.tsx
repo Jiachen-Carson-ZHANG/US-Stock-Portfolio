@@ -25,6 +25,7 @@ import {
   shortSymbol,
 } from "./chart-kit";
 import { HorizontalRoundedBar, VerticalRoundedBar } from "./rounded-bar";
+import { useT } from "@/lib/i18n/context";
 
 type Datum = { symbol: string; value: number };
 
@@ -40,11 +41,12 @@ function toData(
 }
 
 export function UnrealizedPnLBars({ positions }: { positions: PositionView[] }) {
+  const t = useT();
   const data = toData(positions, (p) => Number(p.unrealizedPnL.amount));
   if (data.length === 0) return null;
 
   return (
-    <ChartFrame title="Unrealized P&L by position" height={Math.max(220, data.length * 44)}>
+    <ChartFrame title={t.charts.unrealizedByPosition} height={Math.max(220, data.length * 44)}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
@@ -78,7 +80,7 @@ export function UnrealizedPnLBars({ positions }: { positions: PositionView[] }) 
                 <Tip
                   label={datum.symbol}
                   rows={[
-                    { name: "Unrealized P&L", value: exactUsd(datum.value) },
+                    { name: t.table.unrealized, value: exactUsd(datum.value) },
                   ]}
                 />
               );
@@ -104,12 +106,13 @@ export function UnrealizedPnLBars({ positions }: { positions: PositionView[] }) 
 }
 
 export function ContributionBars({ positions }: { positions: PositionView[] }) {
+  const t = useT();
   const data = toData(positions, (p) => Number(p.todayPnL.amount));
   if (data.length === 0) {
     return (
       <ChartFrame
-        title="Today's contribution"
-        note="No price change recorded for the current session."
+        title={t.charts.contribution}
+        note={t.charts.noHistory}
         height={120}
       >
         <div />
@@ -119,8 +122,8 @@ export function ContributionBars({ positions }: { positions: PositionView[] }) {
 
   return (
     <ChartFrame
-      title="Today's contribution"
-      note="How much each position moved the portfolio today."
+      title={t.charts.contribution}
+      note={t.charts.contributionNote}
       height={260}
     >
       <ResponsiveContainer width="100%" height="100%">
@@ -149,7 +152,7 @@ export function ContributionBars({ positions }: { positions: PositionView[] }) {
               return (
                 <Tip
                   label={datum.symbol}
-                  rows={[{ name: "Today", value: exactUsd(datum.value) }]}
+                  rows={[{ name: t.table.today, value: exactUsd(datum.value) }]}
                 />
               );
             }}

@@ -27,6 +27,10 @@ const ACCOUNTS: SeedAccount[] = [
 
 const SNAPSHOT_DAYS = 120;
 
+// Existing accounts are never silently rewritten, so changing a SEED_* value
+// has no effect until this is passed deliberately.
+const RESET_PASSWORDS = process.argv.includes("--reset-passwords");
+
 async function seedUsers() {
   const db = getDb();
   const generated: { username: string; password: string }[] = [];
@@ -34,7 +38,21 @@ async function seedUsers() {
   for (const account of ACCOUNTS) {
     const existing = db
       .prepare(`SELECT id FROM users WHERE username = ?`)
-      .get(account.username);
+      .get(account.username) as { id: string } | undefined;
+
+    if (existing && RESET_PASSWORDS) {
+      const password = process.env[account.envVar];
+      if (!password) {
+        console.log(`  ${account.username.padEnd(7)} skipped — ${account.envVar} is empty`);
+        continue;
+      }
+      db.prepare(
+        `UPDATE users SET password_hash = ?, display_name = ?, role = ? WHERE id = ?`,
+      ).run(await hashPassword(password), account.displayName, account.role, existing.id);
+      console.log(`  ${account.username.padEnd(7)} password reset`);
+      continue;
+    }
+
     if (existing) {
       console.log(`  ${account.username.padEnd(7)} already exists — left unchanged`);
       continue;
@@ -146,9 +164,21 @@ async function main() {
   console.log("\nSeeding family portfolio dashboard\n");
   console.log("Accounts:");
   await seedUsers();
-  console.log("\nPortfolio:");
-  await seedPositions();
-  await seedSnapshots();
+
+  // Synthetic holdings would overwrite the real ones and pollute the snapshot
+  // history, so the portfolio is only seeded while no broker is connected.
+  const connected = getDb()
+    .prepare(`SELECT 1 FROM broker_connections LIMIT 1`)
+    .get();
+
+  if (connected) {
+    console.log("\nPortfolio: broker connected — real holdings left untouched.");
+  } else {
+    console.log("\nPortfolio:");
+    await seedPositions();
+    await seedSnapshots();
+  }
+
   console.log("\nDone.\n");
 }
 

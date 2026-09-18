@@ -160,6 +160,14 @@ export function summarize(
     cashValue: toDTO(cash),
     cashPercent: percentOf(cash, total) ?? 0,
     shortExposure: toDTO(shortExposure(positions, currency)),
+    realizedPnL: toDTO(
+      sum(
+        positions.map((p) =>
+          money(p.reportedRealizedPnL ?? 0, currency),
+        ),
+        currency,
+      ),
+    ),
     positionCount: positions.filter((p) => p.instrumentType !== "cash").length,
     marketStatus: market.status,
     dataTimestamp: market.dataTimestamp,

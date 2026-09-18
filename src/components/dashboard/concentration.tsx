@@ -1,23 +1,28 @@
+"use client";
+
+import { useT } from "@/lib/i18n/context";
 import type { Concentration } from "@/types/portfolio";
 
 /**
- * Stated as plain shares of market value. Deliberately carries no "safe" or
- * "risky" framing — the spec forbids turning a factual figure into a judgement.
+ * Stated as plain shares of invested capital. Deliberately carries no "safe" or
+ * "risky" framing — a factual figure, not a judgement.
  */
 export function ConcentrationTiles({ data }: { data: Concentration }) {
+  const t = useT();
+
   const tiles = [
-    { label: "Top holding", value: data.top1Percent },
-    { label: "Top 3 holdings", value: data.top3Percent },
-    { label: "Top 5 holdings", value: data.top5Percent },
+    { label: t.charts.topHolding, value: data.top1Percent },
+    { label: t.charts.top3, value: data.top3Percent },
+    { label: t.charts.top5, value: data.top5Percent },
   ];
 
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
       <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Concentration
+        {t.charts.concentration}
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        Share of long invested market value, excluding cash and short positions.
+        {t.charts.concentrationNote}
       </p>
 
       <dl className="mt-4 grid grid-cols-3 gap-4">

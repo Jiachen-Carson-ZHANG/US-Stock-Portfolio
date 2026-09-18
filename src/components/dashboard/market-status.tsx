@@ -1,6 +1,8 @@
 "use client";
 
-import { marketSessionLabel } from "@/lib/market-hours";
+import { RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/context";
 import type { PortfolioSummary } from "@/types/portfolio";
 
 function clockTime(iso: string | null): string {
@@ -22,10 +24,21 @@ const DOT_COLOR: Record<PortfolioSummary["marketStatus"], string> = {
 export function MarketStatus({
   summary,
   refreshing,
+  onRefresh,
 }: {
   summary: PortfolioSummary;
   refreshing?: boolean;
+  onRefresh?: () => void;
 }) {
+  const t = useT();
+
+  const sessionLabel = {
+    "pre-market": t.market.preMarket,
+    regular: t.market.regular,
+    "after-hours": t.market.afterHours,
+    closed: t.market.closed,
+  }[summary.marketStatus];
+
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1.5">
@@ -34,20 +47,33 @@ export function MarketStatus({
           className="size-1.5 rounded-full"
           style={{ background: DOT_COLOR[summary.marketStatus] }}
         />
-        {marketSessionLabel(summary.marketStatus)}
+        {sessionLabel}
       </span>
 
       <span aria-hidden="true">·</span>
 
       <span>
-        Last updated: <span className="tabular">{clockTime(summary.dataTimestamp)}</span>
-        {refreshing && <span className="ml-1.5 opacity-60">refreshing…</span>}
+        {t.market.lastUpdated}:{" "}
+        <span className="tabular">{clockTime(summary.dataTimestamp)}</span>
       </span>
 
+      {onRefresh && (
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+        >
+          <RefreshCw
+            aria-hidden="true"
+            className={cn("size-3.5", refreshing && "animate-spin")}
+          />
+          {refreshing ? t.market.refreshing : t.market.refresh}
+        </button>
+      )}
+
       {summary.isStale && (
-        <span className="w-full text-negative sm:w-auto">
-          Live data temporarily unavailable — showing last known prices.
-        </span>
+        <span className="w-full text-negative sm:w-auto">{t.market.stale}</span>
       )}
     </div>
   );

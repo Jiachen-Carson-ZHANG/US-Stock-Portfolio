@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { quotePollIntervalMs } from "@/lib/market-hours";
-import type { AllocationSlice, PortfolioSummary, PositionView } from "@/types/portfolio";
+import type {
+  AllocationSlice,
+  MoneyDTO,
+  PortfolioSummary,
+  PositionView,
+} from "@/types/portfolio";
+import type { OptionGroupDTO } from "@/lib/portfolio/options";
 
 export type LivePortfolio = {
   summary: PortfolioSummary;
@@ -12,6 +18,8 @@ export type LivePortfolio = {
     byAssetType: AllocationSlice[];
     bySector: AllocationSlice[];
   };
+  totalInvested: MoneyDTO;
+  optionGroups: OptionGroupDTO[];
 };
 
 /**
@@ -23,13 +31,15 @@ export function usePortfolio(initial: LivePortfolio) {
   const [data, setData] = useState(initial);
   const [refreshing, setRefreshing] = useState(false);
   const inFlight = useRef(false);
+  const manualRefresh = useRef<() => void>(() => {});
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
 
-    async function refresh() {
-      if (inFlight.current || document.visibilityState === "hidden") return;
+    async function refresh(force = false) {
+      if (inFlight.current) return;
+      if (!force && document.visibilityState === "hidden") return;
       inFlight.current = true;
       setRefreshing(true);
 
@@ -47,6 +57,8 @@ export function usePortfolio(initial: LivePortfolio) {
         if (!cancelled) setRefreshing(false);
       }
     }
+
+    manualRefresh.current = () => void refresh(true);
 
     function schedule() {
       clearTimeout(timer);
@@ -75,5 +87,5 @@ export function usePortfolio(initial: LivePortfolio) {
     };
   }, [data.summary.marketStatus]);
 
-  return { data, refreshing };
+  return { data, refreshing, refresh: () => manualRefresh.current() };
 }

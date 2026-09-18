@@ -61,7 +61,10 @@ export type PositionMetrics = {
   unrealizedPnLPercent: number | null;
   todayPnL: MoneyDTO;
   todayPnLPercent: number | null;
+  /** Share of net portfolio value. Negative for a short position. */
   weightPercent: number;
+  /** Share of capital invested. Comparable across stocks and option spreads. */
+  investedWeightPercent?: number;
 };
 
 export type PositionView = Position & PositionMetrics;
@@ -77,6 +80,8 @@ export type PortfolioSummary = {
   cashPercent: number;
   /** Net value of written/short positions. Zero when none are held. */
   shortExposure: MoneyDTO;
+  /** Gains already banked, as reported by the broker. */
+  realizedPnL: MoneyDTO;
   positionCount: number;
   marketStatus: MarketSession;
   dataTimestamp: string | null;

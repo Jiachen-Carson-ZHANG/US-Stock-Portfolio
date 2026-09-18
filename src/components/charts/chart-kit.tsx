@@ -137,7 +137,7 @@ export function Legend({
             className="size-2.5 shrink-0 rounded-[3px]"
             style={{ background: item.color }}
           />
-          <span className="truncate text-foreground">{item.label}</span>
+          <span className="min-w-0 flex-1 break-words text-foreground">{item.label}</span>
           <span className="tabular ml-auto shrink-0 text-muted-foreground">
             {item.percent.toFixed(1)}%
           </span>

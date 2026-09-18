@@ -11,23 +11,36 @@ import type {
   Position,
   PositionView,
 } from "@/types/portfolio";
+import Decimal from "decimal.js";
 import {
   allocationByAssetType,
   allocationBySector,
   buildPositionViews,
   concentration,
+  costBasis,
   summarize,
 } from ".";
 import {
   allocationByInvestedCapital,
   groupOptions,
+  performanceByAssetClass,
+  type AssetClassPerformance,
+  toOptionGroupDTO,
   totalInvested,
-  type OptionGroup,
+  type OptionGroupDTO,
 } from "./options";
 import { toDTO } from "@/lib/money";
 import { getQuotes } from "./quotes";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
+import {
+  lastTransactionSync,
+  readTransactions,
+  syncTransactions,
+  transactionTotals,
+  type StoredTransaction,
+  type TransactionTotals,
+} from "./transactions";
 import { activeProvider, getBrokerProvider } from "@/providers";
 import { logger } from "@/lib/logger";
 
@@ -41,7 +54,8 @@ export type PortfolioData = {
     bySector: AllocationSlice[];
   };
   totalInvested: MoneyDTO;
-  optionGroups: OptionGroup[];
+  optionGroups: OptionGroupDTO[];
+  byAssetClass: AssetClassPerformance[];
 };
 
 export function baseCurrency(): string {
@@ -120,7 +134,16 @@ export async function loadPortfolio(now: Date = new Date()): Promise<PortfolioDa
     isStale,
   });
 
-  const views = buildPositionViews(positions, currency);
+  const invested = totalInvested(positions, currency);
+  const views = buildPositionViews(positions, currency).map((view) => ({
+    ...view,
+    investedWeightPercent: invested.amount.isZero()
+      ? 0
+      : new Decimal(costBasis(view).amount)
+          .dividedBy(invested.amount)
+          .times(100)
+          .toNumber(),
+  }));
 
   if (positions.length > 0) {
     maybeCreateSnapshot(getDb(), summary, JSON.stringify(views), now);
@@ -136,8 +159,11 @@ export async function loadPortfolio(now: Date = new Date()): Promise<PortfolioDa
       byAssetType: allocationByAssetType(positions, currency),
       bySector: allocationBySector(positions, currency),
     },
-    totalInvested: toDTO(totalInvested(positions, currency)),
-    optionGroups: groupOptions(positions).groups,
+    totalInvested: toDTO(invested),
+    optionGroups: groupOptions(positions).groups.map((group) =>
+      toOptionGroupDTO(group, invested),
+    ),
+    byAssetClass: performanceByAssetClass(positions, currency),
   };
 }
 
@@ -151,4 +177,34 @@ export async function loadPosition(
 
 export function loadHistory(): PortfolioSnapshot[] {
   return readSnapshots(getDb());
+}
+
+const TRANSACTION_TTL_MS = 15 * 60_000;
+
+/** Fill history changes rarely, so it refreshes on a much slower cadence. */
+export async function loadTransactions(now: Date = new Date()): Promise<{
+  transactions: StoredTransaction[];
+  totals: TransactionTotals;
+}> {
+  const db = getDb();
+
+  if (activeProvider() === "moomoo") {
+    const synced = lastTransactionSync(db);
+    const stale =
+      !synced || now.getTime() - new Date(synced).getTime() > TRANSACTION_TTL_MS;
+
+    if (stale) {
+      try {
+        await syncTransactions(db, getBrokerProvider(), now);
+      } catch (error) {
+        logger.error("broker.transactions.failure", {
+          provider: "moomoo",
+          reason: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    }
+  }
+
+  const transactions = readTransactions(db);
+  return { transactions, totals: transactionTotals(transactions) };
 }

@@ -1,4 +1,9 @@
-import type { AccountSummary, BrokerAccount, BrokerPosition } from "@/types/broker";
+import type {
+  AccountSummary,
+  BrokerAccount,
+  BrokerPosition,
+  BrokerTransaction,
+} from "@/types/broker";
 import type { BrokerProvider } from "./types";
 import { getDb } from "@/lib/db";
 import { moomooGet } from "@/lib/moomoo/client";
@@ -41,6 +46,24 @@ type MoomooFunds = {
   total_assets: string;
   market_val: string;
 };
+
+type MoomooFillsPage = {
+  order_fills: {
+    trd_side: string;
+    deal_id: string;
+    order_id: string;
+    code: string;
+    stock_name: string;
+    qty: string;
+    price: string;
+    create_time: number | string;
+  }[];
+  page_flag: string;
+  completed: boolean;
+};
+
+const MAX_HISTORY_PAGES = 20;
+const DEFAULT_OPTION_MULTIPLIER = 100;
 
 const BASE_CURRENCY = () => process.env.PORTFOLIO_BASE_CURRENCY ?? "USD";
 
@@ -141,6 +164,62 @@ export class MoomooBrokerProvider implements BrokerProvider {
     return moomooGet<MoomooFunds>(
       `/api/v1.0/accounts/${accountId}/funds?currency=${encodeURIComponent(BASE_CURRENCY())}`,
     );
+  }
+
+  /**
+   * Walks moomoo's paginated fill history. Without start/end it returns the
+   * last 90 days, which is the window the API defaults to.
+   */
+  async getTransactions(): Promise<BrokerTransaction[]> {
+    const accountId = await this.accountId();
+    const fills: BrokerTransaction[] = [];
+    let pageFlag = "";
+
+    for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
+      const query = new URLSearchParams({
+        trd_market: process.env.MOOMOO_MARKET ?? "US",
+        page_flag: pageFlag,
+        page_size: "50",
+      });
+
+      const data = await moomooGet<MoomooFillsPage>(
+        `/api/v1.0/accounts/${accountId}/fills_history?${query}`,
+      );
+
+      for (const fill of data.order_fills ?? []) {
+        const parsed = parseSymbol(fill.code);
+        const quantity = Math.abs(Number(fill.qty));
+        const price = Number(fill.price);
+        // moomoo distinguishes SELL from SELL_SHORT, and BUY from BUY_BACK;
+        // both sells reduce exposure and both buys add to it.
+        const side = fill.trd_side?.toUpperCase().startsWith("SELL")
+          ? "sell"
+          : "buy";
+
+        // An option fill is quoted per share but traded per contract, so the
+        // cash moved is 100x the quantity times price.
+        const multiplier =
+          parsed.instrumentType === "option" ? DEFAULT_OPTION_MULTIPLIER : 1;
+
+        fills.push({
+          dealId: fill.deal_id,
+          orderId: fill.order_id,
+          side,
+          symbol: parsed.localCode,
+          name: fill.stock_name,
+          quantity,
+          price,
+          amount: (side === "buy" ? -1 : 1) * quantity * price * multiplier,
+          // moomoo timestamps are microseconds.
+          tradedAt: new Date(Number(fill.create_time) / 1000).toISOString(),
+        });
+      }
+
+      if (data.completed || !data.page_flag) break;
+      pageFlag = data.page_flag;
+    }
+
+    return fills;
   }
 
   async getAccountSummary(): Promise<AccountSummary> {

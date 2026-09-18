@@ -81,6 +81,20 @@ CREATE TABLE IF NOT EXISTS positions (
   synced_at           TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS transactions (
+  deal_id    TEXT PRIMARY KEY,
+  order_id   TEXT,
+  side       TEXT NOT NULL,
+  symbol     TEXT NOT NULL,
+  name       TEXT,
+  quantity   REAL NOT NULL,
+  price      REAL NOT NULL,
+  amount     REAL NOT NULL,
+  traded_at  TEXT NOT NULL,
+  synced_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions(traded_at DESC);
+
 CREATE TABLE IF NOT EXISTS quote_cache (
   symbol         TEXT PRIMARY KEY,
   price          REAL NOT NULL,

@@ -34,3 +34,16 @@ export type AccountSummary = {
   cash: number;
   syncedAt: string;
 };
+
+export type BrokerTransaction = {
+  dealId: string;
+  orderId: string;
+  side: "buy" | "sell";
+  symbol: string;
+  name?: string;
+  quantity: number;
+  price: number;
+  /** Signed cash effect: negative when buying, positive when selling. */
+  amount: number;
+  tradedAt: string;
+};

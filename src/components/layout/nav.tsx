@@ -1,25 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { LayoutGrid, LineChart, Settings, Table2 } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutGrid,
+  LineChart,
+  Languages,
+  Receipt,
+  Settings,
+  Star,
+  Table2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth/session";
+import { useLocale, useSetLocale, useT } from "@/lib/i18n/context";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Overview", icon: LayoutGrid, ownerOnly: false },
-  { href: "/holdings", label: "Holdings", icon: Table2, ownerOnly: false },
-  { href: "/performance", label: "Performance", icon: LineChart, ownerOnly: false },
-  { href: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
-];
+  { href: "/dashboard", key: "overview", icon: LayoutGrid, ownerOnly: false },
+  { href: "/holdings", key: "holdings", icon: Table2, ownerOnly: false },
+  { href: "/performance", key: "performance", icon: LineChart, ownerOnly: false },
+  { href: "/transactions", key: "transactions", icon: Receipt, ownerOnly: false },
+  { href: "/watchlist", key: "watchlist", icon: Star, ownerOnly: false },
+  { href: "/settings", key: "settings", icon: Settings, ownerOnly: true },
+] as const;
 
 function useVisibleItems(role: UserRole) {
   return ITEMS.filter((item) => !item.ownerOnly || role === "owner");
 }
 
+function label(t: Dictionary, key: (typeof ITEMS)[number]["key"]): string {
+  return t.nav[key];
+}
+
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function LanguageToggle({ className }: { className?: string }) {
+  const t = useT();
+  const locale = useLocale();
+  const setLocale = useSetLocale();
+
+  return (
+    <button
+      type="button"
+      onClick={() => setLocale(locale === "en" ? "zh" : "en")}
+      className={cn(
+        "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+        className,
+      )}
+    >
+      <Languages className="size-4" aria-hidden="true" />
+      {t.nav.language}
+    </button>
+  );
 }
 
 export function Sidebar({
@@ -33,11 +68,12 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const items = useVisibleItems(role);
+  const t = useT();
 
   return (
     <aside className="hidden w-56 shrink-0 border-r border-border bg-surface md:flex md:flex-col">
       <div className="px-5 py-5">
-        <p className="text-sm font-semibold tracking-tight">Family Portfolio</p>
+        <p className="text-sm font-semibold tracking-tight">{t.appName}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{displayName}</p>
       </div>
 
@@ -56,18 +92,17 @@ export function Sidebar({
                 )}
               >
                 <item.icon className="size-4" aria-hidden="true" />
-                {item.label}
+                {label(t, item.key)}
               </Link>
             </li>
           ))}
         </ul>
       </nav>
 
-      {canSignOut && (
-        <div className="px-3 pb-4">
-          <SignOutButton />
-        </div>
-      )}
+      <div className="space-y-0.5 px-3 pb-4">
+        <LanguageToggle className="w-full justify-start" />
+        {canSignOut && <SignOutButton />}
+      </div>
     </aside>
   );
 }
@@ -75,24 +110,27 @@ export function Sidebar({
 export function BottomNav({ role }: { role: UserRole }) {
   const pathname = usePathname();
   const items = useVisibleItems(role);
+  const t = useT();
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
       <ul className="flex">
         {items.map((item) => (
-          <li key={item.href} className="flex-1">
+          <li key={item.href} className="min-w-0 flex-1">
             <Link
               href={item.href}
               aria-current={isActive(pathname, item.href) ? "page" : undefined}
               className={cn(
-                "flex min-h-14 flex-col items-center justify-center gap-1 text-[11px]",
+                "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[10px]",
                 isActive(pathname, item.href)
                   ? "font-medium text-foreground"
                   : "text-muted-foreground",
               )}
             >
-              <item.icon className="size-5" aria-hidden="true" />
-              {item.label}
+              <item.icon className="size-5 shrink-0" aria-hidden="true" />
+              <span className="w-full truncate text-center">
+                {label(t, item.key)}
+              </span>
             </Link>
           </li>
         ))}
@@ -103,6 +141,7 @@ export function BottomNav({ role }: { role: UserRole }) {
 
 export function SignOutButton({ className }: { className?: string }) {
   const router = useRouter();
+  const t = useT();
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -119,7 +158,7 @@ export function SignOutButton({ className }: { className?: string }) {
         className,
       )}
     >
-      Sign out
+      {t.nav.signOut}
     </button>
   );
 }

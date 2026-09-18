@@ -8,6 +8,7 @@ import { MarketStatus } from "@/components/dashboard/market-status";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { usePortfolio, type LivePortfolio } from "@/components/dashboard/use-portfolio";
 import { HoldingsTable } from "@/components/holdings/holdings-table";
+import { useT } from "@/lib/i18n/context";
 import type { Concentration } from "@/types/portfolio";
 
 export function LiveDashboard({
@@ -17,29 +18,31 @@ export function LiveDashboard({
   initial: LivePortfolio;
   concentration: Concentration;
 }) {
-  const { data, refreshing } = usePortfolio(initial);
+  const t = useT();
+  const { data, refreshing, refresh } = usePortfolio(initial);
 
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
-        <MarketStatus summary={data.summary} refreshing={refreshing} />
+        <h1 className="text-lg font-semibold tracking-tight">{t.nav.overview}</h1>
+        <MarketStatus
+          summary={data.summary}
+          refreshing={refreshing}
+          onRefresh={refresh}
+        />
       </header>
 
-      <SummaryCards summary={data.summary} />
+      <SummaryCards summary={data.summary} totalInvested={data.totalInvested} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AllocationDonut
           slices={data.allocations.byPosition}
-          note={
-            Number(data.summary.shortExposure.amount) !== 0
-              ? "Long positions only. Short positions are listed in Holdings."
-              : undefined
-          }
+          title={t.charts.allocation}
+          note={t.charts.allocationNote}
         />
         <div className="space-y-4">
-          <ShareBar title="Asset type" slices={data.allocations.byAssetType} />
-          <ShareBar title="Sector" slices={data.allocations.bySector} />
+          <ShareBar title={t.charts.assetType} slices={data.allocations.byAssetType} />
+          <ShareBar title={t.charts.sector} slices={data.allocations.bySector} />
         </div>
       </div>
 
@@ -51,8 +54,11 @@ export function LiveDashboard({
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium">Holdings</h2>
-        <HoldingsTable positions={data.positions} />
+        <h2 className="text-sm font-medium">{t.table.holdings}</h2>
+        <HoldingsTable
+          positions={data.positions}
+          optionGroups={data.optionGroups}
+        />
       </section>
     </div>
   );

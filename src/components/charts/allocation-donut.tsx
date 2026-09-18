@@ -9,7 +9,6 @@ import {
   Tip,
   exactUsd,
   seriesColor,
-  shortSymbol,
 } from "./chart-kit";
 
 /** Past six slices a donut stops reading as part-to-whole, so the tail folds in. */
@@ -32,21 +31,23 @@ function fold(slices: AllocationSlice[]): AllocationSlice[] {
 
 export function AllocationDonut({
   slices,
+  title,
   note,
 }: {
   slices: AllocationSlice[];
+  title: string;
   note?: string;
 }) {
   const data = fold(slices);
   const items = data.map((slice, index) => ({
-    label: shortSymbol(slice.label),
+    label: slice.label,
     value: slice.value,
     percent: slice.percent,
     color: seriesColor(index),
   }));
 
   return (
-    <ChartFrame title="Portfolio allocation" note={note} height={280}>
+    <ChartFrame title={title} note={note} height={300}>
       <div className="grid h-full grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="h-[180px] sm:h-full">
           <ResponsiveContainer width="100%" height="100%">
