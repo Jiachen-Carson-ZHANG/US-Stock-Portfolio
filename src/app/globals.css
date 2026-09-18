@@ -83,6 +83,37 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* A calm, slightly warm field behind the sign-in card. Pure CSS gradients, so
+   nothing is fetched from a CDN that mainland China might not reach. */
+.auth-field {
+  background:
+    radial-gradient(
+      60rem 40rem at 50% -10%,
+      color-mix(in oklab, var(--chart-1) 12%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      40rem 30rem at 100% 100%,
+      color-mix(in oklab, var(--chart-3) 10%, transparent),
+      transparent 70%
+    ),
+    var(--background);
+}
+
+.elevated {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 8px 24px -12px rgb(0 0 0 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .elevated {
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 8px 28px -12px rgb(0 0 0 / 0.6);
+  }
+}
+
 /* Only where digits must align vertically — table columns and axis ticks.
    Large standalone figures keep proportional digits so they don't read loose. */
 .tabular {

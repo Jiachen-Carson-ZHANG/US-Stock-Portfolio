@@ -18,6 +18,9 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Emits a self-contained server bundle, so a container does not need the
+  // whole node_modules tree and the app stays portable across hosts.
+  output: "standalone",
   serverExternalPackages: ["better-sqlite3", "@node-rs/argon2"],
   poweredByHeader: false,
   async headers() {

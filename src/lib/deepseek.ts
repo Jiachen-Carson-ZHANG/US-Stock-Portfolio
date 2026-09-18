@@ -1,7 +1,18 @@
-import "server-only";
+const DEFAULT_BASE_URL = "https://api.deepseek.com";
+const DEFAULT_MODEL = "deepseek-chat";
 
-const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
-const MODEL = "deepseek-chat";
+/**
+ * Any OpenAI-compatible endpoint works, so the provider and model are
+ * configuration rather than code — DeepSeek, Zhipu GLM and Moonshot all expose
+ * the same /chat/completions shape.
+ */
+export function aiBaseUrl(): string {
+  return (process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+}
+
+export function aiModel(): string {
+  return process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+}
 
 export class DeepSeekNotConfiguredError extends Error {
   constructor() {
@@ -26,14 +37,14 @@ export async function deepSeekChat(
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new DeepSeekNotConfiguredError();
 
-  const response = await fetch(DEEPSEEK_URL, {
+  const response = await fetch(`${aiBaseUrl()}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: aiModel(),
       messages,
       max_tokens: options.maxTokens ?? 700,
       temperature: 0.4,
@@ -42,7 +53,10 @@ export async function deepSeekChat(
   });
 
   if (!response.ok) {
-    throw new Error(`DeepSeek returned HTTP ${response.status}`);
+    // The body names the cause (unknown model, bad key, no quota); the key is
+    // never part of it.
+    const detail = (await response.text()).slice(0, 300);
+    throw new Error(`AI provider returned HTTP ${response.status}: ${detail}`);
   }
 
   const body = (await response.json()) as {

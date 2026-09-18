@@ -12,6 +12,7 @@ import {
   Table2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/layout/brand-mark";
 import type { UserRole } from "@/lib/auth/session";
 import { useLocale, useSetLocale, useT } from "@/lib/i18n/context";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -72,9 +73,12 @@ export function Sidebar({
 
   return (
     <aside className="hidden w-56 shrink-0 border-r border-border bg-surface md:flex md:flex-col">
-      <div className="px-5 py-5">
-        <p className="text-sm font-semibold tracking-tight">{t.appName}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{displayName}</p>
+      <div className="flex items-center gap-3 px-5 py-5">
+        <BrandMark className="size-9 shrink-0" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold tracking-tight">{t.appName}</p>
+          <p className="truncate text-xs text-muted-foreground">{displayName}</p>
+        </div>
       </div>
 
       <nav className="flex-1 px-3">

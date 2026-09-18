@@ -4,13 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+  [
+    "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium",
+    "transition-[background-color,border-color,opacity,transform] duration-150",
+    "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15",
+    "active:translate-y-px",
+    "disabled:pointer-events-none disabled:opacity-50",
+  ].join(" "),
   {
     variants: {
       variant: {
-        primary: "bg-accent text-background hover:opacity-90",
+        primary:
+          "bg-accent text-background shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:opacity-90",
         outline: "border border-border bg-surface hover:bg-muted",
-        ghost: "hover:bg-muted",
+        ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
       },
       size: {
         // 44px minimum touch target per §24.

@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed.ts",
     "db:reset-passwords": "tsx scripts/seed.ts --reset-passwords",
-    "moomoo:register": "tsx scripts/moomoo-register.ts"
+    "moomoo:register": "tsx scripts/moomoo-register.ts",
+    "ai:test": "tsx scripts/ai-test.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
