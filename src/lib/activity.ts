@@ -17,7 +17,7 @@ export type ActivityEvent = {
   createdAt: string;
 };
 
-export function recordActivity(
+export async function recordActivity(
   db: DB,
   event: {
     userId: string | null;
@@ -27,28 +27,31 @@ export function recordActivity(
     detail?: string | null;
   },
   now: Date = new Date(),
-): void {
-  db.prepare(
+): Promise<void> {
+  await db.run(
     `INSERT INTO activity_events (id, user_id, username, kind, target, detail, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    randomUUID(),
-    event.userId,
-    event.username,
-    event.kind,
-    event.target ?? null,
-    event.detail ?? null,
-    now.toISOString(),
+    [
+      randomUUID(),
+      event.userId,
+      event.username,
+      event.kind,
+      event.target ?? null,
+      event.detail ?? null,
+      now.toISOString(),
+    ],
   );
 }
 
-export function recentActivity(db: DB, limit = 50): ActivityEvent[] {
-  return db
-    .prepare(
-      `SELECT username, kind, target, detail, created_at AS createdAt
+// Postgres folds unquoted identifiers to lower case, so a bare `AS createdAt`
+// would arrive as `createdat` and read as undefined. Camel-cased aliases are
+// therefore double-quoted throughout this file.
+export async function recentActivity(db: DB, limit = 50): Promise<ActivityEvent[]> {
+  return db.all<ActivityEvent>(
+    `SELECT username, kind, target, detail, created_at AS "createdAt"
        FROM activity_events ORDER BY created_at DESC LIMIT ?`,
-    )
-    .all(limit) as ActivityEvent[];
+    [limit],
+  );
 }
 
 export type AssetInterest = {
@@ -58,17 +61,21 @@ export type AssetInterest = {
 };
 
 /** Which holdings the family opens most — the "what are they watching" view. */
-export function mostViewedAssets(db: DB, limit = 12): AssetInterest[] {
-  return db
-    .prepare(
-      `SELECT target, COUNT(*) AS views, COUNT(DISTINCT username) AS viewers
+export async function mostViewedAssets(db: DB, limit = 12): Promise<AssetInterest[]> {
+  // COUNT returns bigint, which the driver hands back as a string to protect
+  // precision. These counts are small, so casting to int in SQL keeps the
+  // declared `number` type honest.
+  return db.all<AssetInterest>(
+    `SELECT target,
+            COUNT(*)::int AS views,
+            COUNT(DISTINCT username)::int AS viewers
        FROM activity_events
-       WHERE kind = 'view_position' AND target IS NOT NULL
-       GROUP BY target
-       ORDER BY views DESC
-       LIMIT ?`,
-    )
-    .all(limit) as AssetInterest[];
+      WHERE kind = 'view_position' AND target IS NOT NULL
+      GROUP BY target
+      ORDER BY views DESC
+      LIMIT ?`,
+    [limit],
+  );
 }
 
 export type MemberActivity = {
@@ -78,16 +85,14 @@ export type MemberActivity = {
   lastSeen: string | null;
 };
 
-export function activityByMember(db: DB): MemberActivity[] {
-  return db
-    .prepare(
-      `SELECT username,
-              SUM(CASE WHEN kind = 'login' THEN 1 ELSE 0 END) AS logins,
-              SUM(CASE WHEN kind = 'view_position' THEN 1 ELSE 0 END) AS views,
-              MAX(created_at) AS lastSeen
+export async function activityByMember(db: DB): Promise<MemberActivity[]> {
+  return db.all<MemberActivity>(
+    `SELECT username,
+            SUM(CASE WHEN kind = 'login' THEN 1 ELSE 0 END)::int AS logins,
+            SUM(CASE WHEN kind = 'view_position' THEN 1 ELSE 0 END)::int AS views,
+            MAX(created_at) AS "lastSeen"
        FROM activity_events
-       GROUP BY username
-       ORDER BY lastSeen DESC`,
-    )
-    .all() as MemberActivity[];
+      GROUP BY username
+      ORDER BY "lastSeen" DESC`,
+  );
 }

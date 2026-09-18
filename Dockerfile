@@ -1,11 +1,12 @@
 # Build and run the dashboard anywhere Docker runs.
 #   docker build -t family-portfolio .
-#   docker run -p 3000:3000 --env-file .env.local -v portfolio-data:/app/data family-portfolio
+#   docker run -p 3000:3000 --env-file .env.local family-portfolio
+# State lives in Postgres (DATABASE_URL), so no volume is required.
 
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-# better-sqlite3 and @node-rs/argon2 are native; keep build tools out of the
-# final image by compiling them here.
+# @node-rs/argon2 is native; keep build tools out of the final image by
+# compiling it here.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 make g++ ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -33,16 +34,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Seeding and the SQLite file both need these at runtime.
+# Seeding runs at boot, so the scripts and their sources ship too.
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
 COPY --from=builder /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
 
-# The database lives on a volume so it survives redeploys.
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
-VOLUME /app/data
+# State now lives in Postgres, so the container itself is disposable — point
+# DATABASE_URL at the database and no volume is needed.
 
 USER nextjs
 EXPOSE 3000

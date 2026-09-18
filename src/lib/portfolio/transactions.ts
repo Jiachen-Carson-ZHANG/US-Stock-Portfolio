@@ -32,17 +32,21 @@ function toTransaction(row: Row): StoredTransaction {
   };
 }
 
-export function readTransactions(db: DB, limit = 500): StoredTransaction[] {
-  const rows = db
-    .prepare(`SELECT * FROM transactions ORDER BY traded_at DESC LIMIT ?`)
-    .all(limit) as Row[];
+export async function readTransactions(
+  db: DB,
+  limit = 500,
+): Promise<StoredTransaction[]> {
+  const rows = await db.all<Row>(
+    `SELECT * FROM transactions ORDER BY traded_at DESC LIMIT ?`,
+    [limit],
+  );
   return rows.map(toTransaction);
 }
 
-export function lastTransactionSync(db: DB): string | null {
-  const row = db
-    .prepare(`SELECT MAX(synced_at) AS synced_at FROM transactions`)
-    .get() as { synced_at: string | null };
+export async function lastTransactionSync(db: DB): Promise<string | null> {
+  const row = await db.get<{ synced_at: string | null }>(
+    `SELECT MAX(synced_at) AS synced_at FROM transactions`,
+  );
   return row?.synced_at ?? null;
 }
 
@@ -58,8 +62,7 @@ export async function syncTransactions(
   const fills = await broker.getTransactions();
   const syncedAt = now.toISOString();
 
-  const upsert = db.prepare(
-    `INSERT INTO transactions
+  const upsert = `INSERT INTO transactions
        (deal_id, order_id, side, symbol, name, quantity, price, amount, traded_at, synced_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(deal_id) DO UPDATE SET
@@ -70,12 +73,11 @@ export async function syncTransactions(
        price = excluded.price,
        amount = excluded.amount,
        traded_at = excluded.traded_at,
-       synced_at = excluded.synced_at`,
-  );
+       synced_at = excluded.synced_at`;
 
-  const writeAll = db.transaction((items: BrokerTransaction[]) => {
-    for (const fill of items) {
-      upsert.run(
+  await db.transaction(async (tx) => {
+    for (const fill of fills) {
+      await tx.run(upsert, [
         fill.dealId,
         fill.orderId,
         fill.side,
@@ -86,11 +88,10 @@ export async function syncTransactions(
         fill.amount,
         fill.tradedAt,
         syncedAt,
-      );
+      ]);
     }
   });
 
-  writeAll(fills);
   return fills.length;
 }
 

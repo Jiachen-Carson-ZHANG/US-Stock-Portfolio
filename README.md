@@ -15,7 +15,7 @@ a connection that comes back carrying a write scope is refused and discarded.
 | | |
 |---|---|
 | Node.js | 20.9 or newer (developed on 22) |
-| Disk | A persistent, writable directory for the SQLite database |
+| Database | PostgreSQL 14 or newer (managed or self-hosted) |
 | Network | Outbound HTTPS to `webapi.moomoo.com` (and `api.deepseek.com` if AI is enabled) |
 
 No CDN, Google Font, or analytics script is fetched at runtime, so the app loads
@@ -31,6 +31,13 @@ Copy the template and fill it in:
 cp .env.example .env.local
 ```
 
+Need a database to develop against? This starts a throwaway Postgres on port
+55432, matching the `DATABASE_URL` in the template:
+
+```bash
+npm run db:dev:up      # docker; npm run db:dev:down to remove it
+```
+
 ### Required
 
 | Variable | What it does |
@@ -38,7 +45,7 @@ cp .env.example .env.local
 | `APP_URL` | The site's own base URL. **Must exactly match** the moomoo redirect URI, e.g. `https://portfolio.example.com` |
 | `SESSION_SECRET` | Random 32 bytes. `openssl rand -base64 32` |
 | `TOKEN_ENCRYPTION_KEY` | Random 32 bytes, **different** from the above. Encrypts the broker refresh token at rest |
-| `DATABASE_URL` | `file:./data/portfolio.db` |
+| `DATABASE_URL` | Postgres connection string, e.g. `postgres://user:pass@host:5432/portfolio?sslmode=require` |
 | `AUTH_MODE` | `password` to require sign-in. See [Access mode](#5-access-mode) |
 
 If `TOKEN_ENCRYPTION_KEY` changes, the stored broker token can no longer be
@@ -188,20 +195,37 @@ This is **not** a static site. Every page is server-rendered and calls moomoo,
 so a static-file host or an export will not work. The host needs:
 
 1. A long-running **Node.js 20.9+** process
-2. A **persistent writable disk** for `data/`, or a Postgres instance instead
+2. A reachable **PostgreSQL 14+** database
 3. **Environment secrets**
 4. **HTTPS on a fixed hostname** — moomoo's redirect URI must match exactly
 5. Reachability from wherever the family is
 
+The container itself is disposable — all state is in Postgres, so a redeploy
+loses nothing and no persistent volume is needed.
+
 ### Persistence matters
 
-Positions and quotes re-sync from the broker, and accounts can be re-seeded.
-**Daily `portfolio_snapshots` cannot be rebuilt** — they accumulate one row per
-trading day and are the entire performance history.
+Positions and quotes re-sync from the broker and accounts can be re-seeded, but
+**daily `portfolio_snapshots` cannot be rebuilt** — they accumulate one row per
+trading day and are the entire performance history. Transaction history is
+similarly one-way: moomoo only serves a 90-day window, so fills that age out
+survive only in this database.
 
-Test this before relying on a host: deploy, sign in, redeploy, then reload. If
-you are still signed in, the disk persists. If you are bounced to `/login`, it
-does not — move to Postgres.
+Keep the database backed up. On a managed provider, turn on automated backups.
+
+### Moving an existing SQLite database across
+
+Earlier versions stored everything in `data/portfolio.db`. To carry that data
+into Postgres, stop the app, point `DATABASE_URL` at the new database, and run:
+
+```bash
+npm run db:migrate-from-sqlite            # defaults to ./data/portfolio.db
+npm run db:migrate-from-sqlite -- path/to/portfolio.db
+```
+
+It writes with `ON CONFLICT DO NOTHING`, so existing rows always win and the
+script is safe to run twice. The encrypted broker token copies across intact,
+so the moomoo connection survives and does not need re-authorizing.
 
 ### Deploying to coze.cn
 

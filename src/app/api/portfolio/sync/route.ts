@@ -8,12 +8,12 @@ export async function POST() {
   const auth = await requireApiOwner();
   if ("response" in auth) return auth.response;
 
-  const provider = activeProvider();
+  const provider = await activeProvider();
 
   try {
     const count = await syncPositions(
-      getDb(),
-      getBrokerProvider(),
+      await getDb(),
+      await getBrokerProvider(),
       provider === "moomoo" ? "moomoo" : "mock",
     );
     logger.info("broker.sync.success", { provider, positions: count });

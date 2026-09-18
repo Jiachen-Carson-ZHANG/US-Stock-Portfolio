@@ -18,9 +18,9 @@ export async function GET(request: Request) {
   }
 
   const { quotes, isStale, dataTimestamp } = await getQuotes(
-    getDb(),
+    await getDb(),
     parsed.data.symbols,
-    getMarketDataProvider(),
+    await getMarketDataProvider(),
   );
 
   return Response.json({

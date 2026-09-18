@@ -10,11 +10,11 @@ import {
 } from "@/lib/watchlist";
 import { getMarketDataProvider } from "@/providers";
 
-async function withQuotes(entries: ReturnType<typeof readWatchlist>) {
+async function withQuotes(entries: Awaited<ReturnType<typeof readWatchlist>>) {
   if (entries.length === 0) return entries;
 
   try {
-    const quotes = await getMarketDataProvider().getQuotes(
+    const quotes = await (await getMarketDataProvider()).getQuotes(
       entries.map((entry) => entry.symbol),
     );
     const bySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
@@ -35,7 +35,9 @@ export async function GET() {
   const user = await authenticateRequest();
   if (!user) return unauthorized();
 
-  return Response.json({ entries: await withQuotes(readWatchlist(getDb())) });
+  return Response.json({
+    entries: await withQuotes(await readWatchlist(await getDb())),
+  });
 }
 
 export async function POST(request: Request) {
@@ -57,15 +59,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const db = getDb();
-  const entry = addToWatchlist(db, {
+  const db = await getDb();
+  const entry = await addToWatchlist(db, {
     symbol: parsed.data.symbol,
     name: parsed.data.name,
     reason: parsed.data.reason,
     addedBy: user.displayName,
   });
 
-  recordActivity(db, {
+  await recordActivity(db, {
     userId: user.id,
     username: user.username,
     kind: "watchlist_add",
@@ -87,11 +89,11 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Invalid symbol" }, { status: 400 });
   }
 
-  const db = getDb();
-  const removed = removeFromWatchlist(db, parsed.data.symbol);
+  const db = await getDb();
+  const removed = await removeFromWatchlist(db, parsed.data.symbol);
 
   if (removed) {
-    recordActivity(db, {
+    await recordActivity(db, {
       userId: user.id,
       username: user.username,
       kind: "watchlist_remove",

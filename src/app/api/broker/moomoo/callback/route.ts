@@ -58,8 +58,8 @@ export async function GET(request: Request) {
       return back(request, "failed");
     }
 
-    const db = getDb();
-    saveConnection(db, {
+    const db = await getDb();
+    await saveConnection(db, {
       refreshToken: tokens.refresh_token,
       scope: tokens.scope ?? "",
       accountId: null,
@@ -74,8 +74,8 @@ export async function GET(request: Request) {
     // Snapshots describe whatever portfolio was loaded when they were taken.
     // Synthetic history would misrepresent the real account, so it is dropped —
     // but only when nothing real has been recorded yet.
-    if (!storedBrokers(db).includes("moomoo")) {
-      const dropped = clearSnapshots(db);
+    if (!(await storedBrokers(db)).includes("moomoo")) {
+      const dropped = await clearSnapshots(db);
       if (dropped > 0) {
         logger.info("portfolio.snapshots.cleared", { provider: "moomoo", dropped });
       }

@@ -14,7 +14,7 @@ export default async function PerformancePage() {
   await requireUser();
   const { t } = await serverDictionary();
 
-  const snapshots = loadHistory();
+  const snapshots = await loadHistory();
   const stats = statsFor(snapshots);
   const { byAssetClass } = await loadPortfolio();
 

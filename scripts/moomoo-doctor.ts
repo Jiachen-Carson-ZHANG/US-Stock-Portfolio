@@ -26,14 +26,14 @@ async function probe(path: string, token: string, init: RequestInit = {}) {
 }
 
 async function main() {
-  const db = getDb();
+  const db = await getDb();
 
-  const status = readConnectionStatus(db);
+  const status = await readConnectionStatus(db);
   console.log("\n=== stored connection ===");
   console.log(status ? JSON.stringify(status, null, 2) : "none");
   if (!status) return;
 
-  const connection = readConnection(db);
+  const connection = await readConnection(db);
   if (!connection) return;
 
   console.log("\n=== refreshing access token ===");

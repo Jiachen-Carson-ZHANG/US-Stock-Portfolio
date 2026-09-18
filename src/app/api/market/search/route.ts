@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const symbol = parsed.data.q.toUpperCase();
 
   try {
-    const quotes = await getMarketDataProvider().getQuotes([symbol]);
+    const quotes = await (await getMarketDataProvider()).getQuotes([symbol]);
     return Response.json({
       results: quotes.map((quote) => ({
         symbol: quote.symbol,

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, type DB } from "@/lib/db";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestDb, type TestDb } from "@/lib/db/testing";
 import { readPositions, syncPositions } from "@/lib/portfolio/sync";
 import { getQuotes } from "@/lib/portfolio/quotes";
 import { MockBrokerProvider } from "@/providers/broker/mock";
@@ -7,10 +7,14 @@ import { MockMarketDataProvider } from "@/providers/market-data/mock";
 import type { MarketDataProvider } from "@/providers/market-data/types";
 import type { Quote } from "@/types/market";
 
-let db: DB;
+let db: TestDb;
 
-beforeEach(() => {
-  db = createTestDb();
+beforeEach(async () => {
+  db = await createTestDb();
+});
+
+afterEach(async () => {
+  await db.close();
 });
 
 function quote(symbol: string, price: number): Quote {
@@ -44,19 +48,21 @@ describe("position sync", () => {
   it("writes the broker's positions into the database", async () => {
     const count = await syncPositions(db, new MockBrokerProvider(), "mock");
     expect(count).toBeGreaterThan(0);
-    expect(readPositions(db)).toHaveLength(count);
+    expect(await readPositions(db)).toHaveLength(count);
   });
 
   it("replaces rather than appends on a second sync", async () => {
     await syncPositions(db, new MockBrokerProvider(), "mock");
-    const first = readPositions(db).length;
+    const first = (await readPositions(db)).length;
     await syncPositions(db, new MockBrokerProvider(), "mock");
-    expect(readPositions(db)).toHaveLength(first);
+    expect(await readPositions(db)).toHaveLength(first);
   });
 
   it("preserves option contract metadata through the round trip", async () => {
     await syncPositions(db, new MockBrokerProvider(), "mock");
-    const option = readPositions(db).find((p) => p.instrumentType === "option");
+    const option = (await readPositions(db)).find(
+      (p) => p.instrumentType === "option",
+    );
 
     expect(option).toBeDefined();
     expect(option?.contractMultiplier).toBe(100);
@@ -66,7 +72,7 @@ describe("position sync", () => {
 
   it("leaves the stored portfolio untouched when the broker fails", async () => {
     await syncPositions(db, new MockBrokerProvider(), "mock");
-    const before = readPositions(db).length;
+    const before = (await readPositions(db)).length;
 
     const failing = {
       getAccounts: async () => [],
@@ -80,7 +86,7 @@ describe("position sync", () => {
     };
 
     await expect(syncPositions(db, failing, "mock")).rejects.toThrow();
-    expect(readPositions(db)).toHaveLength(before);
+    expect(await readPositions(db)).toHaveLength(before);
   });
 });
 

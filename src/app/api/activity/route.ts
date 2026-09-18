@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid activity" }, { status: 400 });
   }
 
-  recordActivity(getDb(), {
+  recordActivity(await getDb(), {
     userId: user.id,
     username: user.username,
     kind: parsed.data.kind,
@@ -40,7 +40,7 @@ export async function GET() {
   const auth = await requireApiOwner();
   if ("response" in auth) return auth.response;
 
-  const db = getDb();
+  const db = await getDb();
   return Response.json({
     mostViewed: mostViewedAssets(db),
     byMember: activityByMember(db),

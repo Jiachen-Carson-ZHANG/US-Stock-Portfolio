@@ -35,52 +35,50 @@ function toEntry(row: Row): WatchlistEntry {
   };
 }
 
-export function readWatchlist(db: DB): WatchlistEntry[] {
-  const rows = db
-    .prepare(`SELECT * FROM watchlist ORDER BY created_at DESC`)
-    .all() as Row[];
+export async function readWatchlist(db: DB): Promise<WatchlistEntry[]> {
+  const rows = await db.all<Row>(`SELECT * FROM watchlist ORDER BY created_at DESC`);
   return rows.map(toEntry);
 }
 
-export function addToWatchlist(
+export async function addToWatchlist(
   db: DB,
   entry: { symbol: string; name?: string; reason: string; addedBy: string },
   now: Date = new Date(),
-): WatchlistEntry {
+): Promise<WatchlistEntry> {
   const id = randomUUID();
+  const symbol = entry.symbol.toUpperCase();
 
-  db.prepare(
+  // RETURNING hands back the stored row from the same statement, so the insert
+  // and the read can no longer disagree under a concurrent write.
+  const row = await db.get<Row>(
     `INSERT INTO watchlist (id, symbol, name, reason, added_by, created_at)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(symbol) DO UPDATE SET
        reason = excluded.reason,
        added_by = excluded.added_by,
-       name = excluded.name`,
-  ).run(
-    id,
-    entry.symbol.toUpperCase(),
-    entry.name ?? null,
-    entry.reason,
-    entry.addedBy,
-    now.toISOString(),
+       name = excluded.name
+     RETURNING *`,
+    [id, symbol, entry.name ?? null, entry.reason, entry.addedBy, now.toISOString()],
   );
 
-  const row = db
-    .prepare(`SELECT * FROM watchlist WHERE symbol = ?`)
-    .get(entry.symbol.toUpperCase()) as Row;
+  if (!row) throw new Error(`Failed to save ${symbol} to the watchlist.`);
   return toEntry(row);
 }
 
-export function removeFromWatchlist(db: DB, symbol: string): boolean {
-  return (
-    db.prepare(`DELETE FROM watchlist WHERE symbol = ?`).run(symbol.toUpperCase())
-      .changes > 0
-  );
+export async function removeFromWatchlist(db: DB, symbol: string): Promise<boolean> {
+  const result = await db.run(`DELETE FROM watchlist WHERE symbol = ?`, [
+    symbol.toUpperCase(),
+  ]);
+  return result.changes > 0;
 }
 
-export function saveAiNote(db: DB, symbol: string, note: string): void {
-  db.prepare(`UPDATE watchlist SET ai_note = ? WHERE symbol = ?`).run(
+export async function saveAiNote(
+  db: DB,
+  symbol: string,
+  note: string,
+): Promise<void> {
+  await db.run(`UPDATE watchlist SET ai_note = ? WHERE symbol = ?`, [
     note,
     symbol.toUpperCase(),
-  );
+  ]);
 }

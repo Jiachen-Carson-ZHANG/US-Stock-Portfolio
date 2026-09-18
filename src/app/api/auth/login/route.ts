@@ -45,9 +45,9 @@ export async function POST(request: Request) {
   }
 
   const { username, password } = parsed.data;
-  const db = getDb();
+  const db = await getDb();
 
-  const limit = checkRateLimit(db, username);
+  const limit = await checkRateLimit(db, username);
   if (limit.blocked) {
     logger.warn("auth.login.rate_limited", { username });
     return Response.json(
@@ -56,27 +56,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = db
-    .prepare(
-      `SELECT id, username, password_hash, disabled_at FROM users WHERE username = ?`,
-    )
-    .get(username) as UserRow | undefined;
+  const user = await db.get<UserRow>(
+    `SELECT id, username, password_hash, disabled_at FROM users WHERE username = ?`,
+    [username],
+  );
 
   if (!user || user.disabled_at) {
-    recordFailedAttempt(db, username);
+    await recordFailedAttempt(db, username);
     logger.warn("auth.login.failure", { username, reason: "unknown_or_disabled" });
     return invalidCredentials();
   }
 
   if (!(await verifyPassword(user.password_hash, password))) {
-    recordFailedAttempt(db, username);
+    await recordFailedAttempt(db, username);
     logger.warn("auth.login.failure", { username, reason: "bad_password" });
     return invalidCredentials();
   }
 
-  clearFailedAttempts(db, username);
-  recordActivity(db, { userId: user.id, username, kind: "login" });
-  const { token } = createSession(db, user.id);
+  await clearFailedAttempts(db, username);
+  await recordActivity(db, { userId: user.id, username, kind: "login" });
+  const { token } = await createSession(db, user.id);
 
   const cookieStore = await cookies();
   cookieStore.set(

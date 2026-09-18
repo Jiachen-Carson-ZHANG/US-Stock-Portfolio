@@ -39,53 +39,53 @@ export function sessionCookieOptions(maxAgeSeconds: number) {
   };
 }
 
-export function createSession(
+export async function createSession(
   db: DB,
   userId: string,
   now: Date = new Date(),
-): { token: string; expiresAt: Date } {
+): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 86_400_000);
 
-  db.prepare(
+  await db.run(
     `INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, last_seen_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(
-    randomUUID(),
-    userId,
-    hashToken(token),
-    now.toISOString(),
-    expiresAt.toISOString(),
-    now.toISOString(),
+    [
+      randomUUID(),
+      userId,
+      hashToken(token),
+      now.toISOString(),
+      expiresAt.toISOString(),
+      now.toISOString(),
+    ],
   );
 
   return { token, expiresAt };
 }
 
-export function validateSession(
+export async function validateSession(
   db: DB,
   token: string | undefined,
   now: Date = new Date(),
-): AuthUser | null {
+): Promise<AuthUser | null> {
   if (!token) return null;
 
-  const row = db
-    .prepare(
-      `SELECT u.id, u.username, u.display_name, u.role, u.disabled_at
+  const row = await db.get<UserRow>(
+    `SELECT u.id, u.username, u.display_name, u.role, u.disabled_at
        FROM sessions s
        JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ?
-         AND s.revoked_at IS NULL
-         AND s.expires_at > ?`,
-    )
-    .get(hashToken(token), now.toISOString()) as UserRow | undefined;
+      WHERE s.token_hash = ?
+        AND s.revoked_at IS NULL
+        AND s.expires_at > ?`,
+    [hashToken(token), now.toISOString()],
+  );
 
   if (!row || row.disabled_at) return null;
 
-  db.prepare(`UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`).run(
+  await db.run(`UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`, [
     now.toISOString(),
     hashToken(token),
-  );
+  ]);
 
   return {
     id: row.id,
@@ -95,25 +95,25 @@ export function validateSession(
   };
 }
 
-export function revokeSession(
+export async function revokeSession(
   db: DB,
   token: string,
   now: Date = new Date(),
-): void {
-  db.prepare(
+): Promise<void> {
+  await db.run(
     `UPDATE sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL`,
-  ).run(now.toISOString(), hashToken(token));
+    [now.toISOString(), hashToken(token)],
+  );
 }
 
-export function revokeAllSessionsForUser(
+export async function revokeAllSessionsForUser(
   db: DB,
   userId: string,
   now: Date = new Date(),
-): number {
-  const result = db
-    .prepare(
-      `UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`,
-    )
-    .run(now.toISOString(), userId);
+): Promise<number> {
+  const result = await db.run(
+    `UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`,
+    [now.toISOString(), userId],
+  );
   return result.changes;
 }

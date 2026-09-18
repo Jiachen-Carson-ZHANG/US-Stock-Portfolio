@@ -1,8 +1,20 @@
-import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { Pool, type PoolClient } from "pg";
+import { toPositionalParams } from "./sql";
 
-export type DB = Database.Database;
+export type RunResult = { changes: number };
+
+/**
+ * The query surface the app codes against. It mirrors the shape the SQLite
+ * layer exposed (get / all / run / transaction) so call sites read the same;
+ * the difference is that every method is now asynchronous.
+ */
+export type DB = {
+  get<T>(sql: string, params?: unknown[]): Promise<T | undefined>;
+  all<T>(sql: string, params?: unknown[]): Promise<T[]>;
+  run(sql: string, params?: unknown[]): Promise<RunResult>;
+  exec(sql: string): Promise<void>;
+  transaction<T>(fn: (tx: DB) => Promise<T>): Promise<T>;
+};
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -66,18 +78,18 @@ CREATE TABLE IF NOT EXISTS positions (
   underlying_symbol   TEXT,
   name                TEXT,
   sector              TEXT,
-  quantity            REAL NOT NULL,
-  average_cost        REAL,
+  quantity            DOUBLE PRECISION NOT NULL,
+  average_cost        DOUBLE PRECISION,
   currency            TEXT NOT NULL,
   option_type         TEXT,
-  strike              REAL,
+  strike              DOUBLE PRECISION,
   expiration_date     TEXT,
-  contract_multiplier REAL,
-  reported_price           REAL,
-  reported_market_value    REAL,
-  reported_unrealized_pnl  REAL,
-  reported_today_pnl       REAL,
-  reported_realized_pnl    REAL,
+  contract_multiplier DOUBLE PRECISION,
+  reported_price           DOUBLE PRECISION,
+  reported_market_value    DOUBLE PRECISION,
+  reported_unrealized_pnl  DOUBLE PRECISION,
+  reported_today_pnl       DOUBLE PRECISION,
+  reported_realized_pnl    DOUBLE PRECISION,
   synced_at           TEXT NOT NULL
 );
 
@@ -87,9 +99,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   side       TEXT NOT NULL,
   symbol     TEXT NOT NULL,
   name       TEXT,
-  quantity   REAL NOT NULL,
-  price      REAL NOT NULL,
-  amount     REAL NOT NULL,
+  quantity   DOUBLE PRECISION NOT NULL,
+  price      DOUBLE PRECISION NOT NULL,
+  amount     DOUBLE PRECISION NOT NULL,
   traded_at  TEXT NOT NULL,
   synced_at  TEXT NOT NULL
 );
@@ -107,10 +119,10 @@ CREATE TABLE IF NOT EXISTS watchlist (
 
 CREATE TABLE IF NOT EXISTS quote_cache (
   symbol         TEXT PRIMARY KEY,
-  price          REAL NOT NULL,
-  previous_close REAL NOT NULL,
-  change         REAL NOT NULL,
-  change_percent REAL NOT NULL,
+  price          DOUBLE PRECISION NOT NULL,
+  previous_close DOUBLE PRECISION NOT NULL,
+  change         DOUBLE PRECISION NOT NULL,
+  change_percent DOUBLE PRECISION NOT NULL,
   market_status  TEXT NOT NULL,
   data_timestamp TEXT NOT NULL,
   source         TEXT NOT NULL,
@@ -127,64 +139,166 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   positions_json        TEXT NOT NULL,
   created_at            TEXT NOT NULL
 );
+
+-- Columns introduced after the first release. Postgres supports IF NOT EXISTS
+-- here, so the SQLite era's PRAGMA-driven migration helper is no longer needed.
+ALTER TABLE broker_connections ADD COLUMN IF NOT EXISTS account_id TEXT;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_price DOUBLE PRECISION;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_market_value DOUBLE PRECISION;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_unrealized_pnl DOUBLE PRECISION;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_today_pnl DOUBLE PRECISION;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_realized_pnl DOUBLE PRECISION;
 `;
 
-let instance: DB | null = null;
+/** Identifies our schema lock so two booting containers cannot race each other. */
+const SCHEMA_LOCK_KEY = "8164207311002911";
 
-function databasePath(): string {
-  const url = process.env.DATABASE_URL ?? "file:./data/portfolio.db";
-  // The path is runtime configuration, so the bundler must not try to trace it —
-  // without this it pulls the entire project into the server output.
-  return resolve(/*turbopackIgnore: true*/ process.cwd(), url.replace(/^file:/, ""));
+function connectionString(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL is not set. Point it at a Postgres instance, e.g. " +
+        "postgres://user:password@host:5432/portfolio",
+    );
+  }
+  if (url.startsWith("file:")) {
+    throw new Error(
+      `DATABASE_URL still points at a SQLite file (${url}). This app now runs ` +
+        "on Postgres — see README.md for the connection string format.",
+    );
+  }
+  return url;
 }
 
-export function getDb(): DB {
-  if (instance) return instance;
+/**
+ * Managed providers terminate TLS with certificates that do not always chain to
+ * a root Node ships with, which is why `no-verify` exists as an escape hatch.
+ * It encrypts the connection but skips chain validation, so it is a fallback,
+ * not the default.
+ */
+function sslOption(url: string) {
+  const mode = process.env.DATABASE_SSL;
+  if (mode === "off") return undefined;
+  if (mode === "no-verify") return { rejectUnauthorized: false };
+  if (mode === "on") return { rejectUnauthorized: true };
+  return /[?&]sslmode=(require|verify-ca|verify-full)/.test(url)
+    ? { rejectUnauthorized: true }
+    : undefined;
+}
 
-  const path = databasePath();
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+function wrap(runner: {
+  query: (text: string, values?: unknown[]) => Promise<{ rows: unknown[]; rowCount: number | null }>;
+}): Omit<DB, "transaction"> {
+  return {
+    async get<T>(sql: string, params: unknown[] = []): Promise<T | undefined> {
+      const result = await runner.query(toPositionalParams(sql), params);
+      return result.rows[0] as T | undefined;
+    },
+    async all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+      const result = await runner.query(toPositionalParams(sql), params);
+      return result.rows as T[];
+    },
+    async run(sql: string, params: unknown[] = []): Promise<RunResult> {
+      const result = await runner.query(toPositionalParams(sql), params);
+      return { changes: result.rowCount ?? 0 };
+    },
+    async exec(sql: string): Promise<void> {
+      await runner.query(sql);
+    },
+  };
+}
 
-  const db = new Database(path);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(SCHEMA);
-  migrate(db);
+function fromPool(pool: Pool): DB {
+  return {
+    ...wrap(pool),
+    async transaction<T>(fn: (tx: DB) => Promise<T>): Promise<T> {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await fn(fromClient(client));
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
 
-  instance = db;
+/**
+ * Inside a transaction every statement must travel down the same connection,
+ * so a nested transaction() reuses this client rather than checking out another
+ * from the pool — taking a second connection there is a classic self-deadlock.
+ */
+function fromClient(client: PoolClient): DB {
+  return {
+    ...wrap(client),
+    async transaction<T>(fn: (tx: DB) => Promise<T>): Promise<T> {
+      return fn(fromClient(client));
+    },
+  };
+}
+
+let pool: Pool | null = null;
+let ready: Promise<DB> | null = null;
+
+async function initialise(): Promise<DB> {
+  const url = connectionString();
+  pool = new Pool({
+    connectionString: url,
+    ssl: sslOption(url),
+    max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
+
+  // A pooled client can be dropped by the server at any time; without a handler
+  // the 'error' event is unhandled and takes the whole process down.
+  pool.on("error", (error) => {
+    console.error("[db] idle client error", error.message);
+  });
+
+  const db = fromPool(pool);
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT pg_advisory_lock($1)", [SCHEMA_LOCK_KEY]);
+    await client.query(SCHEMA);
+  } finally {
+    await client
+      .query("SELECT pg_advisory_unlock($1)", [SCHEMA_LOCK_KEY])
+      .catch(() => {});
+    client.release();
+  }
   return db;
 }
 
-/** Adds columns introduced after a database was first created. */
-function migrate(db: DB): void {
-  addColumn(db, "broker_connections", "account_id", "TEXT");
-  for (const column of [
-    "reported_price",
-    "reported_market_value",
-    "reported_unrealized_pnl",
-    "reported_today_pnl",
-    "reported_realized_pnl",
-  ]) {
-    addColumn(db, "positions", column, "REAL");
+export function getDb(): Promise<DB> {
+  if (!ready) {
+    ready = initialise().catch((error) => {
+      // A failed connection must not be cached, or every later request in this
+      // process inherits the first failure even once the database is back.
+      ready = null;
+      throw error;
+    });
   }
+  return ready;
 }
 
-function addColumn(db: DB, table: string, column: string, type: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as {
-    name: string;
-  }[];
-  if (!columns.some((c) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-  }
+/** Applies the schema to an already-connected database. Used by the test harness. */
+export async function applySchema(db: DB): Promise<void> {
+  await db.exec(SCHEMA);
 }
 
-/** Fresh in-memory database for tests — never touches the on-disk file. */
-export function createTestDb(): DB {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
-  db.exec(SCHEMA);
-  return db;
+export async function closeDb(): Promise<void> {
+  const current = pool;
+  pool = null;
+  ready = null;
+  if (current) await current.end();
 }
 
 export function resetDbForTests(db: DB | null): void {
-  instance = db;
+  ready = db ? Promise.resolve(db) : null;
 }

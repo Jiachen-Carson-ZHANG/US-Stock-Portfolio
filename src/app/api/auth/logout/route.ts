@@ -8,7 +8,7 @@ export async function POST() {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
   if (token) {
-    revokeSession(getDb(), token);
+    revokeSession(await getDb(), token);
     logger.info("auth.logout");
   }
 

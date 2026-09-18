@@ -8,7 +8,7 @@ export async function POST() {
   const auth = await requireApiOwner();
   if ("response" in auth) return auth.response;
 
-  deleteConnection(getDb());
+  deleteConnection(await getDb());
   clearTokenCache();
   logger.info("broker.disconnected", { provider: "moomoo" });
 

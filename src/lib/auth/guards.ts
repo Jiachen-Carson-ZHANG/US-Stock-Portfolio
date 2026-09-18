@@ -23,7 +23,7 @@ const OPEN_ACCESS_USER: AuthUser = {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   if (isOpenAccess()) return OPEN_ACCESS_USER;
   const cookieStore = await cookies();
-  return validateSession(getDb(), cookieStore.get(SESSION_COOKIE)?.value);
+  return validateSession(await getDb(), cookieStore.get(SESSION_COOKIE)?.value);
 }
 
 /** Server Component guard. Redirects unauthenticated visitors to /login. */

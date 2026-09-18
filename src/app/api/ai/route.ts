@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       }),
     );
 
-    saveAiNote(getDb(), parsed.data.symbol, text);
+    saveAiNote(await getDb(), parsed.data.symbol, text);
     logger.info("ai.view", { symbol: parsed.data.symbol, by: user.username });
 
     return Response.json({ text });

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, type DB } from "@/lib/db";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createTestDb, type TestDb } from "@/lib/db/testing";
 import { generateKey } from "@/lib/crypto";
 import {
   authorizeUrl,
@@ -20,18 +20,18 @@ import {
 } from "@/lib/moomoo/tokens";
 
 describe("PKCE", () => {
-  it("derives the challenge as base64url(sha256(verifier))", () => {
+  it("derives the challenge as base64url(sha256(verifier))", async () => {
     const { verifier, challenge } = createPkcePair();
     const expected = createHash("sha256").update(verifier).digest("base64url");
     expect(challenge).toBe(expected);
   });
 
-  it("produces a fresh verifier and state each time", () => {
+  it("produces a fresh verifier and state each time", async () => {
     expect(createPkcePair().verifier).not.toBe(createPkcePair().verifier);
     expect(createState()).not.toBe(createState());
   });
 
-  it("uses a high-entropy verifier", () => {
+  it("uses a high-entropy verifier", async () => {
     expect(createPkcePair().verifier.length).toBeGreaterThanOrEqual(43);
   });
 });
@@ -39,13 +39,13 @@ describe("PKCE", () => {
 describe("scope enforcement", () => {
   // The user picks scopes on moomoo's own consent screen, so the only real
   // guarantee this app has is refusing a grant that carries write access.
-  it("flags write scopes in a granted string", () => {
+  it("flags write scopes in a granted string", async () => {
     expect(writeScopesIn("quote:read trade:read accid:123")).toEqual([]);
     expect(writeScopesIn("trade:read trade:write")).toEqual(["trade:write"]);
     expect(writeScopesIn("quote:write quote:read")).toEqual(["quote:write"]);
   });
 
-  it("treats an empty grant as carrying no write access", () => {
+  it("treats an empty grant as carrying no write access", async () => {
     expect(writeScopesIn("")).toEqual([]);
   });
 });
@@ -60,12 +60,12 @@ describe("authorize URL", () => {
     }),
   );
 
-  it("targets moomoo's confirm endpoint", () => {
+  it("targets moomoo's confirm endpoint", async () => {
     expect(url.origin).toBe("https://webapi.moomoo.com");
     expect(url.pathname).toBe("/oauth2/authorize/confirm");
   });
 
-  it("carries the PKCE and OAuth parameters", () => {
+  it("carries the PKCE and OAuth parameters", async () => {
     expect(url.searchParams.get("client_id")).toBe("abc-123");
     expect(url.searchParams.get("code_challenge")).toBe("chal");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
@@ -76,7 +76,7 @@ describe("authorize URL", () => {
     );
   });
 
-  it("never asks for a write scope", () => {
+  it("never asks for a write scope", async () => {
     expect(url.searchParams.get("scope")).not.toContain("write");
   });
 });
@@ -85,7 +85,7 @@ describe("big integer JSON parsing", () => {
   // moomoo account IDs exceed Number.MAX_SAFE_INTEGER. JSON.parse rounds them
   // to a valid looking ID for an account that does not exist, which the API
   // then rejects with "No permission to access this account".
-  it("keeps an oversized account id exact", () => {
+  it("keeps an oversized account id exact", async () => {
     const parsed = parseJsonPreservingBigInts(
       '{"s":"ok","d":{"accounts":[{"account_id":283726804710975704}]}}',
     ) as { d: { accounts: { account_id: string }[] } };
@@ -93,12 +93,12 @@ describe("big integer JSON parsing", () => {
     expect(parsed.d.accounts[0].account_id).toBe("283726804710975704");
   });
 
-  it("shows why the raw parser cannot be used", () => {
+  it("shows why the raw parser cannot be used", async () => {
     const naive = JSON.parse('{"account_id":283726804710975704}');
     expect(String(naive.account_id)).not.toBe("283726804710975704");
   });
 
-  it("leaves ordinary numbers as numbers", () => {
+  it("leaves ordinary numbers as numbers", async () => {
     const parsed = parseJsonPreservingBigInts(
       '{"price":337,"volume":1876507,"listing_date":345445200000}',
     ) as Record<string, unknown>;
@@ -108,7 +108,7 @@ describe("big integer JSON parsing", () => {
     expect(parsed.listing_date).toBe(345445200000);
   });
 
-  it("leaves strings untouched", () => {
+  it("leaves strings untouched", async () => {
     const parsed = parseJsonPreservingBigInts(
       '{"card":"1008256316165115","qty":"-1"}',
     ) as Record<string, unknown>;
@@ -119,7 +119,7 @@ describe("big integer JSON parsing", () => {
 });
 
 describe("symbol parsing", () => {
-  it("reads a plain US stock", () => {
+  it("reads a plain US stock", async () => {
     const parsed = parseSymbol("US.AAPL");
     expect(parsed).toMatchObject({
       market: "US",
@@ -128,7 +128,7 @@ describe("symbol parsing", () => {
     });
   });
 
-  it("reads an option's terms out of the code", () => {
+  it("reads an option's terms out of the code", async () => {
     expect(parseSymbol("US.AAPL270115C00200000")).toMatchObject({
       market: "US",
       localCode: "AAPL270115C00200000",
@@ -140,7 +140,7 @@ describe("symbol parsing", () => {
     });
   });
 
-  it("reads a put", () => {
+  it("reads a put", async () => {
     expect(parseSymbol("US.TSLA260320P00150000")).toMatchObject({
       instrumentType: "option",
       optionType: "put",
@@ -149,7 +149,7 @@ describe("symbol parsing", () => {
     });
   });
 
-  it("handles a non-US market", () => {
+  it("handles a non-US market", async () => {
     expect(parseSymbol("HK.00700")).toMatchObject({
       market: "HK",
       localCode: "00700",
@@ -157,7 +157,7 @@ describe("symbol parsing", () => {
     });
   });
 
-  it("falls back to stock when there is no market prefix", () => {
+  it("falls back to stock when there is no market prefix", async () => {
     expect(parseSymbol("AAPL")).toMatchObject({
       market: "",
       localCode: "AAPL",
@@ -169,19 +169,19 @@ describe("symbol parsing", () => {
 describe("contract multiplier", () => {
   // Hardcoding 100 silently misprices any contract that does not use it, so it
   // is derived from the broker's own market value instead.
-  it("derives 100 from a standard option position", () => {
+  it("derives 100 from a standard option position", async () => {
     expect(
       deriveContractMultiplier({ quantity: 2, price: 18.65, marketValue: 3730 }),
     ).toBe(100);
   });
 
-  it("derives a non-standard multiplier", () => {
+  it("derives a non-standard multiplier", async () => {
     expect(
       deriveContractMultiplier({ quantity: 1, price: 10, marketValue: 500 }),
     ).toBe(50);
   });
 
-  it("falls back to 100 when the inputs cannot produce a ratio", () => {
+  it("falls back to 100 when the inputs cannot produce a ratio", async () => {
     expect(deriveContractMultiplier({ quantity: 0, price: 5, marketValue: 0 })).toBe(100);
     expect(deriveContractMultiplier({ quantity: 2, price: 0, marketValue: 100 })).toBe(100);
     expect(
@@ -191,21 +191,25 @@ describe("contract multiplier", () => {
 });
 
 describe("token storage", () => {
-  let db: DB;
+  let db: TestDb;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.TOKEN_ENCRYPTION_KEY = generateKey();
-    db = createTestDb();
+    db = await createTestDb();
   });
 
-  it("round-trips a refresh token", () => {
-    saveConnection(db, {
+  afterEach(async () => {
+    await db.close();
+  });
+
+  it("round-trips a refresh token", async () => {
+    await saveConnection(db, {
       refreshToken: "refresh-abc",
       scope: "quote:read trade:read",
       accountId: "123456",
     });
 
-    expect(readConnection(db)).toMatchObject({
+    expect(await readConnection(db)).toMatchObject({
       refreshToken: "refresh-abc",
       scope: "quote:read trade:read",
       accountId: "123456",
@@ -213,68 +217,68 @@ describe("token storage", () => {
     });
   });
 
-  it("stores the token as ciphertext, never plaintext", () => {
-    saveConnection(db, {
+  it("stores the token as ciphertext, never plaintext", async () => {
+    await saveConnection(db, {
       refreshToken: "super-secret-refresh",
       scope: "quote:read",
       accountId: null,
     });
 
-    const row = db.prepare(`SELECT * FROM broker_connections`).get() as Record<
-      string,
-      unknown
-    >;
+    const row = (await db.get<Record<string, unknown>>(
+      `SELECT * FROM broker_connections`,
+    ))!;
     expect(JSON.stringify(row)).not.toContain("super-secret-refresh");
     expect(row.iv).toBeTruthy();
     expect(row.auth_tag).toBeTruthy();
   });
 
-  it("never exposes the token through the status view", () => {
-    saveConnection(db, {
+  it("never exposes the token through the status view", async () => {
+    await saveConnection(db, {
       refreshToken: "secret",
       scope: "quote:read",
       accountId: null,
     });
 
-    const status = readConnectionStatus(db);
+    const status = await readConnectionStatus(db);
     expect(status).not.toBeNull();
     expect(JSON.stringify(status)).not.toContain("secret");
     expect(status).not.toHaveProperty("refreshToken");
   });
 
-  it("replaces the token on reconnect rather than duplicating the row", () => {
-    saveConnection(db, { refreshToken: "first", scope: "quote:read", accountId: null });
-    saveConnection(db, { refreshToken: "second", scope: "quote:read", accountId: null });
+  it("replaces the token on reconnect rather than duplicating the row", async () => {
+    await saveConnection(db, { refreshToken: "first", scope: "quote:read", accountId: null });
+    await saveConnection(db, { refreshToken: "second", scope: "quote:read", accountId: null });
 
-    const count = db
-      .prepare(`SELECT COUNT(*) AS n FROM broker_connections`)
-      .get() as { n: number };
-    expect(count.n).toBe(1);
-    expect(readConnection(db)?.refreshToken).toBe("second");
+    const count = await db.get<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM broker_connections`,
+    );
+    expect(count!.n).toBe(1);
+    expect((await readConnection(db))?.refreshToken).toBe("second");
   });
 
-  it("records an expired connection", () => {
-    saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
-    markStatus(db, "expired");
-    expect(readConnectionStatus(db)?.status).toBe("expired");
+  it("records an expired connection", async () => {
+    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await markStatus(db, "expired");
+    expect((await readConnectionStatus(db))?.status).toBe("expired");
   });
 
-  it("remembers the resolved account id", () => {
-    saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
-    setAccountId(db, "987654");
-    expect(readConnection(db)?.accountId).toBe("987654");
+  it("remembers the resolved account id", async () => {
+    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await setAccountId(db, "987654");
+    expect((await readConnection(db))?.accountId).toBe("987654");
   });
 
-  it("returns nothing once disconnected", () => {
-    saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
-    deleteConnection(db);
-    expect(readConnection(db)).toBeNull();
-    expect(readConnectionStatus(db)).toBeNull();
+  it("returns nothing once disconnected", async () => {
+    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await deleteConnection(db);
+    expect(await readConnection(db)).toBeNull();
+    expect(await readConnectionStatus(db)).toBeNull();
   });
 
-  it("cannot decrypt a token with a different key", () => {
-    saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
+  it("cannot decrypt a token with a different key", async () => {
+    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
     process.env.TOKEN_ENCRYPTION_KEY = generateKey();
-    expect(() => readConnection(db)).toThrow();
+    // The failure now surfaces as a rejected promise rather than a throw.
+    await expect(readConnection(db)).rejects.toThrow();
   });
 });
