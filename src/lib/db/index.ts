@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+CREATE TABLE IF NOT EXISTS activity_events (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT,
+  username   TEXT NOT NULL,
+  kind       TEXT NOT NULL,
+  target     TEXT,
+  detail     TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_target ON activity_events(kind, target);
+
 CREATE TABLE IF NOT EXISTS login_attempts (
   username     TEXT NOT NULL,
   attempted_at TEXT NOT NULL

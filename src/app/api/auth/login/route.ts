@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getDb } from "@/lib/db";
 import { loginSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
+import { recordActivity } from "@/lib/activity";
 import { verifyPassword } from "@/lib/auth/password";
 import {
   checkRateLimit,
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
   }
 
   clearFailedAttempts(db, username);
+  recordActivity(db, { userId: user.id, username, kind: "login" });
   const { token } = createSession(db, user.id);
 
   const cookieStore = await cookies();

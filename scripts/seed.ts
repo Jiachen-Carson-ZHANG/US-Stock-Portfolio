@@ -16,11 +16,13 @@ type SeedAccount = {
   envVar: string;
 };
 
+// Usernames are stored lowercase and matched case-insensitively at login, so
+// "Father" and "father" both work.
 const ACCOUNTS: SeedAccount[] = [
   { username: "owner", displayName: "Owner", role: "owner", envVar: "SEED_OWNER_PASSWORD" },
   { username: "father", displayName: "Father", role: "viewer", envVar: "SEED_FATHER_PASSWORD" },
   { username: "mother", displayName: "Mother", role: "viewer", envVar: "SEED_MOTHER_PASSWORD" },
-  { username: "wife", displayName: "Wife", role: "viewer", envVar: "SEED_WIFE_PASSWORD" },
+  { username: "mile", displayName: "Mile", role: "viewer", envVar: "SEED_MILE_PASSWORD" },
 ];
 
 const SNAPSHOT_DAYS = 120;

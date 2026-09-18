@@ -5,6 +5,7 @@ import { marketSession } from "@/lib/market-hours";
 import type {
   AllocationSlice,
   Concentration,
+  MoneyDTO,
   PortfolioSnapshot,
   PortfolioSummary,
   Position,
@@ -12,12 +13,18 @@ import type {
 } from "@/types/portfolio";
 import {
   allocationByAssetType,
-  allocationByPosition,
   allocationBySector,
   buildPositionViews,
   concentration,
   summarize,
 } from ".";
+import {
+  allocationByInvestedCapital,
+  groupOptions,
+  totalInvested,
+  type OptionGroup,
+} from "./options";
+import { toDTO } from "@/lib/money";
 import { getQuotes } from "./quotes";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
@@ -33,6 +40,8 @@ export type PortfolioData = {
     byAssetType: AllocationSlice[];
     bySector: AllocationSlice[];
   };
+  totalInvested: MoneyDTO;
+  optionGroups: OptionGroup[];
 };
 
 export function baseCurrency(): string {
@@ -122,10 +131,13 @@ export async function loadPortfolio(now: Date = new Date()): Promise<PortfolioDa
     positions: views,
     concentration: concentration(positions, currency),
     allocations: {
-      byPosition: allocationByPosition(positions, currency),
+      // By capital invested, not current value — a spread counts once at net cost.
+      byPosition: allocationByInvestedCapital(positions, currency),
       byAssetType: allocationByAssetType(positions, currency),
       bySector: allocationBySector(positions, currency),
     },
+    totalInvested: toDTO(totalInvested(positions, currency)),
+    optionGroups: groupOptions(positions).groups,
   };
 }
 

@@ -1,8 +1,15 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  username: z.string().trim().min(1).max(64),
+  // Stored lowercase, so "Father" and "father" are the same account.
+  username: z.string().trim().toLowerCase().min(1).max(64),
   password: z.string().min(1).max(512),
+});
+
+export const activitySchema = z.object({
+  kind: z.enum(["view_position", "view_page", "watchlist_add", "watchlist_remove"]),
+  target: z.string().trim().max(64).optional(),
+  detail: z.string().trim().max(256).optional(),
 });
 
 export const symbolSchema = z
