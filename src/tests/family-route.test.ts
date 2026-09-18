@@ -29,8 +29,11 @@ const post = (body: unknown) =>
       body: JSON.stringify(body),
     }),
   );
+let db: TestDb;
+
 beforeEach(async () => {
-  resetDbForTests(await createTestDb());
+  db = await createTestDb();
+  resetDbForTests(db);
   mocks.user = {
     id: "owner",
     username: "owner",
@@ -39,6 +42,11 @@ beforeEach(async () => {
   };
   mocks.provider = "mock";
   mocks.quotes.mockReset();
+});
+
+afterEach(async () => {
+  await db.close();
+  resetDbForTests(null);
 });
 it("requires authentication for reads and writes", async () => {
   mocks.user = null;

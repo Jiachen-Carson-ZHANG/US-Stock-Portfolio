@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@/lib/db/testing";
 import {
   readSnapshots,
@@ -122,7 +122,7 @@ describe("history and collaboration regressions", () => {
       "2026-09-15",
       "2026-09-16",
     ]);
-    db.close();
+    await db.close();
   });
   it("does not capture stale or previous-day data as today", async () => {
     const db = await createTestDb();
@@ -134,7 +134,7 @@ describe("history and collaboration regressions", () => {
         new Date("2026-09-15T21:00:00Z"),
       ),
     ).toBe(false);
-    db.close();
+    await db.close();
   });
   it("preserves the original note and appends another member contribution", async () => {
     const db = await createTestDb();
@@ -156,7 +156,7 @@ describe("history and collaboration regressions", () => {
         expect.objectContaining({ author: "Mother", body: "Another view" }),
       ]),
     );
-    db.close();
+    await db.close();
   });
 });
 
@@ -174,7 +174,7 @@ describe("snapshot timestamp integrity", () => {
     expect(
       await maybeCreateSnapshot(db, summary, "[]", new Date("2026-09-15T20:05:00Z")),
     ).toBe(false);
-    db.close();
+    await db.close();
   });
 });
 
@@ -206,7 +206,7 @@ describe("analysis data lifecycle", () => {
         "owner",
       )).coverage,
     ).toBeNull();
-    db.close();
+    await db.close();
   });
   it("normalizes benchmark and portfolio to their first common date", async () => {
     const { benchmarkComparison } = await import("@/lib/analysis/math");

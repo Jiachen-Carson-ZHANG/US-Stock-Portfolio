@@ -17,7 +17,8 @@
     "ai:test": "tsx scripts/ai-test.ts",
     "db:dev:up": "docker run -d --name fpd-pg -e POSTGRES_PASSWORD=devpass -e POSTGRES_USER=fpd -e POSTGRES_DB=portfolio -p 55432:5432 postgres:16",
     "db:dev:down": "docker rm -f fpd-pg",
-    "db:migrate-from-sqlite": "tsx scripts/sqlite-to-postgres.ts"
+    "db:migrate-from-sqlite": "tsx scripts/sqlite-to-postgres.ts",
+    "db:e2e:reset": "tsx scripts/reset-e2e-db.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

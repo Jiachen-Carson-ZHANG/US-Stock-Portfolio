@@ -227,3 +227,23 @@ it("preserves full option symbols in holding conversations", async () => {
     "AAPL260918C00150000",
   );
 });
+
+it("loses no post when several family members write at the same time", async () => {
+  // The state is one JSON document that is read, edited and written back, so
+  // overlapping writers each read the same version and the later write
+  // discards the earlier post. Eight is enough to make the interleaving
+  // reliable: without the advisory lock this keeps four.
+  const WRITERS = 8;
+  await Promise.all(
+    Array.from({ length: WRITERS }, (_, i) =>
+      familyAction(db, i % 2 ? owner : viewer, {
+        action: "post",
+        text: `post ${i}`,
+      }, now),
+    ),
+  );
+
+  const texts = (await readFamily(db, owner, now)).posts.map((p) => p.text);
+  expect(texts).toHaveLength(WRITERS);
+  expect(new Set(texts).size).toBe(WRITERS);
+});

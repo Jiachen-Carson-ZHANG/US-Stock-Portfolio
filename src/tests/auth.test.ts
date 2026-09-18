@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { DB } from "@/lib/db";
 import { createTestDb, type TestDb } from "@/lib/db/testing";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import {

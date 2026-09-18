@@ -233,6 +233,11 @@ It writes with `ON CONFLICT DO NOTHING`, so existing rows always win and the
 script is safe to run twice. The encrypted broker token copies across intact,
 so the moomoo connection survives and does not need re-authorizing.
 
+Sessions and login attempts are deliberately not copied — both are throwaway,
+and sessions reference account ids, so carrying them into a database that had
+already seeded its own accounts would fail the foreign key. Everyone signs in
+once after the move.
+
 ### Deploying to coze.cn
 
 Coze 编程 (`code.coze.cn`) hosts Node.js web applications. It runs on 火山引擎
@@ -285,9 +290,18 @@ likely first failure and it produces no obvious error message.**
 set `APP_URL` to the real URL and re-run `npm run moomoo:register` so the OAuth
 redirect URI matches exactly. moomoo compares it character for character.
 
-**Step 6 — carry your data across**, if you are moving from the SQLite version:
-stop the app, set `DATABASE_URL` locally to the Coze database, and run
-`npm run db:migrate-from-sqlite`. See the previous section.
+**Step 6 — carry your data across**, if you are moving from the SQLite version.
+Do this **before the first deploy**, while the database is still empty: the app
+seeds its own accounts on every boot, and once they exist the usernames collide
+and your original accounts — with their passwords — are skipped. The script
+warns when it sees this, but the clean order is:
+
+1. create the database, deploy nothing yet
+2. `DATABASE_URL=<coze postgres> npm run db:migrate-from-sqlite`
+3. deploy; the boot-time seed then leaves your migrated accounts alone
+
+Coze keeps development and production databases apart, so migrating into one
+does nothing to the other. Do it deliberately, for the one you are launching.
 
 #### Verifying the deployment
 

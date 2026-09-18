@@ -131,6 +131,9 @@ type State = {
   read: Record<string, string>;
   quizzes: Record<string, { score: number; at: string }>;
 };
+/** Serialises writers to the single family_state document. */
+const FAMILY_STATE_LOCK = "4711920355087361";
+
 async function load(db: DB): Promise<State> {
   const row = await db.get<{ payload: string }>(
     "SELECT payload FROM family_state WHERE id=1",
@@ -221,6 +224,14 @@ export async function familyAction(
 ) {
   const a = familyActionSchema.parse(input);
   await db.transaction(async (tx) => {
+    // The whole challenge is one JSON document that is read, edited and written
+    // back. Two actions overlapping would both read the same version and the
+    // second write would discard the first — a post silently lost. The lock is
+    // held to the end of the transaction, so writers queue instead.
+    //
+    // An advisory lock rather than SELECT ... FOR UPDATE because the row may
+    // not exist yet, and there is nothing to lock until someone creates it.
+    await tx.run("SELECT pg_advisory_xact_lock(?)", [FAMILY_STATE_LOCK]);
     const s = await load(tx),
       at = now.toISOString(),
       week = weekKey(now),

@@ -14,20 +14,29 @@
 import Database from "better-sqlite3";
 import { closeDb, getDb } from "../src/lib/db";
 
-// Parents before children: sessions reference users.
-// login_attempts is deliberately absent — it is 15-minute rate-limit state with
-// no primary key, so copying it cannot be made idempotent and stale rows would
-// only make someone likelier to be locked out.
+// Parents before children: watchlist_notes references watchlist.
+//
+// Two tables are deliberately absent. login_attempts is 15-minute rate-limit
+// state with no primary key, so copying it cannot be made idempotent and stale
+// rows would only make someone likelier to be locked out. sessions are
+// throwaway too, and carrying them is actively harmful: they reference user
+// ids, so if the target database already seeded its own accounts the usernames
+// collide, the original users are skipped, and the sessions then fail the
+// foreign key. Everyone signs in once after the move instead.
 const TABLES = [
   "users",
-  "sessions",
   "activity_events",
   "broker_connections",
   "positions",
   "transactions",
   "watchlist",
+  "watchlist_notes",
   "quote_cache",
   "portfolio_snapshots",
+  "family_state",
+  "analysis_flows",
+  "analysis_config",
+  "analysis_observations",
 ] as const;
 
 async function main() {
@@ -37,6 +46,21 @@ async function main() {
   const sqlite = new Database(path, { readonly: true });
   const pg = await getDb();
   console.log("Writing Postgres: DATABASE_URL\n");
+
+  // Seeding creates accounts with fresh ids. If it has already run, the usernames
+  // collide and the original accounts are skipped, so the family would be left
+  // signing in with the seeded passwords rather than their own. Migrating into
+  // an empty database avoids the question entirely.
+  const existing = await pg.get<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM users",
+  );
+  if ((existing?.n ?? 0) > 0) {
+    console.log(
+      `  ! The target already holds ${existing?.n} account(s), so accounts from\n` +
+        "    the SQLite file will be skipped and their passwords will not carry\n" +
+        "    over. Migrate into an empty database first if that matters.\n",
+    );
+  }
 
   let copied = 0;
   let skipped = 0;

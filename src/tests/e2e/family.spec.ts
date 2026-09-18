@@ -70,20 +70,28 @@ test("family discussions, sealed predictions and demo trading work on this devic
       .getByRole("button", { name: "Start challenge", exact: true })
       .click();
   }
-  if (
-    await challenge
-      .getByRole("button", { name: "Join with $10,000", exact: true })
-      .count()
-  )
-    await challenge
-      .getByRole("button", { name: "Join with $10,000", exact: true })
-      .click();
+  // Both projects share one server and database, so this may arrive with the
+  // challenge already joined by the earlier run. Counting the join button
+  // straight after starting the challenge raced the round trip: the button did
+  // not exist yet, the click was skipped, and the failure surfaced later as a
+  // missing trade form. Wait for whichever state this run is actually in.
+  const join = challenge.getByRole("button", {
+    name: "Join with $10,000",
+    exact: true,
+  });
+  const ticker = challenge.getByLabel("Ticker", { exact: true });
+  await expect(join.or(ticker).first()).toBeVisible();
+  if (await join.count()) {
+    await join.click();
+    await expect(join).toHaveCount(0);
+  }
   await expect(
     challenge.getByText(
       "Demo challenge — synthetic prices, separate from live market challenges",
     ),
   ).toBeVisible();
-  await challenge.getByLabel("Ticker", { exact: true }).fill("AAPL");
+  await expect(ticker).toBeVisible();
+  await ticker.fill("AAPL");
   await challenge.getByLabel("Whole shares").fill("1");
   await challenge
     .getByRole("button", { name: "Place virtual trade", exact: true })
