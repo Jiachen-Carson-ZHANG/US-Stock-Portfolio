@@ -150,6 +150,15 @@ export function summarize(
   );
   const previousTotal = sum(positions.map(previousCloseValue), currency);
 
+  const realized = sum(
+    positions.map((p) => money(p.reportedRealizedPnL ?? 0, currency)),
+    currency,
+  );
+  const totalReturn = add(pnl, realized);
+  // Capital in = what the portfolio is worth less everything it has made. It is
+  // the base that makes value / capital - 1 equal the return, exactly.
+  const capitalIn = subtract(total, totalReturn);
+
   return {
     totalMarketValue: toDTO(total),
     totalCostBasis: toDTO(cost),
@@ -160,14 +169,9 @@ export function summarize(
     cashValue: toDTO(cash),
     cashPercent: percentOf(cash, total) ?? 0,
     shortExposure: toDTO(shortExposure(positions, currency)),
-    realizedPnL: toDTO(
-      sum(
-        positions.map((p) =>
-          money(p.reportedRealizedPnL ?? 0, currency),
-        ),
-        currency,
-      ),
-    ),
+    realizedPnL: toDTO(realized),
+    totalReturn: toDTO(totalReturn),
+    totalReturnPercent: percentOf(totalReturn, capitalIn),
     positionCount: positions.filter((p) => p.instrumentType !== "cash").length,
     marketStatus: market.status,
     dataTimestamp: market.dataTimestamp,

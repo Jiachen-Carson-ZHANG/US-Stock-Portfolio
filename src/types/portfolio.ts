@@ -82,6 +82,10 @@ export type PortfolioSummary = {
   shortExposure: MoneyDTO;
   /** Gains already banked, as reported by the broker. */
   realizedPnL: MoneyDTO;
+  /** Realized plus unrealized: the whole-journey result. */
+  totalReturn: MoneyDTO;
+  /** totalReturn against the capital that produced it (value less the return). */
+  totalReturnPercent: number | null;
   positionCount: number;
   marketStatus: MarketSession;
   dataTimestamp: string | null;

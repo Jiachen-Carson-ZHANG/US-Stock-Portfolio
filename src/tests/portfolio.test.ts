@@ -290,6 +290,47 @@ describe("short positions", () => {
   });
 });
 
+describe("total return", () => {
+  // Real figures from the connected account.
+  const held = position({
+    id: "held",
+    symbol: "HELD",
+    quantity: 1,
+    currentPrice: 20187.61,
+    previousClose: 20187.61,
+    reportedMarketValue: 20187.61,
+    reportedUnrealizedPnL: -1228.57,
+    reportedRealizedPnL: 359.77,
+  });
+
+  const summary = summarize([held], "USD", MARKET);
+
+  it("adds realized gains to the unrealized result", () => {
+    expect(Number(summary.totalReturn.amount)).toBeCloseTo(-868.8, 2);
+  });
+
+  it("measures the return against the capital that produced it", () => {
+    // 20,187.61 worth now on 21,056.41 put to work
+    expect(summary.totalReturnPercent).toBeCloseTo(-4.126, 3);
+  });
+
+  it("reconciles: capital in, grown by the return, is today's value", () => {
+    const capitalIn =
+      Number(summary.totalMarketValue.amount) - Number(summary.totalReturn.amount);
+    const grown = capitalIn * (1 + (summary.totalReturnPercent ?? 0) / 100);
+    expect(grown).toBeCloseTo(Number(summary.totalMarketValue.amount), 2);
+  });
+
+  it("equals unrealized P&L when nothing has been realized", () => {
+    const plain = summarize(
+      [position({ quantity: 10, averageCost: 100, currentPrice: 110 })],
+      "USD",
+      MARKET,
+    );
+    expect(plain.totalReturn.amount).toBe(plain.totalUnrealizedPnL.amount);
+  });
+});
+
 describe("days to expiration", () => {
   it("counts whole days from the given date", () => {
     expect(daysToExpiration("2026-01-16", new Date("2026-01-01T12:00:00Z"))).toBe(15);

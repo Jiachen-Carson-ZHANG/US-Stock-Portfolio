@@ -11,11 +11,13 @@ function Stat({
   value,
   sub,
   tone,
+  children,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: string;
+  children?: React.ReactNode;
 }) {
   return (
     <Card>
@@ -28,6 +30,7 @@ function Stat({
         {sub && (
           <p className={`mt-0.5 text-sm ${tone ?? "text-muted-foreground"}`}>{sub}</p>
         )}
+        {children}
       </CardContent>
     </Card>
   );
@@ -43,35 +46,40 @@ export function SummaryCards({
   const t = useT();
   const today = Number(summary.todayPnL.amount);
   const unrealized = Number(summary.totalUnrealizedPnL.amount);
-  const short = Number(summary.shortExposure.amount);
-
-  const composition = [
-    `${summary.positionCount} ${t.summary.positions}`,
-    `${summary.cashPercent.toFixed(1)}% ${t.summary.cash}`,
-    short !== 0 ? `${formatMoney(summary.shortExposure)} ${t.summary.short}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const totalReturn = Number(summary.totalReturn.amount);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Stat
         label={t.summary.portfolioValue}
         value={formatMoney(summary.totalMarketValue)}
-        sub={composition}
-      />
+        sub={`${summary.positionCount} ${t.summary.positions} · ${summary.cashPercent.toFixed(1)}% ${t.summary.cash}`}
+      >
+        <p className={`mt-1.5 text-xs ${signClass(unrealized)}`}>
+          {formatMoney(summary.totalUnrealizedPnL, { signed: true })} ·{" "}
+          {formatPercent(summary.totalUnrealizedPnLPercent, { signed: true })}{" "}
+          <span className="text-muted-foreground">{t.summary.unrealized}</span>
+        </p>
+      </Stat>
+
       <Stat
         label={t.summary.today}
         value={formatMoney(summary.todayPnL, { signed: true })}
         sub={formatPercent(summary.todayPnLPercent, { signed: true })}
         tone={signClass(today)}
       />
+
       <Stat
-        label={t.summary.unrealized}
-        value={formatMoney(summary.totalUnrealizedPnL, { signed: true })}
-        sub={formatPercent(summary.totalUnrealizedPnLPercent, { signed: true })}
-        tone={signClass(unrealized)}
-      />
+        label={t.summary.totalReturn}
+        value={formatMoney(summary.totalReturn, { signed: true })}
+        sub={formatPercent(summary.totalReturnPercent, { signed: true })}
+        tone={signClass(totalReturn)}
+      >
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {t.summary.realized} {formatMoney(summary.realizedPnL, { signed: true })}
+        </p>
+      </Stat>
+
       <Stat
         label={t.summary.totalInvested}
         value={formatMoney(totalInvested)}
