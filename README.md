@@ -286,9 +286,17 @@ there; if sign-in fails on the deployed URL while working locally, add that
 exact hostname (or set `PUBLIC_ORIGIN` to it) and redeploy. **This is the most
 likely first failure and it produces no obvious error message.**
 
-**Step 5 — deploy, then point moomoo at it.** After the first successful deploy,
-set `APP_URL` to the real URL and re-run `npm run moomoo:register` so the OAuth
-redirect URI matches exactly. moomoo compares it character for character.
+**Step 5 — register the callback before you need it.** moomoo compares the
+redirect URI character for character, and re-registering issues a new
+`client_id` that invalidates the stored connection. One client can hold several
+URIs, so register every origin the app will ever be served from in one go:
+
+```bash
+npm run moomoo:register -- https://your-app.coze.site https://your-app.vercel.app
+```
+
+`APP_URL` and `http://localhost:3000` are always included. Set `APP_URL` on each
+deployment to its own origin — that is what the app builds its callback from.
 
 **Step 6 — carry your data across**, if you are moving from the SQLite version.
 Do this **before the first deploy**, while the database is still empty: the app
