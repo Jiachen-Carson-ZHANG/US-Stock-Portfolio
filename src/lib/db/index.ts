@@ -300,12 +300,20 @@ async function initialise(): Promise<DB> {
   const db = fromPool(pool);
   const client = await pool.connect();
   try {
-    await client.query("SELECT pg_advisory_lock($1)", [SCHEMA_LOCK_KEY]);
+    // Wrapped in an explicit transaction, with a transaction-scoped lock, so it
+    // survives a connection pooler. Under PgBouncer's transaction mode — which
+    // is what a managed "pooled" connection string gives you — consecutive
+    // statements outside a transaction can land on different backends, so a
+    // session-level lock would guard nothing and its release would apply to
+    // some other connection. The lock ends with the COMMIT either way.
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [SCHEMA_LOCK_KEY]);
     await client.query(SCHEMA);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
   } finally {
-    await client
-      .query("SELECT pg_advisory_unlock($1)", [SCHEMA_LOCK_KEY])
-      .catch(() => {});
     client.release();
   }
   return db;
