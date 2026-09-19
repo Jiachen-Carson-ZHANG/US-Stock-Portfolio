@@ -1,4 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { vi } from "vitest";
+
+// The guard reads the session cookie through next/headers, which has no
+// request context under vitest.
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/lib/db/testing";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
@@ -176,5 +183,28 @@ describe("login rate limiting", () => {
       await recordFailedAttempt(db, "owner", old);
     }
     expect((await checkRateLimit(db, "owner")).blocked).toBe(false);
+  });
+});
+
+describe("login page without a database", () => {
+  // The sign-in page is the one screen that must render when the database is
+  // unreachable — a misconfigured DATABASE_URL otherwise turns every entry
+  // point into a server error with nothing to act on.
+  it("answers 'not signed in' from the cookie alone, without connecting", async () => {
+    const { getCurrentUser } = await import("@/lib/auth/guards");
+    const { resetDbForTests } = await import("@/lib/db");
+
+    // Any connection attempt now throws, standing in for an unreachable server.
+    resetDbForTests(null);
+    const previous = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "postgres://nobody@127.0.0.1:1/none";
+    process.env.AUTH_MODE = "password";
+
+    try {
+      await expect(getCurrentUser()).resolves.toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = previous;
+    }
   });
 });

@@ -23,7 +23,12 @@ const OPEN_ACCESS_USER: AuthUser = {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   if (isOpenAccess()) return OPEN_ACCESS_USER;
   const cookieStore = await cookies();
-  return validateSession(await getDb(), cookieStore.get(SESSION_COOKIE)?.value);
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  // No cookie is already the answer, so do not open a connection to reach it.
+  // It also keeps /login renderable while the database is unreachable, which is
+  // when someone most needs to see a page rather than a server error.
+  if (!token) return null;
+  return validateSession(await getDb(), token);
 }
 
 /** Server Component guard. Redirects unauthenticated visitors to /login. */
