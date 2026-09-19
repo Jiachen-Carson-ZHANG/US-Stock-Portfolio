@@ -282,3 +282,34 @@ describe("token storage", () => {
     await expect(readConnection(db)).rejects.toThrow();
   });
 });
+
+describe("redirect URI", () => {
+  const original = process.env.APP_URL;
+  afterEach(() => {
+    if (original === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = original;
+  });
+
+  // Hosting panels ask for a "URL" and people paste the bare host. moomoo
+  // compares the value character for character, so a relative path fails at
+  // the consent screen with nothing useful logged.
+  it("supplies https when the configured value omits the scheme", async () => {
+    const { redirectUri } = await import("@/lib/moomoo/flow");
+    process.env.APP_URL = "carson-us-portfolio.vercel.app";
+    expect(redirectUri()).toBe(
+      "https://carson-us-portfolio.vercel.app/api/broker/moomoo/callback",
+    );
+  });
+
+  it("keeps an explicit scheme and trims trailing slashes", async () => {
+    const { redirectUri } = await import("@/lib/moomoo/flow");
+    process.env.APP_URL = "https://carson-us-portfolio.vercel.app/";
+    expect(redirectUri()).toBe(
+      "https://carson-us-portfolio.vercel.app/api/broker/moomoo/callback",
+    );
+    process.env.APP_URL = "http://localhost:3000";
+    expect(redirectUri()).toBe(
+      "http://localhost:3000/api/broker/moomoo/callback",
+    );
+  });
+});

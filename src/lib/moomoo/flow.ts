@@ -16,9 +16,18 @@ function key(): Buffer {
   return parseKey(raw);
 }
 
+/**
+ * moomoo compares the redirect URI character for character, so a malformed one
+ * fails at the consent screen with nothing useful in the logs. Hosting panels
+ * invite pasting a bare hostname, which would yield a relative path here, so
+ * the scheme is supplied when it is missing rather than trusted to be there.
+ */
 export function redirectUri(): string {
-  const base = process.env.APP_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/api/broker/moomoo/callback`;
+  const configured = (process.env.APP_URL ?? "http://localhost:3000").trim();
+  const base = /^https?:\/\//i.test(configured)
+    ? configured
+    : `https://${configured}`;
+  return `${base.replace(/\/+$/, "")}/api/broker/moomoo/callback`;
 }
 
 /**
