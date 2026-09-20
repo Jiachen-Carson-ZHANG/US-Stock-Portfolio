@@ -46,10 +46,10 @@ export function LiveDashboard({
         </div>
       </div>
 
-      <ContributionBars positions={data.positions} />
+      <ContributionBars positions={data.positions} optionGroups={data.optionGroups} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <UnrealizedPnLBars positions={data.positions} />
+        <UnrealizedPnLBars positions={data.positions} optionGroups={data.optionGroups} />
         <ConcentrationTiles data={data.concentration ?? concentration} />
       </div>
 

@@ -74,6 +74,8 @@ const en = {
     positionValue: "Position value history",
     stocksVsOptions: "Stocks vs options",
     noHistory: "No history recorded yet.",
+    noMovementToday:
+      "Nothing moved today — the market is closed or prices have not changed since the last close.",
     other: "Other",
   },
 
@@ -308,6 +310,7 @@ const zh: Dictionary = {
     positionValue: "持仓市值走势",
     stocksVsOptions: "股票与期权对比",
     noHistory: "暂无历史记录。",
+    noMovementToday: "今日无变动 —— 市场休市，或自上次收盘以来价格未变。",
     other: "其他",
   },
 
