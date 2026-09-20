@@ -62,7 +62,8 @@ export function SummaryCards({
           <span className="text-muted-foreground">{t.summary.unrealized}</span>
         </p>
         <p className={`mt-0.5 text-xs ${signClass(realized)}`}>
-          {formatMoney(summary.realizedPnL, { signed: true })}{" "}
+          {formatMoney(summary.realizedPnL, { signed: true })} ·{" "}
+          {formatPercent(summary.realizedPnLPercent, { signed: true })}{" "}
           <span className="text-muted-foreground">{t.summary.realized}</span>
         </p>
       </Stat>

@@ -5,14 +5,20 @@ import type { AllocationSlice } from "@/types/portfolio";
 import {
   ChartFrame,
   Legend,
+  OTHER,
   SURFACE,
   Tip,
   exactUsd,
   seriesColor,
 } from "./chart-kit";
 
-/** Past six slices a donut stops reading as part-to-whole, so the tail folds in. */
-const MAX_SLICES = 6;
+/**
+ * Nine named holdings plus the folded tail. Nine is the number of validated
+ * categorical hues; past it the tail becomes "Other" rather than inventing a
+ * colour. A donut reads part-to-whole best at around six, so at this size the
+ * legend and the labels carry identity and the arcs carry proportion.
+ */
+const MAX_SLICES = 10;
 
 function fold(slices: AllocationSlice[]): AllocationSlice[] {
   if (slices.length <= MAX_SLICES) return slices;
@@ -43,7 +49,9 @@ export function AllocationDonut({
     label: slice.label,
     value: slice.value,
     percent: slice.percent,
-    color: seriesColor(index),
+    // The folded tail is neutral wherever it lands, so it never reads as a
+    // holding of its own.
+    color: slice.key === "__other" ? OTHER : seriesColor(index),
   }));
 
   return (

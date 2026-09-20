@@ -190,18 +190,28 @@ export function summarize(
     ? subtract(totalReturn, pnl)
     : reportedRealized;
 
+  /**
+   * All three percentages share one base so they add up the way the amounts
+   * do: unrealized% + realized% = total return%. Giving each its own
+   * denominator would put numbers that look comparable side by side when they
+   * are not — unrealized against cost, realized against deposits — and the
+   * column would silently fail to sum.
+   */
+  const returnBase = hasDeposits ? capitalIn : cost;
+
   return {
     netDeposits: hasDeposits ? toDTO(netDeposits) : null,
     totalMarketValue: toDTO(total),
     totalCostBasis: toDTO(cost),
     totalUnrealizedPnL: toDTO(pnl),
-    totalUnrealizedPnLPercent: percentOf(pnl, cost),
+    totalUnrealizedPnLPercent: percentOf(pnl, returnBase),
     todayPnL: toDTO(today),
     todayPnLPercent: percentOf(today, previousTotal),
     cashValue: toDTO(cash),
     cashPercent: percentOf(cash, total) ?? 0,
     shortExposure: toDTO(shortExposure(positions, currency)),
     realizedPnL: toDTO(realized),
+    realizedPnLPercent: percentOf(realized, returnBase),
     totalReturn: toDTO(totalReturn),
     totalReturnPercent: percentOf(totalReturn, capitalIn),
     positionCount: positions.filter((p) => p.instrumentType !== "cash").length,

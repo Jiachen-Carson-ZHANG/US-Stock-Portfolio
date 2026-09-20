@@ -74,7 +74,10 @@ export async function buildAiContext(now: Date = new Date()): Promise<string> {
   add(
     `Unrealized P&L       ${n(summary.totalUnrealizedPnL)} (${pct(summary.totalUnrealizedPnLPercent)})`,
   );
-  add(`Realized P&L         ${n(summary.realizedPnL)} (broker-reported)`);
+  add(
+    `Realized P&L         ${n(summary.realizedPnL)} (${pct(summary.realizedPnLPercent)})` +
+      (summary.netDeposits ? " — banked; excludes what is still held" : " (broker-reported)"),
+  );
   if (summary.netDeposits) {
     add(`Net deposits         ${n(summary.netDeposits)} (cash paid in, less withdrawals)`);
   }

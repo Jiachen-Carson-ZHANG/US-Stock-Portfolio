@@ -80,8 +80,13 @@ export type PortfolioSummary = {
   cashPercent: number;
   /** Net value of written/short positions. Zero when none are held. */
   shortExposure: MoneyDTO;
-  /** Gains already banked, as reported by the broker. */
+  /**
+   * Gains already banked. Derived as the residual when deposits are known,
+   * because the broker only reports it for positions still held.
+   */
   realizedPnL: MoneyDTO;
+  /** Against the same base as the unrealized and total figures, so they sum. */
+  realizedPnLPercent: number | null;
   /**
    * Cash paid into the account, when configured. Null means it is unknown and
    * totalReturn is inferred from the broker's realized figure instead.

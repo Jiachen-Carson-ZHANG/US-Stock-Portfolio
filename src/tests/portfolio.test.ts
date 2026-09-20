@@ -362,6 +362,13 @@ describe("total return", () => {
     expect(Number(summary.realizedPnL.amount)).toBeCloseTo(359.77, 2);
   });
 
+  it("uses one base so the percentages sum like the amounts do", () => {
+    const withDeposits = summarize([held], "USD", MARKET, money(22100, "USD"));
+    const u = withDeposits.totalUnrealizedPnLPercent ?? 0;
+    const r = withDeposits.realizedPnLPercent ?? 0;
+    expect(u + r).toBeCloseTo(withDeposits.totalReturnPercent ?? 0, 6);
+  });
+
   it("reports no deposits when none are configured", () => {
     expect(summary.netDeposits).toBeNull();
   });

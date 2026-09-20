@@ -9,7 +9,13 @@ export const SERIES = [
   "var(--chart-4)",
   "var(--chart-5)",
   "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
 ] as const;
+
+/** Reserved for the folded tail. A bucket is not a category. */
+export const OTHER = "var(--chart-other)";
 
 export const GRID = "var(--chart-grid)";
 export const AXIS = "var(--chart-axis)";
@@ -17,8 +23,13 @@ export const POSITIVE = "var(--positive)";
 export const NEGATIVE = "var(--negative)";
 export const SURFACE = "var(--surface)";
 
+/**
+ * Past the palette this returns the neutral rather than wrapping around.
+ * Cycling would paint two different holdings the same colour, which reads as
+ * one thing in two places — worse than admitting the chart has run out of hues.
+ */
 export function seriesColor(index: number): string {
-  return SERIES[index % SERIES.length];
+  return SERIES[index] ?? OTHER;
 }
 
 const OCC_SYMBOL = /^([A-Z]+)\d{6}([CP])(\d{8})$/;

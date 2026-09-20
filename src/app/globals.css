@@ -31,14 +31,22 @@
   --positive: #047857;
   --negative: #b91c1c;
 
-  /* Categorical slots in validated adjacent order. Paired with a labelled
-     legend and the holdings table, which is the relief for the sub-3:1 slots. */
+  /* Categorical slots in validated adjacent order: every neighbouring pair
+     clears OKLab dE 15 for normal vision and 8 under simulated deuteranopia
+     and protanopia. Adjacency is the standard that matters here because a
+     donut's arcs only ever touch their neighbours; across all pairs nine hues
+     cannot be separated, which is why a labelled legend carries identity. */
   --chart-1: #2a78d6;
   --chart-2: #eb6834;
   --chart-3: #1baf7a;
   --chart-4: #eda100;
-  --chart-5: #e87ba4;
+  --chart-5: #e0559e;
   --chart-6: #008300;
+  --chart-7: #7c3aed;
+  --chart-8: #0e7490;
+  --chart-9: #9f1239;
+  /* "Other" is a bucket, not a category, so it stays neutral. */
+  --chart-other: #a8a29e;
 
   --chart-grid: #e7e5e4;
   --chart-axis: #a8a29e;
@@ -60,8 +68,14 @@
     --chart-2: #d95926;
     --chart-3: #199e70;
     --chart-4: #c98500;
-    --chart-5: #d55181;
+    /* Was #d55181, which sat 4.2 from the amber beside it under deuteranopia —
+       an adjacent-pair failure that predates the ninth slot. */
+    --chart-5: #f472b6;
     --chart-6: #008300;
+    --chart-7: #8b5cf6;
+    --chart-8: #0e8da8;
+    --chart-9: #be3455;
+    --chart-other: #cfcac5;
 
     --chart-grid: #292524;
     --chart-axis: #78716c;
