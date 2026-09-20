@@ -158,7 +158,7 @@ export function summarize(
   );
   const previousTotal = sum(positions.map(previousCloseValue), currency);
 
-  const realized = sum(
+  const reportedRealized = sum(
     positions.map((p) => money(p.reportedRealizedPnL ?? 0, currency)),
     currency,
   );
@@ -170,8 +170,25 @@ export function summarize(
   const hasDeposits = netDeposits != null && netDeposits.amount.greaterThan(0);
   const totalReturn = hasDeposits
     ? subtract(total, netDeposits)
-    : add(pnl, realized);
-  const capitalIn = hasDeposits ? netDeposits : subtract(total, add(pnl, realized));
+    : add(pnl, reportedRealized);
+  const capitalIn = hasDeposits
+    ? netDeposits
+    : subtract(total, add(pnl, reportedRealized));
+
+  /**
+   * With deposits known the account balances: value = deposits + realized +
+   * unrealized. Realized is the only unobserved term, so it is taken as the
+   * residual rather than from the broker, whose figure covers only positions
+   * still held — it omits names closed outright, and understated realized by
+   * $949 on this account.
+   *
+   * The residual also absorbs dividends, interest and fees, which belong in
+   * the same "banked, not held" bucket. What it cannot absorb is an error in
+   * the stated deposit, so that figure has to be right.
+   */
+  const realized = hasDeposits
+    ? subtract(totalReturn, pnl)
+    : reportedRealized;
 
   return {
     netDeposits: hasDeposits ? toDTO(netDeposits) : null,

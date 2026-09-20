@@ -343,6 +343,25 @@ describe("total return", () => {
     expect(Number(zero.totalReturn.amount)).toBeCloseTo(-868.8, 2);
   });
 
+  it("makes the three figures on the summary cards add up", () => {
+    // What the family reads is unrealized, realized and total return side by
+    // side. If they do not sum, one of them is wrong — and it was realized,
+    // because the broker omits positions closed outright.
+    const withDeposits = summarize([held], "USD", MARKET, money(22100, "USD"));
+    const unrealized = Number(withDeposits.totalUnrealizedPnL.amount);
+    const realized = Number(withDeposits.realizedPnL.amount);
+    const total = Number(withDeposits.totalReturn.amount);
+    expect(unrealized + realized).toBeCloseTo(total, 6);
+  });
+
+  it("derives realized as the residual rather than trusting the broker", () => {
+    const withDeposits = summarize([held], "USD", MARKET, money(22100, "USD"));
+    // value 20,187.61 - deposits 22,100 - unrealized -1,228.57
+    expect(Number(withDeposits.realizedPnL.amount)).toBeCloseTo(-683.82, 2);
+    // the broker's own figure, which it replaces
+    expect(Number(summary.realizedPnL.amount)).toBeCloseTo(359.77, 2);
+  });
+
   it("reports no deposits when none are configured", () => {
     expect(summary.netDeposits).toBeNull();
   });
