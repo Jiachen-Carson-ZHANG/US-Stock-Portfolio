@@ -27,7 +27,7 @@ import {
 import { HorizontalRoundedBar, VerticalRoundedBar } from "./rounded-bar";
 import { useT } from "@/lib/i18n/context";
 import type { OptionGroupDTO } from "@/lib/portfolio/options";
-import { pnlByHolding } from "@/lib/portfolio/chart-data";
+import { pnlByHolding, type PnLDatum } from "@/lib/portfolio/chart-data";
 
 export function UnrealizedPnLBars({
   positions,
@@ -75,7 +75,7 @@ export function UnrealizedPnLBars({
             cursor={{ fill: GRID, fillOpacity: 0.4 }}
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
-              const datum = payload[0].payload as Datum;
+              const datum = payload[0].payload as PnLDatum;
               return (
                 <Tip
                   label={datum.symbol}
@@ -159,7 +159,7 @@ export function ContributionBars({
             cursor={{ fill: GRID, fillOpacity: 0.4 }}
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
-              const datum = payload[0].payload as Datum;
+              const datum = payload[0].payload as PnLDatum;
               return (
                 <Tip
                   label={datum.symbol}
