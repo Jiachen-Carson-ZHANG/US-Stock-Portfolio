@@ -49,7 +49,14 @@ export function LiveDashboard({
       <ContributionBars positions={data.positions} optionGroups={data.optionGroups} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <UnrealizedPnLBars positions={data.positions} optionGroups={data.optionGroups} />
+        <UnrealizedPnLBars
+              positions={data.positions}
+              optionGroups={data.optionGroups}
+              closedRealized={
+                Number(data.summary.realizedPnL.amount) -
+                data.positions.reduce((n, p) => n + (p.reportedRealizedPnL ?? 0), 0)
+              }
+            />
         <ConcentrationTiles data={data.concentration ?? concentration} />
       </div>
 

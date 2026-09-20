@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { formatMoney } from "@/lib/money";
+import { spreadPrices } from "@/lib/portfolio/chart-data";
 import { cn, signClass } from "@/lib/utils";
 import { useT } from "@/lib/i18n/context";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -292,7 +293,23 @@ export function HoldingsTable({
                       <td className="tabular px-4 py-3 text-right">
                         {g.legs.length} {t.position.legs.toLowerCase()}
                       </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">—</td>
+                      <td className="tabular px-4 py-3 text-right">
+                        {(() => {
+                          const prices = spreadPrices(g);
+                          if (!prices) return "—";
+                          return (
+                            <>
+                              <div>{money(prices.now, g.netCost.currency)}</div>
+                              <div
+                                className="text-xs font-normal text-muted-foreground"
+                                title={t.position.averageCost}
+                              >
+                                {money(prices.paid, g.netCost.currency)}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </td>
                       <td className={cn("tabular px-4 py-3 text-right", signClass(today))}>
                         {formatMoney(g.todayPnL, { signed: true })}
                       </td>

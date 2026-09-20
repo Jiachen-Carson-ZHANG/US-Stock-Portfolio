@@ -134,6 +134,28 @@ export function Tip({
   );
 }
 
+/** A series key: swatch and name, for charts where identity is not a slice. */
+export function SeriesLegend({
+  items,
+}: {
+  items: { label: string; color: string }[];
+}) {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      {items.map((item) => (
+        <li key={item.label} className="flex items-center gap-1.5 text-xs">
+          <span
+            aria-hidden="true"
+            className="size-2.5 shrink-0 rounded-[3px]"
+            style={{ background: item.color }}
+          />
+          <span className="text-muted-foreground">{item.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function Legend({
   items,
 }: {

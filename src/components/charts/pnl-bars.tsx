@@ -17,9 +17,11 @@ import {
   AXIS_TICK,
   ChartFrame,
   GRID,
+  SeriesLegend,
   NEGATIVE,
   POSITIVE,
   Tip,
+  seriesColor,
   compactUsd,
   exactUsd,
   shortSymbol,
@@ -27,80 +29,103 @@ import {
 import { HorizontalRoundedBar, VerticalRoundedBar } from "./rounded-bar";
 import { useT } from "@/lib/i18n/context";
 import type { OptionGroupDTO } from "@/lib/portfolio/options";
-import { pnlByHolding, type PnLDatum } from "@/lib/portfolio/chart-data";
+import {
+  pnlByHolding,
+  returnByHolding,
+  type PnLDatum,
+  type ReturnDatum,
+} from "@/lib/portfolio/chart-data";
 
 export function UnrealizedPnLBars({
   positions,
   optionGroups,
+  closedRealized = 0,
 }: {
   positions: PositionView[];
   optionGroups: OptionGroupDTO[];
+  /** Banked on holdings since sold, so the bars still reach total return. */
+  closedRealized?: number;
 }) {
   const t = useT();
-  const data = pnlByHolding(
+  const data = returnByHolding(
     positions,
     optionGroups,
-    (p) => Number(p.unrealizedPnL.amount),
-    (g) => Number(g.unrealizedPnL.amount),
+    closedRealized,
+    t.charts.closedPositions,
   );
   if (data.length === 0) return null;
 
+  // Two series, so a legend is required: colour alone must not carry which
+  // half of the result a segment is.
+  const series = [
+    { key: "unrealized" as const, label: t.summary.unrealized, color: seriesColor(0) },
+    { key: "realized" as const, label: t.summary.realized, color: seriesColor(2) },
+  ];
+
   return (
-    <ChartFrame title={t.charts.unrealizedByPosition} height={Math.max(220, data.length * 44)}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
-        >
-          <CartesianGrid horizontal={false} stroke={GRID} />
-          <XAxis
-            type="number"
-            tickFormatter={compactUsd}
-            tick={AXIS_TICK}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="symbol"
-            tickFormatter={shortSymbol}
-            tick={AXIS_TICK}
-            axisLine={false}
-            tickLine={false}
-            width={88}
-          />
-          <ReferenceLine x={0} stroke={AXIS} />
-          <Tooltip
-            cursor={{ fill: GRID, fillOpacity: 0.4 }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const datum = payload[0].payload as PnLDatum;
-              return (
-                <Tip
-                  label={datum.symbol}
-                  rows={[
-                    { name: t.table.unrealized, value: exactUsd(datum.value) },
-                  ]}
-                />
-              );
-            }}
-          />
-          <Bar
-            dataKey="value"
-            shape={<HorizontalRoundedBar />}
-            maxBarSize={28}
-            isAnimationActive={false}
-          >
-            {data.map((datum) => (
-              <Cell
-                key={datum.symbol}
-                fill={datum.value >= 0 ? POSITIVE : NEGATIVE}
+    <ChartFrame
+      title={t.charts.returnByPosition}
+      note={t.charts.returnByPositionNote}
+      height={Math.max(240, data.length * 44 + 40)}
+    >
+      <div className="flex h-full flex-col gap-2">
+        <SeriesLegend items={series.map((s) => ({ label: s.label, color: s.color }))} />
+        <div className="min-h-0 flex-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={data}
+              layout="vertical"
+              margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
+            >
+              <CartesianGrid horizontal={false} stroke={GRID} />
+              <XAxis
+                type="number"
+                tickFormatter={compactUsd}
+                tick={AXIS_TICK}
+                axisLine={false}
+                tickLine={false}
               />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+              <YAxis
+                type="category"
+                dataKey="symbol"
+                tickFormatter={shortSymbol}
+                tick={AXIS_TICK}
+                axisLine={false}
+                tickLine={false}
+                width={88}
+              />
+              <ReferenceLine x={0} stroke={AXIS} />
+              <Tooltip
+                cursor={{ fill: GRID, fillOpacity: 0.4 }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload as ReturnDatum;
+                  return (
+                    <Tip
+                      label={d.symbol}
+                      rows={[
+                        { name: series[0].label, value: exactUsd(d.unrealized), color: series[0].color },
+                        { name: series[1].label, value: exactUsd(d.realized), color: series[1].color },
+                        { name: t.summary.totalReturn, value: exactUsd(d.total) },
+                      ]}
+                    />
+                  );
+                }}
+              />
+              {series.map((s) => (
+                <Bar
+                  key={s.key}
+                  dataKey={s.key}
+                  stackId="result"
+                  fill={s.color}
+                  maxBarSize={28}
+                  isAnimationActive={false}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </ChartFrame>
   );
 }
