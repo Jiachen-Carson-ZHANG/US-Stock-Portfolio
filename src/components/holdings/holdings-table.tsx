@@ -89,6 +89,20 @@ function money(value: number | undefined, currency: string): string {
   return formatMoney({ amount: String(value), currency });
 }
 
+/**
+ * What one share or contract cost, taken from the cost basis rather than the
+ * broker's average. moomoo nets realized proceeds against that average, so on
+ * a partly sold holding it comes back negative — NVDA reports -229.89 here.
+ * Dividing the cost basis keeps this consistent with the cost column beside it.
+ */
+function unitCost(p: PositionView): number | undefined {
+  const units = p.quantity * (p.instrumentType === "option" ? (p.contractMultiplier ?? 100) : 1);
+  if (!units) return undefined;
+  const basis = Number(p.costBasis.amount);
+  if (!Number.isFinite(basis)) return undefined;
+  return basis / units;
+}
+
 function qty(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(value);
 }
@@ -234,10 +248,10 @@ export function HoldingsTable({
               <th scope="col" className="px-4 py-3 text-left font-medium">{t.table.symbol}</th>
               <th scope="col" className="px-4 py-3 text-left font-medium">{t.table.type}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.qty}</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.cost}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.price}</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.marketValue}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.today}</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.cost}</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.marketValue}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.unrealized}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.weight}</th>
             </tr>
@@ -278,15 +292,15 @@ export function HoldingsTable({
                       <td className="tabular px-4 py-3 text-right">
                         {g.legs.length} {t.position.legs.toLowerCase()}
                       </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">—</td>
+                      <td className={cn("tabular px-4 py-3 text-right", signClass(today))}>
+                        {formatMoney(g.todayPnL, { signed: true })}
+                      </td>
                       <td className="tabular px-4 py-3 text-right">
                         {formatMoney(g.netCost)}
                       </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">—</td>
                       <td className="tabular px-4 py-3 text-right font-medium">
                         {formatMoney(g.netMarketValue)}
-                      </td>
-                      <td className={cn("tabular px-4 py-3 text-right", signClass(today))}>
-                        {formatMoney(g.todayPnL, { signed: true })}
                       </td>
                       <td className={cn("tabular px-4 py-3 text-right", signClass(unrealized))}>
                         {formatMoney(g.unrealizedPnL, { signed: true })}
@@ -342,13 +356,23 @@ export function HoldingsTable({
                     <td className="px-4 py-3 text-muted-foreground">{typeLabel(t, p)}</td>
                     <td className="tabular px-4 py-3 text-right">{qty(p.quantity)}</td>
                     <td className="tabular px-4 py-3 text-right">
-                      {isCash ? "—" : formatMoney(p.costBasis)}
-                    </td>
-                    <td className="tabular px-4 py-3 text-right">
-                      {isCash ? "—" : money(p.currentPrice, p.currency)}
-                    </td>
-                    <td className="tabular px-4 py-3 text-right font-medium">
-                      {formatMoney(p.marketValue)}
+                      {isCash ? (
+                        "—"
+                      ) : (
+                        <>
+                          <div>{money(p.currentPrice, p.currency)}</div>
+                          {/* What it cost, directly beneath what it is worth, so the
+                              comparison needs no arithmetic. Derived from the cost
+                              basis rather than the broker average, which nets realized
+                              proceeds and can come back negative. */}
+                          <div
+                            className="text-xs font-normal text-muted-foreground"
+                            title={t.position.averageCost}
+                          >
+                            {money(unitCost(p), p.currency)}
+                          </div>
+                        </>
+                      )}
                     </td>
                     <td
                       className={cn(
@@ -357,6 +381,12 @@ export function HoldingsTable({
                       )}
                     >
                       {isCash ? "—" : formatMoney(p.todayPnL, { signed: true })}
+                    </td>
+                    <td className="tabular px-4 py-3 text-right">
+                      {isCash ? "—" : formatMoney(p.costBasis)}
+                    </td>
+                    <td className="tabular px-4 py-3 text-right font-medium">
+                      {formatMoney(p.marketValue)}
                     </td>
                     <td
                       className={cn(
