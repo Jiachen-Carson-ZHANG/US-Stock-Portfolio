@@ -155,6 +155,8 @@ async function seedSnapshots() {
         totalCostBasis: { amount: cost.toFixed(), currency: "USD" },
         totalUnrealizedPnL: { amount: total.minus(cost).toFixed(), currency: "USD" },
         cashValue: { amount: cash.toFixed(), currency: "USD" },
+        realizedPnL: { amount: "0", currency: "USD" },
+        netDeposits: null,
       },
       "[]",
     );

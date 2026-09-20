@@ -137,7 +137,14 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   total_unrealized_pnl  TEXT NOT NULL,
   cash_value            TEXT NOT NULL,
   positions_json        TEXT NOT NULL,
-  created_at            TEXT NOT NULL
+  created_at            TEXT NOT NULL,
+  -- Without these a day's row records only what was being carried, so a chart
+  -- drawn from history could never show the whole result. Every day recorded
+  -- before they existed is a day that cannot be re-derived.
+  realized_pnl          TEXT,
+  net_deposits          TEXT,
+  -- How the row was produced: a live capture, or reconstructed from fills.
+  source                TEXT NOT NULL DEFAULT 'live'
 );
 
 CREATE TABLE IF NOT EXISTS watchlist_notes (
@@ -184,6 +191,9 @@ ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_market_value DOUBLE PREC
 ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_unrealized_pnl DOUBLE PRECISION;
 ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_today_pnl DOUBLE PRECISION;
 ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_realized_pnl DOUBLE PRECISION;
+ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS realized_pnl TEXT;
+ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS net_deposits TEXT;
+ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'live';
 `;
 
 /** Identifies our schema lock so two booting containers cannot race each other. */

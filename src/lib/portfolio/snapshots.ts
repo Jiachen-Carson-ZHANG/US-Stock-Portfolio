@@ -9,6 +9,9 @@ type SnapshotRow = {
   total_cost: string;
   total_unrealized_pnl: string;
   cash_value: string;
+  realized_pnl: string | null;
+  net_deposits: string | null;
+  source: "live" | "reconstructed";
 };
 
 export async function readSnapshots(
@@ -17,7 +20,7 @@ export async function readSnapshots(
 ): Promise<PortfolioSnapshot[]> {
   const rows = await db.all<SnapshotRow>(
     `SELECT snapshot_date, total_market_value, total_cost,
-            total_unrealized_pnl, cash_value
+            total_unrealized_pnl, cash_value, realized_pnl, net_deposits, source
        FROM portfolio_snapshots
       ORDER BY snapshot_date DESC
       LIMIT ?`,
@@ -30,6 +33,9 @@ export async function readSnapshots(
     totalCost: row.total_cost,
     totalUnrealizedPnL: row.total_unrealized_pnl,
     cashValue: row.cash_value,
+    realizedPnL: row.realized_pnl,
+    netDeposits: row.net_deposits,
+    source: row.source,
   }));
 }
 
@@ -38,22 +44,32 @@ export async function writeSnapshot(
   date: string,
   summary: Pick<
     PortfolioSummary,
-    "totalMarketValue" | "totalCostBasis" | "totalUnrealizedPnL" | "cashValue"
+    | "totalMarketValue"
+    | "totalCostBasis"
+    | "totalUnrealizedPnL"
+    | "cashValue"
+    | "realizedPnL"
+    | "netDeposits"
   >,
   positionsJson: string,
   now: Date = new Date(),
+  source: "live" | "reconstructed" = "live",
 ): Promise<void> {
   await db.run(
     `INSERT INTO portfolio_snapshots
        (id, snapshot_date, total_market_value, total_cost,
-        total_unrealized_pnl, cash_value, positions_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        total_unrealized_pnl, cash_value, positions_json, created_at,
+        realized_pnl, net_deposits, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(snapshot_date) DO UPDATE SET
        total_market_value = excluded.total_market_value,
        total_cost = excluded.total_cost,
        total_unrealized_pnl = excluded.total_unrealized_pnl,
        cash_value = excluded.cash_value,
-       positions_json = excluded.positions_json`,
+       positions_json = excluded.positions_json,
+       realized_pnl = excluded.realized_pnl,
+       net_deposits = excluded.net_deposits,
+       source = excluded.source`,
     [
       randomUUID(),
       date,
@@ -63,6 +79,9 @@ export async function writeSnapshot(
       summary.cashValue.amount,
       positionsJson,
       now.toISOString(),
+      summary.realizedPnL.amount,
+      summary.netDeposits?.amount ?? null,
+      source,
     ],
   );
 }

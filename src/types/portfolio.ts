@@ -121,4 +121,10 @@ export type PortfolioSnapshot = {
   totalCost: string;
   totalUnrealizedPnL: string;
   cashValue: string;
+  /** Banked by this date. Null on rows written before it was recorded. */
+  realizedPnL: string | null;
+  /** Paid in by this date, so total return is value less this. */
+  netDeposits: string | null;
+  /** "live" for a capture at the time, "reconstructed" for a backfill. */
+  source: "live" | "reconstructed";
 };

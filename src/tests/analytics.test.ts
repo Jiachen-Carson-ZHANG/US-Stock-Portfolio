@@ -13,6 +13,9 @@ function snapshot(date: string, value: number): PortfolioSnapshot {
     totalCost: "100",
     totalUnrealizedPnL: String(value - 100),
     cashValue: "0",
+    realizedPnL: null,
+    netDeposits: null,
+    source: "live" as const,
   };
 }
 

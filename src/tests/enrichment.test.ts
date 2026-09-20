@@ -20,6 +20,9 @@ const snap = (date: string, value: number): PortfolioSnapshot => ({
   totalCost: "100",
   totalUnrealizedPnL: "0",
   cashValue: "0",
+    realizedPnL: null,
+    netDeposits: null,
+    source: "live" as const,
 });
 const review = { from: "2026-09-01", to: "2026-09-30" };
 describe("trustworthy analysis", () => {
@@ -115,6 +118,8 @@ describe("history and collaboration regressions", () => {
       totalCostBasis: { amount: "100", currency: "USD" },
       totalUnrealizedPnL: { amount: "0", currency: "USD" },
       cashValue: { amount: "0", currency: "USD" },
+      realizedPnL: { amount: "0", currency: "USD" },
+      netDeposits: null,
     };
     for (const date of ["2026-09-14", "2026-09-15", "2026-09-16"])
       await writeSnapshot(db, date, summary, "[]");
