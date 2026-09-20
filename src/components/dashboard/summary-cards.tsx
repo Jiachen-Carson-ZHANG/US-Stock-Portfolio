@@ -47,6 +47,7 @@ export function SummaryCards({
   const today = Number(summary.todayPnL.amount);
   const unrealized = Number(summary.totalUnrealizedPnL.amount);
   const totalReturn = Number(summary.totalReturn.amount);
+  const realized = Number(summary.realizedPnL.amount);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -59,6 +60,10 @@ export function SummaryCards({
           {formatMoney(summary.totalUnrealizedPnL, { signed: true })} ·{" "}
           {formatPercent(summary.totalUnrealizedPnLPercent, { signed: true })}{" "}
           <span className="text-muted-foreground">{t.summary.unrealized}</span>
+        </p>
+        <p className={`mt-0.5 text-xs ${signClass(realized)}`}>
+          {formatMoney(summary.realizedPnL, { signed: true })}{" "}
+          <span className="text-muted-foreground">{t.summary.realized}</span>
         </p>
       </Stat>
 
@@ -74,22 +79,23 @@ export function SummaryCards({
         value={formatMoney(summary.totalReturn, { signed: true })}
         sub={formatPercent(summary.totalReturnPercent, { signed: true })}
         tone={signClass(totalReturn)}
-      >
-        {/* Naming the base makes the headline checkable: value less deposits
-            is the return. Without a configured figure the base is inferred
-            from the broker's realized P&L, so that is what gets shown. */}
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          {summary.netDeposits
-            ? `${t.summary.netDeposits} ${formatMoney(summary.netDeposits)}`
-            : `${t.summary.realized} ${formatMoney(summary.realizedPnL, { signed: true })}`}
-        </p>
-      </Stat>
+      />
 
+      {/* "Invested" means the money actually put in, when that is known. Cost
+          of holdings is a different quantity — it excludes cash and moves with
+          every trade — so it is kept, in smaller type, rather than conflated
+          with the deposit. Value less deposits is then the return above. */}
       <Stat
         label={t.summary.totalInvested}
-        value={formatMoney(totalInvested)}
+        value={formatMoney(summary.netDeposits ?? totalInvested)}
         sub={`${t.summary.cash} ${formatMoney(summary.cashValue)}`}
-      />
+      >
+        {summary.netDeposits && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {t.summary.costBasis} {formatMoney(totalInvested)}
+          </p>
+        )}
+      </Stat>
     </div>
   );
 }
