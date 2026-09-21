@@ -20,15 +20,15 @@ import type {
 } from "@/types/portfolio";
 import Decimal from "decimal.js";
 import {
-  allocationByAssetType,
-  allocationBySector,
   buildPositionViews,
   concentration,
   costBasis,
   summarize,
 } from ".";
 import {
+  allocationByAssetTypeAtCost,
   allocationByInvestedCapital,
+  allocationBySectorAtCost,
   groupOptions,
   performanceByAssetClass,
   type AssetClassPerformance,
@@ -206,6 +206,13 @@ export async function loadPortfolio(
     await netDeposits(db, portfolioId, currency),
   );
 
+  // From the fills, which cover the whole account, rather than the broker's
+  // figure, which only covers positions still open. Needed in two places, so
+  // replayed once.
+  const realized = Object.fromEntries(
+    realizedBySymbol(await readTransactions(db, portfolioId, 5000)),
+  );
+
   const invested = totalInvested(positions, currency);
   const views = buildPositionViews(positions, currency).map((view) => ({
     ...view,
@@ -239,19 +246,21 @@ export async function loadPortfolio(
     allocations: {
       // By capital invested, not current value — a spread counts once at net cost.
       byPosition: allocationByInvestedCapital(positions, currency),
-      byAssetType: allocationByAssetType(positions, currency),
-      bySector: allocationBySector(positions, currency),
+      // By what was committed, not what it is quoted at — see
+      // allocationByAssetTypeAtCost. Face value counted a spread's long leg
+      // at full notional and dropped its short, which is how options showed
+      // as 65% of a portfolio they are a third of.
+      byAssetType: allocationByAssetTypeAtCost(positions, currency),
+      bySector: allocationBySectorAtCost(positions, currency),
     },
     totalInvested: toDTO(invested),
     optionGroups: groupOptions(positions).groups.map((group) =>
       toOptionGroupDTO(group, invested),
     ),
-    byAssetClass: performanceByAssetClass(positions, currency),
+    byAssetClass: performanceByAssetClass(positions, currency, realized),
     // From the fills, which cover the whole account, rather than the broker's
     // figure, which only covers positions still open.
-    realizedBySymbol: Object.fromEntries(
-      realizedBySymbol(await readTransactions(db, portfolioId, 5000)),
-    ),
+    realizedBySymbol: realized,
   };
 }
 

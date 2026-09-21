@@ -109,19 +109,49 @@ export function SummaryCards({
         period={when(since, "since")}
       />
 
-      {/* "Invested" means the money actually put in, when that is known. Cost
-          of holdings is a different quantity — it excludes cash and moves with
-          every trade — so it is kept, in smaller type, rather than conflated
-          with the deposit. Value less deposits is then the return above. */}
+      {/* "Invested" is the money actually paid in. Cash and cost of holdings
+          sit beside it and do not add up to it, which reads as a mistake
+          until you see the missing term: profit already taken went back into
+          cash without ever having been paid in. The arithmetic is shown
+          rather than asserted, because "why does 6,807 + 17,398 not make
+          22,100?" is the first thing anyone asks. */}
       <Stat
         label={t.summary.totalInvested}
         value={formatMoney(summary.netDeposits ?? totalInvested)}
-        sub={`${t.summary.cash} ${formatMoney(summary.cashValue)}`}
+        sub={summary.netDeposits ? t.summary.paidIn : undefined}
         period={when(since, "since")}
       >
-        {summary.netDeposits && (
+        {summary.netDeposits ? (
+          <dl className="mt-3 space-y-1 text-xs">
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">{t.summary.cash}</dt>
+              <dd className="tabular">{formatMoney(summary.cashValue)}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">{t.summary.costBasis}</dt>
+              <dd className="tabular">{formatMoney(totalInvested)}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">
+                {realized >= 0 ? t.summary.lessProfitTaken : t.summary.plusLossTaken}
+              </dt>
+              <dd className={`tabular ${signClass(realized)}`}>
+                {formatMoney(
+                  { ...summary.realizedPnL, amount: String(-realized) },
+                  { signed: true },
+                )}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 border-t border-border pt-1">
+              <dt className="text-muted-foreground">{t.summary.totalInvested}</dt>
+              <dd className="tabular font-medium">
+                {formatMoney(summary.netDeposits)}
+              </dd>
+            </div>
+          </dl>
+        ) : (
           <p className="mt-1.5 text-xs text-muted-foreground">
-            {t.summary.costBasis} {formatMoney(totalInvested)}
+            {t.summary.cash} {formatMoney(summary.cashValue)}
           </p>
         )}
       </Stat>

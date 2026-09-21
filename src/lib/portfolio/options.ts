@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import type { AllocationSlice, Money, MoneyDTO, Position } from "@/types/portfolio";
 import { add, money, sum, toDTO, zero } from "@/lib/money";
+import { parseSymbol } from "@/lib/moomoo/symbols";
 import {
   contractMultiplier,
   costBasis,
@@ -313,12 +314,133 @@ export function allocationByInvestedCapital(
     .sort((a, b) => Number(b.value) - Number(a.value));
 }
 
+/**
+ * Composition by what each group cost, rather than what it is quoted at.
+ *
+ * Face value flatters options twice over. A long leg is quoted at the full
+ * notional of the contract, and a spread's short leg is simply dropped, so
+ * $3.2k of committed capital presented as $26k and the shares beside it
+ * shrank to a rounding error. Netting each spread to its own cost puts the
+ * slices back in proportion to the decisions behind them.
+ *
+ * Cash is the exception and is counted at face, because for cash those are
+ * the same number.
+ */
+function costWeighted(
+  positions: Position[],
+  currency: string,
+  keyOf: (subject: { position?: Position; group?: OptionGroup }) => {
+    key: string;
+    label: string;
+  } | null,
+): AllocationSlice[] {
+  const { groups, nonOptions } = groupOptions(positions);
+  const buckets = new Map<string, { label: string; value: Money }>();
+
+  const put = (key: string, label: string, value: Money) => {
+    if (!value.amount.greaterThan(0)) return;
+    const existing = buckets.get(key);
+    buckets.set(key, {
+      label,
+      value: existing ? add(existing.value, value) : value,
+    });
+  };
+
+  for (const group of groups) {
+    const bucket = keyOf({ group });
+    if (bucket) put(bucket.key, bucket.label, group.netCost);
+  }
+
+  for (const position of nonOptions) {
+    const bucket = keyOf({ position });
+    if (!bucket) continue;
+    put(
+      bucket.key,
+      bucket.label,
+      position.instrumentType === "cash"
+        ? marketValue(position)
+        : investedCapital(position, currency),
+    );
+  }
+
+  const total = [...buckets.values()].reduce(
+    (acc, entry) => add(acc, entry.value),
+    zero(currency),
+  );
+  if (total.amount.isZero()) return [];
+
+  return [...buckets]
+    .map(([key, entry]) => ({
+      key,
+      label: entry.label,
+      value: entry.value.amount.toFixed(),
+      percent: entry.value.amount.dividedBy(total.amount).times(100).toNumber(),
+    }))
+    .sort((a, b) => Number(b.value) - Number(a.value));
+}
+
+const COST_LABELS: Record<string, string> = {
+  stock: "Stocks",
+  etf: "ETFs",
+  option: "Options",
+  cash: "Cash",
+};
+
+export function allocationByAssetTypeAtCost(
+  positions: Position[],
+  currency: string,
+): AllocationSlice[] {
+  return costWeighted(positions, currency, ({ position, group }) => {
+    if (group) return { key: "option", label: COST_LABELS.option };
+    if (!position) return null;
+    return {
+      key: position.instrumentType,
+      label: COST_LABELS[position.instrumentType] ?? position.instrumentType,
+    };
+  });
+}
+
+/**
+ * Sector had the same distortion, and an option inherits its underlying's
+ * sector — the exposure belongs to the company, not to the contract.
+ */
+export function allocationBySectorAtCost(
+  positions: Position[],
+  currency: string,
+): AllocationSlice[] {
+  const sectorOf = new Map<string, string>();
+  for (const position of positions) {
+    if (position.sector) sectorOf.set(position.symbol, position.sector);
+    if (position.sector && position.underlyingSymbol) {
+      sectorOf.set(position.underlyingSymbol, position.sector);
+    }
+  }
+  if (sectorOf.size === 0) return [];
+
+  return costWeighted(positions, currency, ({ position, group }) => {
+    if (group) {
+      const sector = sectorOf.get(group.underlying);
+      return sector ? { key: sector, label: sector } : null;
+    }
+    if (!position || position.instrumentType === "cash") return null;
+    const sector = sectorOf.get(position.symbol) ?? position.sector;
+    return sector ? { key: sector, label: sector } : null;
+  });
+}
+
 export type AssetClassPerformance = {
   key: "stocks" | "options";
   invested: MoneyDTO;
   marketValue: MoneyDTO;
   unrealizedPnL: MoneyDTO;
+  /** Profit already taken in this class, replayed from the fills. */
+  realizedPnL: MoneyDTO;
+  /** Realized plus unrealized — the whole result, not just what is open. */
+  totalPnL: MoneyDTO;
+  /** Return on what is still held. */
   returnPercent: number | null;
+  /** Return counting closed positions too. */
+  totalReturnPercent: number | null;
 };
 
 /**
@@ -326,9 +448,24 @@ export type AssetClassPerformance = {
  * one is actually carrying the portfolio. Options are measured per spread so a
  * hedged position is not counted twice.
  */
+/**
+ * Stocks against options, counting everything each has done.
+ *
+ * Measuring only what is still open judges a class on the positions that
+ * happened to survive: sell the winners and the class looks worse than it
+ * was. Realized profit is replayed from the fills, which cover the account
+ * from its first trade, and attributed to a class by whether the symbol is
+ * an option contract.
+ *
+ * Realized is measured against capital still committed, which is the only
+ * base available here. That overstates the percentage for a class that has
+ * closed most of what it held, so the money figure is the honest one and
+ * the percentage is a guide.
+ */
 export function performanceByAssetClass(
   positions: Position[],
   currency: string,
+  realizedBySymbol: Record<string, number> = {},
 ): AssetClassPerformance[] {
   const { groups, nonOptions } = groupOptions(positions);
   const equities = nonOptions.filter((p) => p.instrumentType !== "cash");
@@ -350,8 +487,25 @@ export function performanceByAssetClass(
     .map((g) => g.unrealizedPnL)
     .reduce((acc, m) => add(acc, m), zero(currency));
 
+  // An option contract carries its terms in the symbol; anything else is a
+  // share. Closed names are not in `positions` at all, which is exactly why
+  // the fills have to be the source.
+  let stockRealized = zero(currency);
+  let optionRealized = zero(currency);
+  for (const [symbol, amount] of Object.entries(realizedBySymbol)) {
+    const value = money(amount, currency);
+    if (parseSymbol(symbol).instrumentType === "option") {
+      optionRealized = add(optionRealized, value);
+    } else {
+      stockRealized = add(stockRealized, value);
+    }
+  }
+
   const ratio = (pnl: Money, base: Money) =>
     base.amount.isZero() ? null : pnl.amount.dividedBy(base.amount).times(100).toNumber();
+
+  const stockTotal = add(stockPnL, stockRealized);
+  const optionTotal = add(optionPnL, optionRealized);
 
   return [
     {
@@ -359,14 +513,20 @@ export function performanceByAssetClass(
       invested: toDTO(stockInvested),
       marketValue: toDTO(stockValue),
       unrealizedPnL: toDTO(stockPnL),
+      realizedPnL: toDTO(stockRealized),
+      totalPnL: toDTO(stockTotal),
       returnPercent: ratio(stockPnL, stockInvested),
+      totalReturnPercent: ratio(stockTotal, stockInvested),
     },
     {
       key: "options" as const,
       invested: toDTO(optionInvested),
       marketValue: toDTO(optionValue),
       unrealizedPnL: toDTO(optionPnL),
+      realizedPnL: toDTO(optionRealized),
+      totalPnL: toDTO(optionTotal),
       returnPercent: ratio(optionPnL, optionInvested),
+      totalReturnPercent: ratio(optionTotal, optionInvested),
     },
   ];
 }

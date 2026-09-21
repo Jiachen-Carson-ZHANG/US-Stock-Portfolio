@@ -16,6 +16,10 @@ import {
   totalMarketValue,
   unrealizedPnL,
 } from "@/lib/portfolio";
+import {
+  allocationByAssetTypeAtCost,
+  allocationBySectorAtCost,
+} from "@/lib/portfolio/options";
 
 function position(overrides: Partial<Position>): Position {
   return {
@@ -387,5 +391,94 @@ describe("days to expiration", () => {
   it("counts whole days from the given date", () => {
     expect(daysToExpiration("2026-01-16", new Date("2026-01-01T12:00:00Z"))).toBe(15);
     expect(daysToExpiration("2026-01-01", new Date("2026-01-01T23:00:00Z"))).toBe(0);
+  });
+});
+
+describe("allocation weighted by cost", () => {
+  // The bug this replaces: a call spread's long leg was counted at full
+  // notional and its short leg dropped, so $3.2k of committed capital
+  // presented as $26k and options looked like 65% of a portfolio they were
+  // a third of.
+  function spreadPortfolio(): Position[] {
+    return [
+      position({
+        symbol: "VRT270319C230000",
+        instrumentType: "option",
+        underlyingSymbol: "VRT",
+        optionType: "call",
+        strike: 230,
+        expirationDate: "2027-03-19",
+        contractMultiplier: 100,
+        quantity: 1,
+        averageCost: 40,
+        currentPrice: 52,
+        sector: "Technology",
+      }),
+      position({
+        symbol: "VRT270319C280000",
+        instrumentType: "option",
+        underlyingSymbol: "VRT",
+        optionType: "call",
+        strike: 280,
+        expirationDate: "2027-03-19",
+        contractMultiplier: 100,
+        quantity: -1,
+        averageCost: 24,
+        currentPrice: 32,
+        sector: "Technology",
+      }),
+      position({
+        symbol: "NVDA",
+        instrumentType: "stock",
+        quantity: 10,
+        averageCost: 200,
+        currentPrice: 222,
+        sector: "Technology",
+      }),
+      position({
+        symbol: "USD",
+        instrumentType: "cash",
+        quantity: 400,
+        averageCost: undefined,
+        currentPrice: undefined,
+      }),
+    ];
+  }
+
+  it("counts a spread once, at what it cost", () => {
+    const slices = allocationByAssetTypeAtCost(spreadPortfolio(), "USD");
+    const options = slices.find((slice) => slice.key === "option");
+
+    // 1 contract long at 40 minus 1 short at 24, times a hundred shares.
+    expect(Number(options?.value)).toBeCloseTo(1_600, 2);
+  });
+
+  it("puts the slices in proportion to capital committed", () => {
+    const slices = allocationByAssetTypeAtCost(spreadPortfolio(), "USD");
+    const by = Object.fromEntries(slices.map((slice) => [slice.key, slice]));
+
+    // 1,600 of options, 2,000 of stock, 400 of cash — 4,000 in all.
+    expect(Number(by.option.value)).toBeCloseTo(1_600, 2);
+    expect(Number(by.stock.value)).toBeCloseTo(2_000, 2);
+    expect(Number(by.cash.value)).toBeCloseTo(400, 2);
+    expect(by.stock.percent).toBeCloseTo(50, 4);
+    expect(by.option.percent).toBeCloseTo(40, 4);
+    expect(by.cash.percent).toBeCloseTo(10, 4);
+  });
+
+  it("adds to a hundred per cent", () => {
+    const total = allocationByAssetTypeAtCost(spreadPortfolio(), "USD").reduce(
+      (sum, slice) => sum + slice.percent,
+      0,
+    );
+    expect(total).toBeCloseTo(100, 6);
+  });
+
+  it("gives an option the sector of its underlying", () => {
+    const slices = allocationBySectorAtCost(spreadPortfolio(), "USD");
+    expect(slices).toHaveLength(1);
+    expect(slices[0].label).toBe("Technology");
+    // Cash has no sector, so it is absent rather than counted as one.
+    expect(Number(slices[0].value)).toBeCloseTo(3_600, 2);
   });
 });
