@@ -308,3 +308,31 @@ describe("attributing realized profit to the trade that took it", () => {
     expect(byDeal.get("2026-07-01-VRT270319C280000-sell-1")).toBeCloseTo(1_200, 6);
   });
 });
+
+describe("shares that arrived without being bought", () => {
+  // Carson's NVDA share was a gift. He decided its whole value should count
+  // as gain rather than as money he contributed, which is what a zero cost
+  // produces.
+  it("counts a zero-cost share entirely as gain", () => {
+    const days = reconstruct(
+      [fill("2026-06-03", "buy", "NVDA", 1, 0)],
+      [{ date: "2026-06-02", amount: 1_000 }],
+      new Map([["NVDA", new Map([["2026-06-03", 220]])]]),
+      ["2026-06-02", "2026-06-03"],
+    );
+
+    const last = days[days.length - 1];
+    expect(last.cash.toNumber()).toBeCloseTo(1_000, 2);
+    expect(last.costBasis.toNumber()).toBeCloseTo(0, 2);
+    expect(last.unrealized.toNumber()).toBeCloseTo(220, 2);
+    expect(last.totalReturn.toNumber()).toBeCloseTo(220, 2);
+  });
+
+  it("realizes the full proceeds when the gift is sold", () => {
+    const realized = realizedBySymbol([
+      fill("2026-06-03", "buy", "NVDA", 1, 0),
+      fill("2026-07-01", "sell", "NVDA", 1, 230),
+    ]);
+    expect(realized.get("NVDA")).toBeCloseTo(230, 2);
+  });
+});

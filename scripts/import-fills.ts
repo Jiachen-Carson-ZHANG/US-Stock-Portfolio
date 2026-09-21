@@ -11,6 +11,12 @@
  * CSV columns: date,side,symbol,quantity,price
  *   2026-06-03,buy,LITE,2,978.00
  *
+ * This file is also how you correct the record. If the reconstruction says
+ * the replay still holds something the account has sold, add the missing
+ * sell. If it says the account holds something the replay never bought — a
+ * gift, a transfer in — add it as a buy at price 0, which gives it no cost
+ * and lets its whole value count as gain.
+ *
  * Only filled orders belong here; cancelled and failed ones never moved cash.
  * Deal ids are derived from the row, so re-importing the same file changes
  * nothing and a corrected row replaces its original.
@@ -61,8 +67,12 @@ function parse(csv: string): Row[] {
     if (!Number.isFinite(qty) || qty <= 0) {
       throw new Error(`${where}: quantity must be a positive number`);
     }
-    if (!Number.isFinite(unit) || unit <= 0) {
-      throw new Error(`${where}: price must be a positive number`);
+    // Zero is allowed, and means "this arrived without being bought".
+    // A gifted or transferred-in share has no cost, so all of its value
+    // shows up as gain — which is what Carson decided the NVDA share should
+    // do. A negative price is still nonsense.
+    if (!Number.isFinite(unit) || unit < 0) {
+      throw new Error(`${where}: price must be zero or a positive number`);
     }
     rows.push({ date, side, symbol: symbol.toUpperCase(), quantity: qty, price: unit });
   }

@@ -248,8 +248,14 @@ async function main() {
     for (const reason of refusals) console.error(`  - ${reason}`);
     if (drift > TOLERANCE) {
       console.error(
-        "\n  Check the holdings above first. If the remainder is understood,\n" +
-          `  re-run with --accept-drift=${Math.ceil(drift / 50) * 50}.`,
+        "\n  Fix it at the source where you can — the holdings above say how:\n" +
+          "    · replay still holds it  -> add the missing sell to data/early-fills.csv\n" +
+          "    · account holds it, replay never bought it -> add it as a buy at\n" +
+          "      price 0, which gives a gift or transfer no cost so its whole\n" +
+          "      value counts as gain\n" +
+          "  Then re-run db:import-fills and try again.\n\n" +
+          "  If the remainder really is only dividends, interest and fees,\n" +
+          `  accept it deliberately: --accept-drift=${Math.ceil(drift / 50) * 50}\n`,
       );
     }
     console.error("");
