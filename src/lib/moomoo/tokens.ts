@@ -1,3 +1,4 @@
+import { assertReadOnlyScope } from "./oauth";
 import type { DB } from "@/lib/db";
 import { decrypt, encrypt, parseKey } from "@/lib/crypto";
 
@@ -49,6 +50,7 @@ export async function saveConnection(
   params: { refreshToken: string; scope: string; accountId: string | null },
   now: Date = new Date(),
 ): Promise<void> {
+  assertReadOnlyScope(params.scope);
   const payload = encrypt(params.refreshToken, encryptionKey());
 
   await db.run(
@@ -56,7 +58,8 @@ export async function saveConnection(
        (id, provider, encrypted_refresh_token, iv, auth_tag, scope,
         account_id, connected_at, last_refresh_at, status, portfolio_id)
      VALUES (?, 'moomoo', ?, ?, ?, ?, ?, ?, ?, 'connected', ?)
-     ON CONFLICT(id) DO UPDATE SET
+     ON CONFLICT (portfolio_id, provider) DO UPDATE SET
+       id = excluded.id,
        encrypted_refresh_token = excluded.encrypted_refresh_token,
        iv = excluded.iv,
        auth_tag = excluded.auth_tag,

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { canRead, findById } from "@/lib/portfolios";
 import { logger } from "@/lib/logger";
-import { exchangeCode, writeScopesIn } from "@/lib/moomoo/oauth";
+import { exchangeCode, writeScopesIn, assertReadOnlyScope } from "@/lib/moomoo/oauth";
 import { consumePendingFlow, redirectUri } from "@/lib/moomoo/flow";
 import { saveConnection } from "@/lib/moomoo/tokens";
 import { clearTokenCache } from "@/lib/moomoo/client";
@@ -11,8 +11,8 @@ import { storedBrokers, syncPositions } from "@/lib/portfolio/sync";
 import { clearSnapshots } from "@/lib/portfolio/snapshots";
 import { MoomooBrokerProvider } from "@/providers/broker/moomoo";
 
-function back(request: Request, outcome: string): Response {
-  const url = new URL("/settings", request.url);
+function back(request: Request, outcome: string, slug?: string): Response {
+  const url = new URL(slug ? `/${slug}/connection` : "/", request.url);
   url.searchParams.set("moomoo", outcome);
   return Response.redirect(url, 303);
 }
@@ -42,15 +42,15 @@ export async function GET(request: Request) {
     !(await canRead(db, user, target.id))
   ) {
     logger.warn("broker.connect.state_mismatch", { provider: "moomoo" });
-    return back(request, "state_mismatch");
+    return back(request, "state_mismatch", target?.slug);
   }
 
   if (!state || pending.state !== state) {
     logger.warn("broker.connect.state_mismatch", { provider: "moomoo" });
-    return back(request, "state_mismatch");
+    return back(request, "state_mismatch", target?.slug);
   }
 
-  if (!code) return back(request, "denied");
+  if (!code) return back(request, "denied", target?.slug);
 
   try {
     const tokens = await exchangeCode({
@@ -68,12 +68,14 @@ export async function GET(request: Request) {
         provider: "moomoo",
         scopes: writeScopes.join(" "),
       });
-      return back(request, "write_scope");
+      return back(request, "write_scope", target?.slug);
     }
+
+    assertReadOnlyScope(tokens.scope);
 
     if (!tokens.refresh_token) {
       logger.error("broker.connect.no_refresh_token", { provider: "moomoo" });
-      return back(request, "failed");
+      return back(request, "failed", target?.slug);
     }
 
     await saveConnection(db, target.id, {
@@ -119,15 +121,19 @@ export async function GET(request: Request) {
         provider: "moomoo",
         reason: error instanceof Error ? error.message : "unknown",
       });
-      return back(request, "connected_sync_failed");
+      return back(request, "connected_sync_failed", target?.slug);
     }
 
-    return back(request, "connected");
+    return back(request, "connected", target?.slug);
   } catch (error) {
-    logger.error("broker.connect.failure", {
-      provider: "moomoo",
-      reason: error instanceof Error ? error.message : "unknown",
-    });
-    return back(request, "failed");
+    const reason = error instanceof Error ? error.message : "unknown";
+    logger.error("broker.connect.failure", { provider: "moomoo", reason });
+
+    // A permissions problem and a storage problem need different advice, and
+    // telling someone to re-tick boxes they already ticked correctly is how
+    // an afternoon disappears. The scope assertion names itself; anything
+    // else is ours to fix, not theirs.
+    const outcome = /read-only|permission/i.test(reason) ? "write_scope" : "save_failed";
+    return back(request, outcome, target?.slug);
   }
 }

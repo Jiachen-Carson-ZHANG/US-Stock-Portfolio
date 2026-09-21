@@ -202,6 +202,13 @@ CREATE TABLE IF NOT EXISTS portfolios (
 );
 
 -- Who, besides the owner, may read a portfolio. Absence of a row is denial.
+CREATE TABLE IF NOT EXISTS portfolio_ai_notes (
+  portfolio_id TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  symbol TEXT NOT NULL,
+  note TEXT NOT NULL,
+  PRIMARY KEY (portfolio_id, symbol)
+);
+
 CREATE TABLE IF NOT EXISTS portfolio_access (
   portfolio_id TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
   user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -295,6 +302,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_config_scope
 
 -- One broker connection per portfolio, so a second consent cannot silently
 -- attach a second token to the same account.
+-- Connection ids used to be the bare provider name, one row for the whole
+-- app. They are now derived from the portfolio, so the old row is renamed
+-- before the unique index goes on: otherwise reconnecting inserts a second
+-- row for the same portfolio and fails on the constraint instead of
+-- replacing what is there.
+UPDATE broker_connections
+   SET id = provider || ':' || portfolio_id
+ WHERE portfolio_id IS NOT NULL
+   AND id = provider;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_broker_connection_portfolio
   ON broker_connections(portfolio_id, provider);
 

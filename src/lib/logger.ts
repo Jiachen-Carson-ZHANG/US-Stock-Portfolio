@@ -41,7 +41,12 @@ const SECRET_PATTERNS: RegExp[] = [
   // A JWT, whose individual segments are too short for the length rule below.
   /\beyJ[A-Za-z0-9_-]{6,}(?:\.[A-Za-z0-9_-]+){0,2}/g,
   // Anything else long enough to be a credential and shaped like one.
-  /\b[A-Za-z0-9_\-+/=]{28,}\b/g,
+  //
+  // A digit is required. Without that condition this swallowed
+  // "idx_broker_connection_portfolio" out of a Postgres error and turned a
+  // one-line diagnosis into an afternoon. Credentials are base64, hex or
+  // random and essentially always carry one; identifiers usually do not.
+  /\b(?=[A-Za-z0-9_\-+/=]*\d)[A-Za-z0-9_\-+/=]{28,}\b/g,
 ];
 
 function redactValue(value: string): string {

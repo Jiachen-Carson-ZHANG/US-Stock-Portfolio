@@ -76,3 +76,22 @@ describe("secret-shaped values", () => {
     expect(logged()).toContain("GOOGL270319C350000");
   });
 });
+
+describe("what redaction must not eat", () => {
+  // This exact case cost an afternoon: a unique-constraint violation came
+  // back as `violates unique constraint "[redacted]"`, which named nothing.
+  it("keeps a database identifier in an error message", () => {
+    logger.error("broker.connect.failure", {
+      reason:
+        'duplicate key value violates unique constraint "idx_broker_connection_portfolio"',
+    });
+    expect(logged()).toContain("idx_broker_connection_portfolio");
+  });
+
+  it("still redacts a credential of the same length", () => {
+    logger.error("broker.connect.failure", {
+      reason: "rejected token b7f3a91c04de55219a8c6f0e3d47bb12",
+    });
+    expect(logged()).not.toContain("b7f3a91c04de55219a8c6f0e3d47bb12");
+  });
+});
