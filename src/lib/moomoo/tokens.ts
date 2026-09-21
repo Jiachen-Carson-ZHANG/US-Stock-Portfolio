@@ -1,7 +1,17 @@
 import type { DB } from "@/lib/db";
 import { decrypt, encrypt, parseKey } from "@/lib/crypto";
 
-const CONNECTION_ID = "moomoo";
+/**
+ * One connection row per portfolio, per provider.
+ *
+ * The row used to be a singleton keyed "moomoo", which is exactly the shape
+ * that cannot hold two people's accounts. Deriving the key from the portfolio
+ * keeps the upsert a one-liner and makes a second consent impossible to
+ * confuse with the first.
+ */
+function connectionId(portfolioId: string): string {
+  return `moomoo:${portfolioId}`;
+}
 
 export type ConnectionStatus = "connected" | "expired" | "error";
 
@@ -35,6 +45,7 @@ function encryptionKey(): Buffer {
 
 export async function saveConnection(
   db: DB,
+  portfolioId: string,
   params: { refreshToken: string; scope: string; accountId: string | null },
   now: Date = new Date(),
 ): Promise<void> {
@@ -43,8 +54,8 @@ export async function saveConnection(
   await db.run(
     `INSERT INTO broker_connections
        (id, provider, encrypted_refresh_token, iv, auth_tag, scope,
-        account_id, connected_at, last_refresh_at, status)
-     VALUES (?, 'moomoo', ?, ?, ?, ?, ?, ?, ?, 'connected')
+        account_id, connected_at, last_refresh_at, status, portfolio_id)
+     VALUES (?, 'moomoo', ?, ?, ?, ?, ?, ?, ?, 'connected', ?)
      ON CONFLICT(id) DO UPDATE SET
        encrypted_refresh_token = excluded.encrypted_refresh_token,
        iv = excluded.iv,
@@ -54,7 +65,7 @@ export async function saveConnection(
        last_refresh_at = excluded.last_refresh_at,
        status = 'connected'`,
     [
-      CONNECTION_ID,
+      connectionId(portfolioId),
       payload.ciphertext,
       payload.iv,
       payload.authTag,
@@ -62,13 +73,17 @@ export async function saveConnection(
       params.accountId,
       now.toISOString(),
       now.toISOString(),
+      portfolioId,
     ],
   );
 }
 
-export async function readConnection(db: DB): Promise<BrokerConnection | null> {
+export async function readConnection(
+  db: DB,
+  portfolioId: string,
+): Promise<BrokerConnection | null> {
   const row = await db.get<Row>(`SELECT * FROM broker_connections WHERE id = ?`, [
-    CONNECTION_ID,
+    connectionId(portfolioId),
   ]);
 
   if (!row) return null;
@@ -93,11 +108,12 @@ export async function readConnection(db: DB): Promise<BrokerConnection | null> {
 /** Connection metadata for the owner's settings screen — never the token. */
 export async function readConnectionStatus(
   db: DB,
+  portfolioId: string,
 ): Promise<Omit<BrokerConnection, "refreshToken"> | null> {
   const row = await db.get<Row>(
     `SELECT scope, account_id, status, connected_at, last_refresh_at
        FROM broker_connections WHERE id = ?`,
-    [CONNECTION_ID],
+    [connectionId(portfolioId)],
   );
 
   if (!row) return null;
@@ -111,27 +127,39 @@ export async function readConnectionStatus(
   };
 }
 
-export async function markStatus(db: DB, status: ConnectionStatus): Promise<void> {
+export async function markStatus(
+  db: DB,
+  portfolioId: string,
+  status: ConnectionStatus,
+): Promise<void> {
   await db.run(`UPDATE broker_connections SET status = ? WHERE id = ?`, [
     status,
-    CONNECTION_ID,
+    connectionId(portfolioId),
   ]);
 }
 
-export async function markRefreshed(db: DB, now: Date = new Date()): Promise<void> {
+export async function markRefreshed(
+  db: DB,
+  portfolioId: string,
+  now: Date = new Date(),
+): Promise<void> {
   await db.run(
     `UPDATE broker_connections SET last_refresh_at = ?, status = 'connected' WHERE id = ?`,
-    [now.toISOString(), CONNECTION_ID],
+    [now.toISOString(), connectionId(portfolioId)],
   );
 }
 
-export async function setAccountId(db: DB, accountId: string): Promise<void> {
+export async function setAccountId(
+  db: DB,
+  portfolioId: string,
+  accountId: string,
+): Promise<void> {
   await db.run(`UPDATE broker_connections SET account_id = ? WHERE id = ?`, [
     accountId,
-    CONNECTION_ID,
+    connectionId(portfolioId),
   ]);
 }
 
-export async function deleteConnection(db: DB): Promise<void> {
-  await db.run(`DELETE FROM broker_connections WHERE id = ?`, [CONNECTION_ID]);
+export async function deleteConnection(db: DB, portfolioId: string): Promise<void> {
+  await db.run(`DELETE FROM broker_connections WHERE id = ?`, [connectionId(portfolioId)]);
 }

@@ -1,26 +1,31 @@
 import { recordActivity } from "@/lib/activity";
-import { requireApiOwner } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { logger } from "@/lib/logger";
 import { syncPositions } from "@/lib/portfolio/sync";
 import { activeProvider, getBrokerProvider } from "@/providers";
 
-export async function POST() {
-  const auth = await requireApiOwner();
-  if ("response" in auth) return auth.response;
+export async function POST(request: Request) {
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
+  const denied = requireWritable(context);
+  if (denied) return denied.response;
 
-  const provider = await activeProvider();
+  const portfolioId = context.portfolio.id;
+  const provider = await activeProvider(portfolioId);
   const db = await getDb();
 
   try {
     const count = await syncPositions(
       db,
-      await getBrokerProvider(),
+      portfolioId,
+      await getBrokerProvider(portfolioId),
       provider === "moomoo" ? "moomoo" : "mock",
     );
     await recordActivity(db, {
-      userId: auth.user.id,
-      username: auth.user.username,
+      userId: context.user.id,
+      username: context.user.username,
       kind: "sync",
       detail: `${count} positions from ${provider}`,
     });

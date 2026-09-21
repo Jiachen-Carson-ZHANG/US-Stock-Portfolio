@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, type TestDb } from "@/lib/db/testing";
+import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
 import { readSnapshots, writeSnapshot } from "@/lib/portfolio/snapshots";
+
+/** Scoping is exercised in portfolios.test.ts; here it only has to be real. */
+const PF = TEST_PORTFOLIO_ID;
 
 let db: TestDb;
 beforeEach(async () => {
@@ -17,9 +20,7 @@ describe("what a snapshot records", () => {
   // produced it are gone. Everything needed to draw total return has to be in
   // the row at the time it is written.
   it("keeps realized and deposits, so total return is recoverable per day", async () => {
-    await writeSnapshot(
-      db,
-      "2026-09-20",
+    await writeSnapshot(db, PF, "2026-09-20",
       {
         totalMarketValue: usd("22070.41"),
         totalCostBasis: usd("24205.87"),
@@ -31,7 +32,7 @@ describe("what a snapshot records", () => {
       "[]",
     );
 
-    const [row] = await readSnapshots(db);
+    const [row] = await readSnapshots(db, PF);
     expect(row.realizedPnL).toBe("1328.87");
     expect(row.netDeposits).toBe("22100");
     expect(row.source).toBe("live");
@@ -45,9 +46,7 @@ describe("what a snapshot records", () => {
   });
 
   it("marks a reconstructed day as such, so a chart can say so", async () => {
-    await writeSnapshot(
-      db,
-      "2026-07-01",
+    await writeSnapshot(db, PF, "2026-07-01",
       {
         totalMarketValue: usd("100"),
         totalCostBasis: usd("100"),
@@ -60,7 +59,7 @@ describe("what a snapshot records", () => {
       new Date(),
       "reconstructed",
     );
-    const [row] = await readSnapshots(db);
+    const [row] = await readSnapshots(db, PF);
     expect(row.source).toBe("reconstructed");
     expect(row.netDeposits).toBeNull();
   });

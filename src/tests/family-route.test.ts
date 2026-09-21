@@ -13,8 +13,26 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth/guards", () => ({
   authenticateRequest: async () => mocks.user,
+  getCurrentUser: async () => mocks.user,
   unauthorized: () =>
     Response.json({ error: "Authentication required" }, { status: 401 }),
+  forbidden: () => Response.json({ error: "Not permitted" }, { status: 403 }),
+}));
+// The family challenge is not portfolio data; the route only asks for a
+// portfolio so it knows whose broker token may fetch a quote.
+vi.mock("@/lib/portfolios/context", () => ({
+  requirePortfolioApi: async () =>
+    mocks.user
+      ? {
+          user: mocks.user,
+          portfolio: { id: "pf-family", slug: "carson", ownerUserId: mocks.user.id },
+        }
+      : {
+          response: Response.json(
+            { error: "Authentication required" },
+            { status: 401 },
+          ),
+        },
 }));
 vi.mock("@/providers", () => ({
   activeProvider: () => mocks.provider,

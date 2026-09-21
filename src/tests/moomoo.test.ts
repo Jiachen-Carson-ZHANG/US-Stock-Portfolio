@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, type TestDb } from "@/lib/db/testing";
+import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
 import { generateKey } from "@/lib/crypto";
 import {
   authorizeUrl,
@@ -18,6 +18,9 @@ import {
   saveConnection,
   setAccountId,
 } from "@/lib/moomoo/tokens";
+
+/** Scoping is exercised in portfolios.test.ts; here it only has to be real. */
+const PF = TEST_PORTFOLIO_ID;
 
 describe("PKCE", () => {
   it("derives the challenge as base64url(sha256(verifier))", async () => {
@@ -203,13 +206,13 @@ describe("token storage", () => {
   });
 
   it("round-trips a refresh token", async () => {
-    await saveConnection(db, {
+    await saveConnection(db, PF, {
       refreshToken: "refresh-abc",
       scope: "quote:read trade:read",
       accountId: "123456",
     });
 
-    expect(await readConnection(db)).toMatchObject({
+    expect(await readConnection(db, PF)).toMatchObject({
       refreshToken: "refresh-abc",
       scope: "quote:read trade:read",
       accountId: "123456",
@@ -218,7 +221,7 @@ describe("token storage", () => {
   });
 
   it("stores the token as ciphertext, never plaintext", async () => {
-    await saveConnection(db, {
+    await saveConnection(db, PF, {
       refreshToken: "super-secret-refresh",
       scope: "quote:read",
       accountId: null,
@@ -233,53 +236,53 @@ describe("token storage", () => {
   });
 
   it("never exposes the token through the status view", async () => {
-    await saveConnection(db, {
+    await saveConnection(db, PF, {
       refreshToken: "secret",
       scope: "quote:read",
       accountId: null,
     });
 
-    const status = await readConnectionStatus(db);
+    const status = await readConnectionStatus(db, PF);
     expect(status).not.toBeNull();
     expect(JSON.stringify(status)).not.toContain("secret");
     expect(status).not.toHaveProperty("refreshToken");
   });
 
   it("replaces the token on reconnect rather than duplicating the row", async () => {
-    await saveConnection(db, { refreshToken: "first", scope: "quote:read", accountId: null });
-    await saveConnection(db, { refreshToken: "second", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "first", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "second", scope: "quote:read", accountId: null });
 
     const count = await db.get<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM broker_connections`,
     );
     expect(count!.n).toBe(1);
-    expect((await readConnection(db))?.refreshToken).toBe("second");
+    expect((await readConnection(db, PF))?.refreshToken).toBe("second");
   });
 
   it("records an expired connection", async () => {
-    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
-    await markStatus(db, "expired");
-    expect((await readConnectionStatus(db))?.status).toBe("expired");
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await markStatus(db, PF, "expired");
+    expect((await readConnectionStatus(db, PF))?.status).toBe("expired");
   });
 
   it("remembers the resolved account id", async () => {
-    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
-    await setAccountId(db, "987654");
-    expect((await readConnection(db))?.accountId).toBe("987654");
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await setAccountId(db, PF, "987654");
+    expect((await readConnection(db, PF))?.accountId).toBe("987654");
   });
 
   it("returns nothing once disconnected", async () => {
-    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
-    await deleteConnection(db);
-    expect(await readConnection(db)).toBeNull();
-    expect(await readConnectionStatus(db)).toBeNull();
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await deleteConnection(db, PF);
+    expect(await readConnection(db, PF)).toBeNull();
+    expect(await readConnectionStatus(db, PF)).toBeNull();
   });
 
   it("cannot decrypt a token with a different key", async () => {
-    await saveConnection(db, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
     process.env.TOKEN_ENCRYPTION_KEY = generateKey();
     // The failure now surfaces as a rejected promise rather than a throw.
-    await expect(readConnection(db)).rejects.toThrow();
+    await expect(readConnection(db, PF)).rejects.toThrow();
   });
 });
 

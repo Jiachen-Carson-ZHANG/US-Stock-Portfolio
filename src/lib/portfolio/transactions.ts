@@ -34,18 +34,24 @@ function toTransaction(row: Row): StoredTransaction {
 
 export async function readTransactions(
   db: DB,
+  portfolioId: string,
   limit = 500,
 ): Promise<StoredTransaction[]> {
   const rows = await db.all<Row>(
-    `SELECT * FROM transactions ORDER BY traded_at DESC LIMIT ?`,
-    [limit],
+    `SELECT * FROM transactions WHERE portfolio_id = ?
+      ORDER BY traded_at DESC LIMIT ?`,
+    [portfolioId, limit],
   );
   return rows.map(toTransaction);
 }
 
-export async function lastTransactionSync(db: DB): Promise<string | null> {
+export async function lastTransactionSync(
+  db: DB,
+  portfolioId: string,
+): Promise<string | null> {
   const row = await db.get<{ synced_at: string | null }>(
-    `SELECT MAX(synced_at) AS synced_at FROM transactions`,
+    `SELECT MAX(synced_at) AS synced_at FROM transactions WHERE portfolio_id = ?`,
+    [portfolioId],
   );
   return row?.synced_at ?? null;
 }
@@ -56,6 +62,7 @@ export async function lastTransactionSync(db: DB): Promise<string | null> {
  */
 export async function syncTransactions(
   db: DB,
+  portfolioId: string,
   broker: BrokerProvider,
   now: Date = new Date(),
 ): Promise<number> {
@@ -63,8 +70,8 @@ export async function syncTransactions(
   const syncedAt = now.toISOString();
 
   const upsert = `INSERT INTO transactions
-       (deal_id, order_id, side, symbol, name, quantity, price, amount, traded_at, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (deal_id, order_id, side, symbol, name, quantity, price, amount, traded_at, synced_at, portfolio_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(deal_id) DO UPDATE SET
        side = excluded.side,
        symbol = excluded.symbol,
@@ -88,6 +95,7 @@ export async function syncTransactions(
         fill.amount,
         fill.tradedAt,
         syncedAt,
+        portfolioId,
       ]);
     }
   });

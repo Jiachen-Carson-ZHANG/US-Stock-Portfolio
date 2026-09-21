@@ -1,6 +1,8 @@
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import {
   familyAction,
   familyActionSchema,
@@ -18,8 +20,11 @@ export async function GET() {
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  // The challenge prices against whichever portfolio the player is viewing
+  // from; its only role here is deciding whose broker token fetches a quote.
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
+  const user = context.user;
   let input: unknown;
   try {
     input = await request.json();
@@ -36,7 +41,7 @@ export async function POST(request: Request) {
     let quote: Quote | undefined;
     let quotes: Quote[] = [];
     const db = await getDb();
-    const mode = (await activeProvider()) === "mock" ? "demo" : "live";
+    const mode = (await activeProvider(context.portfolio.id)) === "mock" ? "demo" : "live";
     if (parsed.data.action === "trade" || parsed.data.action === "mark") {
       const challenge = (await readFamily(db, user)).challenge;
       if (challenge && challenge.mode !== mode)
@@ -49,7 +54,9 @@ export async function POST(request: Request) {
         );
       if (parsed.data.action === "trade") {
         const symbol = parsed.data.symbol;
-        quote = (await (await getMarketDataProvider()).getQuotes([symbol])).find(
+        quote = (
+          await (await getMarketDataProvider(context.portfolio.id)).getQuotes([symbol])
+        ).find(
           (q) => q.symbol === symbol,
         );
         if (!quote)
@@ -66,7 +73,9 @@ export async function POST(request: Request) {
           ),
         ];
         if (symbols.length)
-          quotes = await (await getMarketDataProvider()).getQuotes(symbols);
+          quotes = await (
+            await getMarketDataProvider(context.portfolio.id)
+          ).getQuotes(symbols);
       }
     }
     return Response.json(

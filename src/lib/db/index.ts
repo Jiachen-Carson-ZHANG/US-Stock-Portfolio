@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { ensureDefaultPortfolio } from "@/lib/portfolios";
 import { toPositionalParams } from "./sql";
 
 export type RunResult = { changes: number };
@@ -183,6 +184,32 @@ CREATE TABLE IF NOT EXISTS analysis_observations (
   PRIMARY KEY (kind, date)
 );
 
+-- One row per portfolio. Everything that used to mean "the portfolio" is now
+-- scoped by this, so a second person's account is a row rather than a fork.
+CREATE TABLE IF NOT EXISTS portfolios (
+  id            TEXT PRIMARY KEY,
+  slug          TEXT NOT NULL UNIQUE,
+  display_name  TEXT NOT NULL,
+  -- Nullable so removing a person does not delete the portfolio with them;
+  -- an orphan is visible to owners and can be reassigned.
+  owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  kind          TEXT NOT NULL CHECK (kind IN ('broker','paper')),
+  base_currency TEXT NOT NULL DEFAULT 'USD',
+  -- Paper portfolios start from a stated balance. Broker ones take their
+  -- opening position from the cash-flow ledger instead.
+  opening_cash  TEXT,
+  created_at    TEXT NOT NULL
+);
+
+-- Who, besides the owner, may read a portfolio. Absence of a row is denial.
+CREATE TABLE IF NOT EXISTS portfolio_access (
+  portfolio_id TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  granted_at   TEXT NOT NULL,
+  PRIMARY KEY (portfolio_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_access_user ON portfolio_access(user_id);
+
 -- Columns introduced after the first release. Postgres supports IF NOT EXISTS
 -- here, so the SQLite era's PRAGMA-driven migration helper is no longer needed.
 ALTER TABLE broker_connections ADD COLUMN IF NOT EXISTS account_id TEXT;
@@ -194,6 +221,37 @@ ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_realized_pnl DOUBLE PREC
 ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS realized_pnl TEXT;
 ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS net_deposits TEXT;
 ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'live';
+
+-- Multi-portfolio scoping. Nullable at the column level and backfilled on
+-- boot: an existing deployment has rows that predate portfolios, and failing
+-- to start is a worse outcome than a row briefly carrying no owner.
+ALTER TABLE positions           ADD COLUMN IF NOT EXISTS portfolio_id TEXT REFERENCES portfolios(id) ON DELETE CASCADE;
+ALTER TABLE transactions        ADD COLUMN IF NOT EXISTS portfolio_id TEXT REFERENCES portfolios(id) ON DELETE CASCADE;
+ALTER TABLE broker_connections  ADD COLUMN IF NOT EXISTS portfolio_id TEXT REFERENCES portfolios(id) ON DELETE CASCADE;
+ALTER TABLE portfolio_snapshots ADD COLUMN IF NOT EXISTS portfolio_id TEXT REFERENCES portfolios(id) ON DELETE CASCADE;
+ALTER TABLE analysis_flows      ADD COLUMN IF NOT EXISTS portfolio_id TEXT REFERENCES portfolios(id) ON DELETE CASCADE;
+ALTER TABLE analysis_config     ADD COLUMN IF NOT EXISTS portfolio_id TEXT REFERENCES portfolios(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_positions_portfolio    ON positions(portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_portfolio ON transactions(portfolio_id, traded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_flows_portfolio        ON analysis_flows(portfolio_id, date);
+
+-- A snapshot date was unique across the whole table, which with two portfolios
+-- would let one overwrite the other's day. The uniqueness belongs to the pair.
+ALTER TABLE portfolio_snapshots DROP CONSTRAINT IF EXISTS portfolio_snapshots_snapshot_date_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshots_portfolio_date
+  ON portfolio_snapshots(portfolio_id, snapshot_date);
+
+-- Same reasoning for the analysis settings: "deposits reviewed to here" is a
+-- statement about one portfolio, not about the database.
+ALTER TABLE analysis_config DROP CONSTRAINT IF EXISTS analysis_config_pkey;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_config_scope
+  ON analysis_config(portfolio_id, key);
+
+-- One broker connection per portfolio, so a second consent cannot silently
+-- attach a second token to the same account.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_broker_connection_portfolio
+  ON broker_connections(portfolio_id, provider);
 `;
 
 /** Identifies our schema lock so two booting containers cannot race each other. */
@@ -326,6 +384,12 @@ async function initialise(): Promise<DB> {
   } finally {
     client.release();
   }
+
+  // Adopts rows written before portfolios existed. Idempotent, and run here
+  // rather than in a migration script because a row no portfolio can see is
+  // invisible in the app but still counted by every total.
+  await ensureDefaultPortfolio(db);
+
   return db;
 }
 

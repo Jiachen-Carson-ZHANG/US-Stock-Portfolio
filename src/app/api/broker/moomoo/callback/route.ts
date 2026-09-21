@@ -1,7 +1,7 @@
-import { getCurrentUser } from "@/lib/auth/guards";
 import { recordActivity } from "@/lib/activity";
-import { authenticateRequest } from "@/lib/auth/guards";
+import { getCurrentUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { canRead, findById } from "@/lib/portfolios";
 import { logger } from "@/lib/logger";
 import { exchangeCode, writeScopesIn } from "@/lib/moomoo/oauth";
 import { consumePendingFlow, redirectUri } from "@/lib/moomoo/flow";
@@ -19,8 +19,8 @@ function back(request: Request, outcome: string): Response {
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "owner") {
-    return Response.redirect(new URL("/dashboard", request.url), 303);
+  if (!user) {
+    return Response.redirect(new URL("/login", request.url), 303);
   }
 
   const query = new URL(request.url).searchParams;
@@ -29,7 +29,23 @@ export async function GET(request: Request) {
 
   const pending = await consumePendingFlow();
 
-  if (!pending || !state || pending.state !== state) {
+  const db = await getDb();
+
+  // The portfolio is taken from the flow we started, never from the query, and
+  // is re-checked here: a cookie survives a sign-out and could otherwise
+  // attach a token to an account this person no longer has any claim on.
+  const target = pending ? await findById(db, pending.portfolioId) : null;
+  if (
+    !pending ||
+    !target ||
+    target.ownerUserId !== user.id ||
+    !(await canRead(db, user, target.id))
+  ) {
+    logger.warn("broker.connect.state_mismatch", { provider: "moomoo" });
+    return back(request, "state_mismatch");
+  }
+
+  if (!state || pending.state !== state) {
     logger.warn("broker.connect.state_mismatch", { provider: "moomoo" });
     return back(request, "state_mismatch");
   }
@@ -60,23 +76,20 @@ export async function GET(request: Request) {
       return back(request, "failed");
     }
 
-    const db = await getDb();
-    await saveConnection(db, {
+    await saveConnection(db, target.id, {
       refreshToken: tokens.refresh_token,
       scope: tokens.scope ?? "",
       accountId: null,
     });
-    clearTokenCache();
+    clearTokenCache(target.id);
 
-    const connector = await authenticateRequest();
-    if (connector) {
-      await recordActivity(db, {
-        userId: connector.id,
-        username: connector.username,
-        kind: "broker_connect",
-        detail: `moomoo · ${tokens.scope ?? "no scope reported"}`,
-      });
-    }
+    await recordActivity(db, {
+      userId: user.id,
+      username: user.username,
+      kind: "broker_connect",
+      target: target.slug,
+      detail: `moomoo · ${tokens.scope ?? "no scope reported"}`,
+    });
     logger.info("broker.connect.success", {
       provider: "moomoo",
       scope: tokens.scope,
@@ -85,8 +98,8 @@ export async function GET(request: Request) {
     // Snapshots describe whatever portfolio was loaded when they were taken.
     // Synthetic history would misrepresent the real account, so it is dropped —
     // but only when nothing real has been recorded yet.
-    if (!(await storedBrokers(db)).includes("moomoo")) {
-      const dropped = await clearSnapshots(db);
+    if (!(await storedBrokers(db, target.id)).includes("moomoo")) {
+      const dropped = await clearSnapshots(db, target.id);
       if (dropped > 0) {
         logger.info("portfolio.snapshots.cleared", { provider: "moomoo", dropped });
       }
@@ -94,7 +107,12 @@ export async function GET(request: Request) {
 
     // Pull holdings immediately so the dashboard is populated on return.
     try {
-      const count = await syncPositions(db, new MoomooBrokerProvider(), "moomoo");
+      const count = await syncPositions(
+        db,
+        target.id,
+        new MoomooBrokerProvider(target.id),
+        "moomoo",
+      );
       logger.info("broker.sync.success", { provider: "moomoo", positions: count });
     } catch (error) {
       logger.error("broker.sync.failure", {

@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/guards";
+import { requirePortfolio } from "@/lib/portfolios/context";
 import { loadPortfolio } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LiveHoldings } from "@/components/holdings/live-holdings";
@@ -7,10 +7,10 @@ import { EmptyState } from "@/components/ui/misc";
 export const dynamic = "force-dynamic";
 
 export default async function HoldingsPage() {
-  await requireUser();
+  const { portfolio } = await requirePortfolio();
   const { t } = await serverDictionary();
   const { positions, summary, allocations, totalInvested, optionGroups } =
-    await loadPortfolio();
+    await loadPortfolio(portfolio.id);
 
   if (positions.length === 0) {
     return (

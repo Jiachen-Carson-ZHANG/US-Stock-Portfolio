@@ -1,11 +1,16 @@
-import { requireApiOwner } from "@/lib/auth/guards";
 import { logger } from "@/lib/logger";
+import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { authorizeUrl, createPkcePair, createState } from "@/lib/moomoo/oauth";
 import { redirectUri, storePendingFlow } from "@/lib/moomoo/flow";
 
-export async function POST() {
-  const auth = await requireApiOwner();
-  if ("response" in auth) return auth.response;
+export async function POST(request: Request) {
+  // Connecting a broker is a write against your own portfolio. Anyone may do
+  // it for theirs; nobody may do it for somebody else's.
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
+  const denied = requireWritable(context);
+  if (denied) return denied.response;
 
   const clientId = process.env.MOOMOO_CLIENT_ID;
   if (!clientId) {
@@ -17,9 +22,12 @@ export async function POST() {
 
   const { verifier, challenge } = createPkcePair();
   const state = createState();
-  await storePendingFlow({ state, verifier });
+  await storePendingFlow({ state, verifier, portfolioId: context.portfolio.id });
 
-  logger.info("broker.connect.started", { provider: "moomoo" });
+  logger.info("broker.connect.started", {
+    provider: "moomoo",
+    portfolio: context.portfolio.slug,
+  });
 
   return Response.json({
     authorizeUrl: authorizeUrl({

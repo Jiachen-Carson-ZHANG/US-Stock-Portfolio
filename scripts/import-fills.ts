@@ -18,6 +18,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { closeDb, getDb } from "../src/lib/db";
+import { ensureDefaultPortfolio } from "../src/lib/portfolios";
 import { parseSymbol } from "../src/lib/moomoo/symbols";
 
 type Row = {
@@ -77,6 +78,9 @@ async function main() {
 
   const rows = parse(readFileSync(path, "utf8"));
   const db = await getDb();
+  const portfolio = await ensureDefaultPortfolio(db);
+  if (!portfolio) throw new Error("No portfolio to import into.");
+  console.log(`Importing into /${portfolio.slug}.`);
   const syncedAt = new Date().toISOString();
 
   let written = 0;
@@ -94,8 +98,8 @@ async function main() {
 
       const result = await tx.run(
         `INSERT INTO transactions
-           (deal_id, order_id, side, symbol, name, quantity, price, amount, traded_at, synced_at)
-         VALUES (?, NULL, ?, ?, NULL, ?, ?, ?, ?, ?)
+           (deal_id, order_id, side, symbol, name, quantity, price, amount, traded_at, synced_at, portfolio_id)
+         VALUES (?, NULL, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(deal_id) DO UPDATE SET
            side = excluded.side,
            quantity = excluded.quantity,
@@ -112,6 +116,7 @@ async function main() {
           amount,
           `${row.date}T00:00:00.000Z`,
           syncedAt,
+                  portfolio.id,
         ],
       );
       written += result.changes;

@@ -13,6 +13,7 @@
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { closeDb, getDb } from "../src/lib/db";
+import { ensureDefaultPortfolio } from "../src/lib/portfolios";
 
 type Flow = { date: string; amount: number; note: string };
 
@@ -56,19 +57,25 @@ async function main() {
   const path = process.argv[2] ?? "data/deposits.csv";
   const flows = parse(readFileSync(path, "utf8"));
   const db = await getDb();
+  const portfolio = await ensureDefaultPortfolio(db);
+  if (!portfolio) throw new Error("No portfolio to record flows against.");
+  console.log(`Recording against /${portfolio.slug}.`);
 
   await db.transaction(async (tx) => {
     // Replacing wholesale keeps the ledger a faithful copy of the statement
     // rather than an append-only pile that double-counts on a second run.
-    await tx.run("DELETE FROM analysis_flows WHERE created_by = ?", ["import"]);
+    await tx.run(
+      "DELETE FROM analysis_flows WHERE created_by = ? AND portfolio_id = ?",
+      ["import", portfolio.id],
+    );
     for (const flow of flows) {
       const landing = toBusinessDay(flow.date);
       const note =
         landing === flow.date ? flow.note : `${flow.note} (received ${flow.date})`;
       await tx.run(
-        `INSERT INTO analysis_flows (id, date, amount, note, created_by)
-         VALUES (?, ?, ?, ?, 'import')`,
-        [randomUUID(), landing, flow.amount, note],
+        `INSERT INTO analysis_flows (id, date, amount, note, created_by, portfolio_id)
+         VALUES (?, ?, ?, ?, 'import', ?)`,
+        [randomUUID(), landing, flow.amount, note, portfolio.id],
       );
       if (landing !== flow.date) {
         console.log(`  ${flow.date} fell on a weekend — carried to ${landing}`);
@@ -84,9 +91,9 @@ async function main() {
     const from = flows[0]?.date;
     const to = new Date().toISOString().slice(0, 10);
     await db.run(
-      `INSERT INTO analysis_config (key, value) VALUES ('review', ?)
-       ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
-      [JSON.stringify({ from, to })],
+      `INSERT INTO analysis_config (portfolio_id, key, value) VALUES (?, 'review', ?)
+       ON CONFLICT (portfolio_id, key) DO UPDATE SET value = excluded.value`,
+      [portfolio.id, JSON.stringify({ from, to })],
     );
     console.log(`Marked ${from} to ${to} as reviewed.`);
   }

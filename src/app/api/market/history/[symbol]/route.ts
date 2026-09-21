@@ -1,13 +1,16 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
 import { historyRangeSchema, symbolSchema } from "@/lib/schemas";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { getMarketDataProvider } from "@/providers";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ symbol: string }> },
 ) {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  // Quotes are not portfolio data, but fetching them spends a broker token,
+  // so the request still says whose. Defaults to the viewer's own.
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
 
   const parsedSymbol = symbolSchema.safeParse((await params).symbol);
   if (!parsedSymbol.success) {
@@ -25,7 +28,9 @@ export async function GET(
   const to = new Date();
   const from = new Date(to.getTime() - parsedRange.data.days * 86_400_000);
 
-  const prices = await (await getMarketDataProvider()).getHistoricalPrices(
+  const prices = await (
+    await getMarketDataProvider(context.portfolio.id)
+  ).getHistoricalPrices(
     parsedSymbol.data,
     { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
   );

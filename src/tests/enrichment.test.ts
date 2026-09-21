@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTestDb } from "@/lib/db/testing";
+import { createTestDb, TEST_PORTFOLIO_ID } from "@/lib/db/testing";
 import {
   readSnapshots,
   writeSnapshot,
@@ -14,6 +14,9 @@ import {
 } from "@/lib/analysis/math";
 import { analysisInputSchema } from "@/lib/analysis/store";
 import type { PortfolioSnapshot, PortfolioSummary } from "@/types/portfolio";
+
+/** Scoping is exercised in portfolios.test.ts; here it only has to be real. */
+const PF = TEST_PORTFOLIO_ID;
 const snap = (date: string, value: number): PortfolioSnapshot => ({
   snapshotDate: date,
   totalMarketValue: String(value),
@@ -122,8 +125,8 @@ describe("history and collaboration regressions", () => {
       netDeposits: null,
     };
     for (const date of ["2026-09-14", "2026-09-15", "2026-09-16"])
-      await writeSnapshot(db, date, summary, "[]");
-    expect((await readSnapshots(db, 2)).map((s) => s.snapshotDate)).toEqual([
+      await writeSnapshot(db, PF, date, summary, "[]");
+    expect((await readSnapshots(db, PF, 2)).map((s) => s.snapshotDate)).toEqual([
       "2026-09-15",
       "2026-09-16",
     ]);
@@ -132,9 +135,7 @@ describe("history and collaboration regressions", () => {
   it("does not capture stale or previous-day data as today", async () => {
     const db = await createTestDb();
     expect(
-      await maybeCreateSnapshot(
-        db,
-        { isStale: true } as PortfolioSummary,
+      await maybeCreateSnapshot(db, PF, { isStale: true } as PortfolioSummary,
         "[]",
         new Date("2026-09-15T21:00:00Z"),
       ),
@@ -177,7 +178,7 @@ describe("snapshot timestamp integrity", () => {
       cashValue: { amount: "0", currency: "USD" },
     } as PortfolioSummary;
     expect(
-      await maybeCreateSnapshot(db, summary, "[]", new Date("2026-09-15T20:05:00Z")),
+      await maybeCreateSnapshot(db, PF, summary, "[]", new Date("2026-09-15T20:05:00Z")),
     ).toBe(false);
     await db.close();
   });
@@ -189,24 +190,28 @@ describe("analysis data lifecycle", () => {
     const db = await createTestDb();
     await saveAnalysis(
       db,
+      PF,
       { action: "review", from: "2026-01-01", to: "2026-01-02" },
       "owner",
     );
-    expect((await readAnalysis(db)).coverage).not.toBeNull();
+    expect((await readAnalysis(db, PF)).coverage).not.toBeNull();
     const after = await saveAnalysis(
       db,
+      PF,
       { action: "flow", date: "2026-01-02", amount: 100, note: "deposit" },
       "owner",
     );
     expect(after.coverage).toBeNull();
     await saveAnalysis(
       db,
+      PF,
       { action: "review", from: "2026-01-01", to: "2026-01-02" },
       "owner",
     );
     expect(
       (await saveAnalysis(
         db,
+        PF,
         { action: "removeFlow", id: after.flows[0].id! },
         "owner",
       )).coverage,

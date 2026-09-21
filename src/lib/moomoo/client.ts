@@ -19,8 +19,14 @@ export function parseJsonPreservingBigInts(text: string): unknown {
   return JSON.parse(text.replace(/:\s*(-?\d{16,})(?=\s*[,}\]])/g, ':"$1"'));
 }
 
-/** Access tokens live ~2h; caching avoids a refresh round trip per request. */
-let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+/**
+ * Access tokens live ~2h; caching avoids a refresh round trip per request.
+ *
+ * Keyed by portfolio. A single cached token was fine while one account
+ * existed, and becomes a leak the moment a second one does: whoever refreshed
+ * last would lend their credential to everybody else's requests.
+ */
+const cachedAccessTokens = new Map<string, { token: string; expiresAt: number }>();
 
 export class MoomooNotConnectedError extends Error {
   constructor() {
@@ -36,8 +42,9 @@ export class MoomooAuthExpiredError extends Error {
   }
 }
 
-export function clearTokenCache(): void {
-  cachedAccessToken = null;
+export function clearTokenCache(portfolioId?: string): void {
+  if (portfolioId === undefined) cachedAccessTokens.clear();
+  else cachedAccessTokens.delete(portfolioId);
 }
 
 function clientId(): string {
@@ -46,13 +53,14 @@ function clientId(): string {
   return id;
 }
 
-async function accessToken(): Promise<string> {
-  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
-    return cachedAccessToken.token;
+async function accessToken(portfolioId: string): Promise<string> {
+  const cached = cachedAccessTokens.get(portfolioId);
+  if (cached && cached.expiresAt > Date.now() + 60_000) {
+    return cached.token;
   }
 
   const db = await getDb();
-  const connection = await readConnection(db);
+  const connection = await readConnection(db, portfolioId);
   if (!connection) throw new MoomooNotConnectedError();
 
   try {
@@ -61,16 +69,16 @@ async function accessToken(): Promise<string> {
       clientId: clientId(),
     });
 
-    cachedAccessToken = {
+    cachedAccessTokens.set(portfolioId, {
       token: tokens.access_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
-    };
-    await markRefreshed(db);
+    });
+    await markRefreshed(db, portfolioId);
     logger.info("broker.token.refreshed", { provider: "moomoo" });
     return tokens.access_token;
   } catch (error) {
-    markStatus(db, "expired");
-    clearTokenCache();
+    await markStatus(db, portfolioId, "expired");
+    clearTokenCache(portfolioId);
     logger.error("broker.token.refresh_failed", {
       provider: "moomoo",
       reason: error instanceof Error ? error.message : "unknown",
@@ -95,20 +103,21 @@ async function call(path: string, init: RequestInit, token: string) {
  * on 401 with a fresh token and once on 429 after the advertised delay.
  */
 export async function moomooRequest<T>(
+  portfolioId: string,
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  let response = await call(path, init, await accessToken());
+  let response = await call(path, init, await accessToken(portfolioId));
 
   if (response.status === 401) {
-    clearTokenCache();
-    response = await call(path, init, await accessToken());
+    clearTokenCache(portfolioId);
+    response = await call(path, init, await accessToken(portfolioId));
   }
 
   if (response.status === 429) {
     const wait = Number(response.headers.get("Retry-After") ?? 2);
     await new Promise((resolve) => setTimeout(resolve, Math.min(wait, 10) * 1000));
-    response = await call(path, init, await accessToken());
+    response = await call(path, init, await accessToken(portfolioId));
   }
 
   const text = await response.text();
@@ -132,12 +141,16 @@ export async function moomooRequest<T>(
   return body.data;
 }
 
-export function moomooGet<T>(path: string): Promise<T> {
-  return moomooRequest<T>(path, { method: "GET" });
+export function moomooGet<T>(portfolioId: string, path: string): Promise<T> {
+  return moomooRequest<T>(portfolioId, path, { method: "GET" });
 }
 
-export function moomooPost<T>(path: string, body: unknown): Promise<T> {
-  return moomooRequest<T>(path, {
+export function moomooPost<T>(
+  portfolioId: string,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  return moomooRequest<T>(portfolioId, path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -12,6 +12,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { closeDb, getDb } from "../src/lib/db";
+import { ensureDefaultPortfolio } from "../src/lib/portfolios";
 import { reconstruct, type CashFlow, type PriceSeries } from "../src/lib/portfolio/reconstruct";
 import { writeSnapshot } from "../src/lib/portfolio/snapshots";
 import { readTransactions } from "../src/lib/portfolio/transactions";
@@ -31,13 +32,17 @@ const usd = (value: { toFixed(dp: number): string }) => ({
 async function main() {
   const write = process.argv.includes("--write");
   const db = await getDb();
+  const portfolio = await ensureDefaultPortfolio(db);
+  if (!portfolio) throw new Error("No portfolio to replay.");
+  console.log(`\nPortfolio: /${portfolio.slug}`);
 
-  const fills = (await readTransactions(db, 5000)).slice().reverse();
+  const fills = (await readTransactions(db, portfolio.id, 5000)).slice().reverse();
   if (fills.length === 0) throw new Error("No fills on record — nothing to replay.");
 
   const deposits = (
     await db.all<{ date: string; amount: number }>(
-      "SELECT date, amount FROM analysis_flows ORDER BY date",
+      "SELECT date, amount FROM analysis_flows WHERE portfolio_id = ? ORDER BY date",
+      [portfolio.id],
     )
   ).map((row): CashFlow => ({ date: row.date, amount: Number(row.amount) }));
   if (deposits.length === 0) {
@@ -93,7 +98,7 @@ async function main() {
       ? JSON.parse(readFileSync(CACHE, "utf8"))
       : {};
 
-  const provider = await getMarketDataProvider();
+  const provider = await getMarketDataProvider(portfolio.id);
   const prices: PriceSeries = new Map();
   const tradingDays = new Set<string>();
   const missingSymbols: string[] = [];
@@ -161,7 +166,9 @@ async function main() {
                               THEN COALESCE(reported_market_value, 0) ELSE 0 END), 0)::text AS positions,
             COALESCE(SUM(CASE WHEN instrument_type = 'cash'
                               THEN quantity ELSE 0 END), 0)::text AS cash
-       FROM positions`,
+       FROM positions
+      WHERE portfolio_id = ?`,
+    [portfolio.id],
   );
   const actual = Number(live?.positions ?? 0) + Number(live?.cash ?? 0);
 
@@ -206,6 +213,7 @@ async function main() {
   for (const day of days) {
     await writeSnapshot(
       db,
+      portfolio.id,
       day.date,
       {
         totalMarketValue: usd(day.marketValue),

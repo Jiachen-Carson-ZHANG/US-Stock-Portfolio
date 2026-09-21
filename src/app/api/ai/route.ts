@@ -1,4 +1,5 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { recordActivity } from "@/lib/activity";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -18,9 +19,9 @@ import { buildAiContext, GROUNDING_RULES } from "@/lib/ai/context";
  * model fills the gaps with invented figures that read exactly like the real
  * ones. If the snapshot cannot be built the note is refused instead.
  */
-async function portfolioContext(): Promise<string | null> {
+async function portfolioContext(portfolioId: string): Promise<string | null> {
   try {
-    return await buildAiContext();
+    return await buildAiContext(portfolioId);
   } catch (error) {
     logger.error("ai.context.failure", {
       reason: error instanceof Error ? error.message : "unknown",
@@ -30,8 +31,9 @@ async function portfolioContext(): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  const access = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in access) return access.response;
+  const user = access.user;
 
   if (!isDeepSeekConfigured()) {
     return Response.json(
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Symbol required" }, { status: 400 });
     }
 
-    const context = await portfolioContext();
+    const context = await portfolioContext(access.portfolio.id);
     if (context === null) {
       return Response.json(
         { error: "Portfolio data is unavailable, so no grounded view can be given." },

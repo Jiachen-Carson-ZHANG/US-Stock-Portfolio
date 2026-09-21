@@ -8,6 +8,12 @@ const FLOW_TTL_SECONDS = 600;
 export type PendingFlow = {
   state: string;
   verifier: string;
+  /**
+   * Which portfolio this consent was started for. Carried through the round
+   * trip so the returning token lands on the account that asked for it — the
+   * one thing that goes wrong when two people connect the same OAuth client.
+   */
+  portfolioId: string;
 };
 
 function key(): Buffer {

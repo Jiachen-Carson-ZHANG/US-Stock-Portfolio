@@ -1,5 +1,6 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
 import { searchSchema } from "@/lib/schemas";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { getMarketDataProvider } from "@/providers";
 
 /**
@@ -8,8 +9,10 @@ import { getMarketDataProvider } from "@/providers";
  * the ticker is real and carries its name and price.
  */
 export async function GET(request: Request) {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  // Quotes are not portfolio data, but fetching them spends a broker token,
+  // so the request still says whose. Defaults to the viewer's own.
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
 
   const parsed = searchSchema.safeParse({
     q: new URL(request.url).searchParams.get("q") ?? "",
@@ -21,7 +24,9 @@ export async function GET(request: Request) {
   const symbol = parsed.data.q.toUpperCase();
 
   try {
-    const quotes = await (await getMarketDataProvider()).getQuotes([symbol]);
+    const quotes = await (
+      await getMarketDataProvider(context.portfolio.id)
+    ).getQuotes([symbol]);
     return Response.json({
       results: quotes.map((quote) => ({
         symbol: quote.symbol,

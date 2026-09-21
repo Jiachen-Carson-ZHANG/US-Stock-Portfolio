@@ -10,12 +10,17 @@ import {
   removeFromWatchlist,
 } from "@/lib/watchlist";
 import { getMarketDataProvider } from "@/providers";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 
-async function withQuotes(entries: Awaited<ReturnType<typeof readWatchlist>>) {
+async function withQuotes(
+  portfolioId: string,
+  entries: Awaited<ReturnType<typeof readWatchlist>>,
+) {
   if (entries.length === 0) return entries;
 
   try {
-    const quotes = await (await getMarketDataProvider()).getQuotes(
+    const quotes = await (await getMarketDataProvider(portfolioId)).getQuotes(
       entries.map((entry) => entry.symbol),
     );
     const bySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
@@ -32,12 +37,17 @@ async function withQuotes(entries: Awaited<ReturnType<typeof readWatchlist>>) {
   }
 }
 
-export async function GET() {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+export async function GET(request: Request) {
+  // The watchlist itself is shared by the family; the portfolio only decides
+  // whose broker connection prices it.
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
 
   return Response.json({
-    entries: await withQuotes(await readWatchlist(await getDb())),
+    entries: await withQuotes(
+      context.portfolio.id,
+      await readWatchlist(await getDb()),
+    ),
   });
 }
 

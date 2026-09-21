@@ -48,10 +48,13 @@ function contractLabel(leg: PositionView): string {
   return `${side} ${Math.abs(leg.quantity)}x ${type} ${strike}`;
 }
 
-export async function buildAiContext(now: Date = new Date()): Promise<string> {
+export async function buildAiContext(
+  portfolioId: string,
+  now: Date = new Date(),
+): Promise<string> {
   const [portfolio, history] = await Promise.all([
-    loadPortfolio(now),
-    loadTransactions(now).catch(() => null),
+    loadPortfolio(portfolioId, now),
+    loadTransactions(portfolioId, now).catch(() => null),
   ]);
   const { summary, positions, concentration, optionGroups, byAssetClass } =
     portfolio;

@@ -1,4 +1,5 @@
 import { requireOwner } from "@/lib/auth/guards";
+import { requirePortfolio } from "@/lib/portfolios/context";
 import { getDb } from "@/lib/db";
 import { activeProvider } from "@/providers";
 import { loadPortfolio } from "@/lib/portfolio/service";
@@ -64,12 +65,13 @@ export default async function SettingsPage({
   searchParams: Promise<{ moomoo?: string }>;
 }) {
   await requireOwner();
+  const { portfolio } = await requirePortfolio();
 
-  const provider = await activeProvider();
-  const { summary, positions } = await loadPortfolio();
+  const provider = await activeProvider(portfolio.id);
+  const { summary, positions } = await loadPortfolio(portfolio.id);
   const db = await getDb();
   const users = await readUsers();
-  const connection = await readConnectionStatus(db);
+  const connection = await readConnectionStatus(db, portfolio.id);
   const mostViewed = await mostViewedAssets(db);
   const byMember = await activityByMember(db);
   const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];

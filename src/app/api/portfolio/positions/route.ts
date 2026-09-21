@@ -1,9 +1,10 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
 import { loadPortfolio } from "@/lib/portfolio/service";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 
-export async function GET() {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+export async function GET(request: Request) {
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
 
   const {
     positions,
@@ -13,7 +14,7 @@ export async function GET() {
     optionGroups,
     concentration,
     realizedBySymbol,
-  } = await loadPortfolio();
+  } = await loadPortfolio(context.portfolio.id);
   return Response.json({
     positions,
     concentration,

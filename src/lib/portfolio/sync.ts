@@ -51,22 +51,30 @@ function toPosition(row: PositionRow): Position {
   };
 }
 
-export async function lastSyncedAt(db: DB): Promise<string | null> {
+export async function lastSyncedAt(
+  db: DB,
+  portfolioId: string,
+): Promise<string | null> {
   const row = await db.get<{ synced_at: string | null }>(
-    `SELECT MAX(synced_at) AS synced_at FROM positions`,
+    `SELECT MAX(synced_at) AS synced_at FROM positions WHERE portfolio_id = ?`,
+    [portfolioId],
   );
   return row?.synced_at ?? null;
 }
 
-export async function storedBrokers(db: DB): Promise<string[]> {
+export async function storedBrokers(db: DB, portfolioId: string): Promise<string[]> {
   const rows = await db.all<{ broker: string }>(
-    `SELECT DISTINCT broker FROM positions`,
+    `SELECT DISTINCT broker FROM positions WHERE portfolio_id = ?`,
+    [portfolioId],
   );
   return rows.map((row) => row.broker);
 }
 
-export async function readPositions(db: DB): Promise<Position[]> {
-  const rows = await db.all<PositionRow>(`SELECT * FROM positions`);
+export async function readPositions(db: DB, portfolioId: string): Promise<Position[]> {
+  const rows = await db.all<PositionRow>(
+    `SELECT * FROM positions WHERE portfolio_id = ?`,
+    [portfolioId],
+  );
   return rows.map(toPosition);
 }
 
@@ -76,6 +84,7 @@ export async function readPositions(db: DB): Promise<Position[]> {
  */
 export async function syncPositions(
   db: DB,
+  portfolioId: string,
   broker: BrokerProvider,
   brokerName: Position["broker"],
   now: Date = new Date(),
@@ -87,11 +96,12 @@ export async function syncPositions(
        (id, broker, instrument_type, symbol, underlying_symbol, name, sector,
         quantity, average_cost, currency, option_type, strike, expiration_date,
         contract_multiplier, reported_price, reported_market_value, reported_unrealized_pnl,
-        reported_today_pnl, reported_realized_pnl, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        reported_today_pnl, reported_realized_pnl, synced_at, portfolio_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   await db.transaction(async (tx) => {
-    await tx.run(`DELETE FROM positions`);
+    // Scoped: replacing "the" position set used to wipe every portfolio's.
+    await tx.run(`DELETE FROM positions WHERE portfolio_id = ?`, [portfolioId]);
     for (const position of positions) {
       await tx.run(insert, [
         randomUUID(),
@@ -114,6 +124,7 @@ export async function syncPositions(
         position.reportedTodayPnL ?? null,
         position.reportedRealizedPnL ?? null,
         syncedAt,
+        portfolioId,
       ]);
     }
   });

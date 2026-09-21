@@ -1,13 +1,16 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { quotesQuerySchema } from "@/lib/schemas";
 import { getQuotes } from "@/lib/portfolio/quotes";
 import { getMarketDataProvider } from "@/providers";
 import { marketSession } from "@/lib/market-hours";
 
 export async function GET(request: Request) {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  // Quotes are not portfolio data, but fetching them spends a broker token,
+  // so the request still says whose. Defaults to the viewer's own.
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
 
   const url = new URL(request.url);
   const parsed = quotesQuerySchema.safeParse({
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
   const { quotes, isStale, dataTimestamp } = await getQuotes(
     await getDb(),
     parsed.data.symbols,
-    await getMarketDataProvider(),
+    await getMarketDataProvider(context.portfolio.id),
   );
 
   return Response.json({

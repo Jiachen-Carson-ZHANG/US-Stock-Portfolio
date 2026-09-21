@@ -49,10 +49,22 @@ export type AnalysisData = {
 // The tables live in the central schema (src/lib/db/index.ts), applied once at
 // startup under an advisory lock, rather than being re-created on every read.
 
-export async function readAnalysis(db: DB): Promise<AnalysisData> {
+export async function readAnalysis(
+  db: DB,
+  portfolioId: string,
+): Promise<AnalysisData> {
+  // Flows and the review attestation belong to one portfolio; benchmark and
+  // FX series are market data and stay shared, which is the point of keeping
+  // them in their own table.
   const [configRows, flows, benchmark, fx] = await Promise.all([
-    db.all<{ key: string; value: string }>("SELECT key,value FROM analysis_config"),
-    db.all<CashFlow>("SELECT id,date,amount,note FROM analysis_flows ORDER BY date,id"),
+    db.all<{ key: string; value: string }>(
+      "SELECT key,value FROM analysis_config WHERE portfolio_id=?",
+      [portfolioId],
+    ),
+    db.all<CashFlow>(
+      "SELECT id,date,amount,note FROM analysis_flows WHERE portfolio_id=? ORDER BY date,id",
+      [portfolioId],
+    ),
     db.all<Observation>(
       "SELECT date,value FROM analysis_observations WHERE kind=? ORDER BY date",
       ["benchmark"],
@@ -74,28 +86,40 @@ export async function readAnalysis(db: DB): Promise<AnalysisData> {
 
 export async function saveAnalysis(
   db: DB,
+  portfolioId: string,
   input: z.infer<typeof analysisInputSchema>,
   userId: string,
 ): Promise<AnalysisData> {
   await db.transaction(async (tx) => {
     const config = (key: string, value: string) =>
       tx.run(
-        "INSERT INTO analysis_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        [key, value],
+        "INSERT INTO analysis_config(portfolio_id,key,value) VALUES(?,?,?) ON CONFLICT(portfolio_id,key) DO UPDATE SET value=excluded.value",
+        [portfolioId, key, value],
       );
     switch (input.action) {
       case "flow":
         await tx.run(
-          "INSERT INTO analysis_flows (id,date,amount,note,created_by) VALUES(?,?,?,?,?)",
-          [randomUUID(), input.date, input.amount, input.note, userId],
+          "INSERT INTO analysis_flows (id,date,amount,note,created_by,portfolio_id) VALUES(?,?,?,?,?,?)",
+          [randomUUID(), input.date, input.amount, input.note, userId, portfolioId],
         );
         // A new flow invalidates the reviewed window: the ledger it was signed
         // off against no longer matches.
-        await tx.run("DELETE FROM analysis_config WHERE key='review'");
+        await tx.run(
+          "DELETE FROM analysis_config WHERE key='review' AND portfolio_id=?",
+          [portfolioId],
+        );
         break;
       case "removeFlow":
-        await tx.run("DELETE FROM analysis_flows WHERE id=?", [input.id]);
-        await tx.run("DELETE FROM analysis_config WHERE key='review'");
+        // Scoped by portfolio as well as id, so a guessed id from another
+        // portfolio deletes nothing.
+        await tx.run("DELETE FROM analysis_flows WHERE id=? AND portfolio_id=?", [
+          input.id,
+          portfolioId,
+        ]);
+        await tx.run(
+          "DELETE FROM analysis_config WHERE key='review' AND portfolio_id=?",
+          [portfolioId],
+        );
         break;
       case "review":
         if (
@@ -118,5 +142,5 @@ export async function saveAnalysis(
         break;
     }
   });
-  return readAnalysis(db);
+  return readAnalysis(db, portfolioId);
 }

@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import Decimal from "decimal.js";
 import { closeDb, getDb } from "../src/lib/db";
+import { ensureDefaultPortfolio } from "../src/lib/portfolios";
 import { hashPassword } from "../src/lib/auth/password";
 import { syncPositions, readPositions } from "../src/lib/portfolio/sync";
 import { writeSnapshot } from "../src/lib/portfolio/snapshots";
@@ -89,9 +90,9 @@ async function seedUsers() {
   }
 }
 
-async function seedPositions() {
+async function seedPositions(portfolioId: string) {
   const db = await getDb();
-  const count = await syncPositions(db, new MockBrokerProvider(), "mock");
+  const count = await syncPositions(db, portfolioId, new MockBrokerProvider(), "mock");
   console.log(`  synced ${count} mock positions`);
 }
 
@@ -99,9 +100,9 @@ async function seedPositions() {
  * Backfills the portfolio-value series so the performance chart has history on
  * a fresh install. Mock mode only — real deployments accumulate real snapshots.
  */
-async function seedSnapshots() {
+async function seedSnapshots(portfolioId: string) {
   const db = await getDb();
-  const positions = await readPositions(db);
+  const positions = await readPositions(db, portfolioId);
   if (positions.length === 0) return;
 
   const market = new MockMarketDataProvider();
@@ -149,6 +150,7 @@ async function seedSnapshots() {
 
     await writeSnapshot(
       db,
+      portfolioId,
       date,
       {
         totalMarketValue: { amount: total.toFixed(), currency: "USD" },
@@ -171,17 +173,22 @@ async function main() {
   console.log("Accounts:");
   await seedUsers();
 
+  // Re-run after the users exist: the first boot of an empty database creates
+  // the default portfolio with no owner, because there was nobody to own it.
+  const db = await getDb();
+  const portfolio = await ensureDefaultPortfolio(db);
+  if (!portfolio) throw new Error("Could not create the default portfolio.");
+  console.log(`\nPortfolio: /${portfolio.slug} (${portfolio.displayName})`);
+
   // Synthetic holdings would overwrite the real ones and pollute the snapshot
   // history, so the portfolio is only seeded while no broker is connected.
-  const db = await getDb();
   const connected = await db.get(`SELECT 1 FROM broker_connections LIMIT 1`);
 
   if (connected) {
-    console.log("\nPortfolio: broker connected — real holdings left untouched.");
+    console.log("  broker connected — real holdings left untouched.");
   } else {
-    console.log("\nPortfolio:");
-    await seedPositions();
-    await seedSnapshots();
+    await seedPositions(portfolio.id);
+    await seedSnapshots(portfolio.id);
   }
 
   console.log("\nDone.\n");

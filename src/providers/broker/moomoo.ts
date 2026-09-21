@@ -68,8 +68,16 @@ const DEFAULT_OPTION_MULTIPLIER = 100;
 const BASE_CURRENCY = () => process.env.PORTFOLIO_BASE_CURRENCY ?? "USD";
 
 export class MoomooBrokerProvider implements BrokerProvider {
+  /**
+   * Whose account this provider speaks for. Every call it makes carries this,
+   * so one person's refresh token can never be used to read another's
+   * holdings — the mistake a shared singleton would make silently.
+   */
+  constructor(private readonly portfolioId: string) {}
+
   async getAccounts(): Promise<BrokerAccount[]> {
     const data = await moomooGet<{ accounts: MoomooAccount[] }>(
+      this.portfolioId,
       "/api/v1.0/accounts/authorized_trd_accs",
     );
 
@@ -86,7 +94,7 @@ export class MoomooBrokerProvider implements BrokerProvider {
   /** Resolves the account once and remembers it, so sync is a single call path. */
   private async accountId(): Promise<string> {
     const db = await getDb();
-    const stored = (await readConnection(db))?.accountId;
+    const stored = (await readConnection(db, this.portfolioId))?.accountId;
     if (stored) return stored;
 
     const accounts = await this.getAccounts();
@@ -94,7 +102,7 @@ export class MoomooBrokerProvider implements BrokerProvider {
       throw new Error("No authorized moomoo trading account is available.");
     }
 
-    setAccountId(db, accounts[0].id);
+    await setAccountId(db, this.portfolioId, accounts[0].id);
     return accounts[0].id;
   }
 
@@ -102,7 +110,10 @@ export class MoomooBrokerProvider implements BrokerProvider {
     const accountId = await this.accountId();
 
     const [rows, funds] = await Promise.all([
-      moomooGet<MoomooPosition[]>(`/api/v1.0/accounts/${accountId}/positions`),
+      moomooGet<MoomooPosition[]>(
+        this.portfolioId,
+        `/api/v1.0/accounts/${accountId}/positions`,
+      ),
       this.getFunds(accountId),
     ]);
 
@@ -162,6 +173,7 @@ export class MoomooBrokerProvider implements BrokerProvider {
 
   private async getFunds(accountId: string): Promise<MoomooFunds> {
     return moomooGet<MoomooFunds>(
+      this.portfolioId,
       `/api/v1.0/accounts/${accountId}/funds?currency=${encodeURIComponent(BASE_CURRENCY())}`,
     );
   }
@@ -183,6 +195,7 @@ export class MoomooBrokerProvider implements BrokerProvider {
       });
 
       const data = await moomooGet<MoomooFillsPage>(
+      this.portfolioId,
         `/api/v1.0/accounts/${accountId}/fills_history?${query}`,
       );
 

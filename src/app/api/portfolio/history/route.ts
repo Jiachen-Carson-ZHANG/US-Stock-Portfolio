@@ -1,10 +1,11 @@
-import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
 import { historyRangeSchema } from "@/lib/schemas";
 import { loadHistory } from "@/lib/portfolio/service";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
+import { portfolioSlugFrom } from "@/lib/portfolios/request";
 
 export async function GET(request: Request) {
-  const user = await authenticateRequest();
-  if (!user) return unauthorized();
+  const context = await requirePortfolioApi(portfolioSlugFrom(request));
+  if ("response" in context) return context.response;
 
   const url = new URL(request.url);
   const parsed = historyRangeSchema.safeParse({
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
     .toISOString()
     .slice(0, 10);
 
-  const snapshots = (await loadHistory()).filter((s) => s.snapshotDate >= cutoff);
+  const snapshots = (await loadHistory(context.portfolio.id)).filter(
+    (s) => s.snapshotDate >= cutoff,
+  );
   return Response.json({ snapshots });
 }

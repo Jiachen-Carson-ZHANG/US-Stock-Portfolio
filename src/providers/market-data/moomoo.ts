@@ -48,6 +48,12 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export class MoomooMarketDataProvider implements MarketDataProvider {
+  /**
+   * Quotes are not private, but fetching them still spends someone's token, so
+   * the provider is told whose. Callers pass the portfolio being viewed.
+   */
+  constructor(private readonly portfolioId: string) {}
+
   async getQuotes(symbols: string[]): Promise<Quote[]> {
     const tradable = symbols.filter((symbol) => !isCash(symbol));
     if (tradable.length === 0) return [];
@@ -57,6 +63,7 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
 
     for (const batch of chunk(tradable, SNAPSHOT_BATCH)) {
       const data = await moomooPost<{ snapshot_list: Snapshot[] }>(
+      this.portfolioId,
         "/api/v1.0/quote/snapshot",
         { code_list: batch.map(toMoomooCode) },
       );
@@ -98,6 +105,7 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
     });
 
     const data = await moomooGet<{ kline_list: Kline[] }>(
+      this.portfolioId,
       `/api/v1.0/quote/${encodeURIComponent(toMoomooCode(symbol))}/history-kline?${query}`,
     );
 

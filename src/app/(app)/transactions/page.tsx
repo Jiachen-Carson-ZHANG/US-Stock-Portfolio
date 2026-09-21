@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/guards";
+import { requirePortfolio } from "@/lib/portfolios/context";
 import { loadPortfolio, loadTransactions } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { EmptyState } from "@/components/ui/misc";
@@ -13,13 +13,13 @@ function usd(value: number, currency: string) {
 }
 
 export default async function TransactionsPage() {
-  await requireUser();
+  const { portfolio } = await requirePortfolio();
   const { t } = await serverDictionary();
   const currency = baseCurrency();
 
   const [{ transactions, totals }, { summary }] = await Promise.all([
-    loadTransactions(),
-    loadPortfolio(),
+    loadTransactions(portfolio.id),
+    loadPortfolio(portfolio.id),
   ]);
 
   const realized = Number(summary.realizedPnL.amount);

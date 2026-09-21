@@ -3,7 +3,7 @@ import { currentLocale } from "@/lib/i18n/server";
 import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { requireUser } from "@/lib/auth/guards";
+import { requirePortfolio } from "@/lib/portfolios/context";
 import { loadPosition } from "@/lib/portfolio/service";
 import { getMarketDataProvider } from "@/providers";
 import { daysToExpiration } from "@/lib/portfolio";
@@ -67,19 +67,21 @@ export default async function PositionDetailPage({
 }: {
   params: Promise<{ symbol: string }>;
 }) {
-  await requireUser();
+  const { portfolio } = await requirePortfolio();
   const zh = (await currentLocale()) === "zh";
 
   const raw = decodeURIComponent((await params).symbol);
   const parsed = symbolSchema.safeParse(raw);
   if (!parsed.success) notFound();
 
-  const position = await loadPosition(parsed.data);
+  const position = await loadPosition(portfolio.id, parsed.data);
   if (!position) notFound();
 
   const to = new Date();
   const from = new Date(to.getTime() - HISTORY_DAYS * 86_400_000);
-  const prices = await (await getMarketDataProvider()).getHistoricalPrices(position.symbol, {
+  const prices = await (
+    await getMarketDataProvider(portfolio.id)
+  ).getHistoricalPrices(position.symbol, {
     from: from.toISOString().slice(0, 10),
     to: to.toISOString().slice(0, 10),
   });

@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/guards";
+import { requirePortfolio } from "@/lib/portfolios/context";
 import { loadHistory, loadPortfolio } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { AssetClassSplit } from "@/components/dashboard/asset-class-split";
@@ -8,10 +8,10 @@ import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
 import { getDb } from "@/lib/db";
 export const dynamic = "force-dynamic";
 export default async function PerformancePage() {
-  const user = await requireUser();
+  const { user, portfolio: current } = await requirePortfolio();
   const { t } = await serverDictionary();
-  const portfolio = await loadPortfolio();
-  const snapshots = await loadHistory();
+  const portfolio = await loadPortfolio(current.id);
+  const snapshots = await loadHistory(current.id);
   return (
     <div className="space-y-6">
       <header>
@@ -25,7 +25,7 @@ export default async function PerformancePage() {
       <AssetClassSplit data={portfolio.byAssetClass} />
       <PerformanceExplorer
         snapshots={snapshots}
-        initial={await readAnalysis(await getDb())}
+        initial={await readAnalysis(await getDb(), current.id)}
         owner={user.role === "owner"}
         currency={portfolio.summary.totalMarketValue.currency}
       />

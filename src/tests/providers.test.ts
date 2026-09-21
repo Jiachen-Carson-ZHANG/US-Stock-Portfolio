@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, type TestDb } from "@/lib/db/testing";
+import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
 import { readPositions, syncPositions } from "@/lib/portfolio/sync";
 import { getQuotes } from "@/lib/portfolio/quotes";
 import { MockBrokerProvider } from "@/providers/broker/mock";
 import { MockMarketDataProvider } from "@/providers/market-data/mock";
 import type { MarketDataProvider } from "@/providers/market-data/types";
 import type { Quote } from "@/types/market";
+
+/** Scoping is exercised in portfolios.test.ts; here it only has to be real. */
+const PF = TEST_PORTFOLIO_ID;
 
 let db: TestDb;
 
@@ -46,21 +49,21 @@ describe("mock broker provider", () => {
 
 describe("position sync", () => {
   it("writes the broker's positions into the database", async () => {
-    const count = await syncPositions(db, new MockBrokerProvider(), "mock");
+    const count = await syncPositions(db, PF, new MockBrokerProvider(), "mock");
     expect(count).toBeGreaterThan(0);
-    expect(await readPositions(db)).toHaveLength(count);
+    expect(await readPositions(db, PF)).toHaveLength(count);
   });
 
   it("replaces rather than appends on a second sync", async () => {
-    await syncPositions(db, new MockBrokerProvider(), "mock");
-    const first = (await readPositions(db)).length;
-    await syncPositions(db, new MockBrokerProvider(), "mock");
-    expect(await readPositions(db)).toHaveLength(first);
+    await syncPositions(db, PF, new MockBrokerProvider(), "mock");
+    const first = (await readPositions(db, PF)).length;
+    await syncPositions(db, PF, new MockBrokerProvider(), "mock");
+    expect(await readPositions(db, PF)).toHaveLength(first);
   });
 
   it("preserves option contract metadata through the round trip", async () => {
-    await syncPositions(db, new MockBrokerProvider(), "mock");
-    const option = (await readPositions(db)).find(
+    await syncPositions(db, PF, new MockBrokerProvider(), "mock");
+    const option = (await readPositions(db, PF)).find(
       (p) => p.instrumentType === "option",
     );
 
@@ -71,8 +74,8 @@ describe("position sync", () => {
   });
 
   it("leaves the stored portfolio untouched when the broker fails", async () => {
-    await syncPositions(db, new MockBrokerProvider(), "mock");
-    const before = (await readPositions(db)).length;
+    await syncPositions(db, PF, new MockBrokerProvider(), "mock");
+    const before = (await readPositions(db, PF)).length;
 
     const failing = {
       getAccounts: async () => [],
@@ -85,8 +88,8 @@ describe("position sync", () => {
       getTransactions: async () => [],
     };
 
-    await expect(syncPositions(db, failing, "mock")).rejects.toThrow();
-    expect(await readPositions(db)).toHaveLength(before);
+    await expect(syncPositions(db, PF, failing, "mock")).rejects.toThrow();
+    expect(await readPositions(db, PF)).toHaveLength(before);
   });
 });
 

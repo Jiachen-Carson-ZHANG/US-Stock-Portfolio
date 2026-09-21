@@ -16,15 +16,17 @@ type SnapshotRow = {
 
 export async function readSnapshots(
   db: DB,
+  portfolioId: string,
   limit = 400,
 ): Promise<PortfolioSnapshot[]> {
   const rows = await db.all<SnapshotRow>(
     `SELECT snapshot_date, total_market_value, total_cost,
             total_unrealized_pnl, cash_value, realized_pnl, net_deposits, source
        FROM portfolio_snapshots
+      WHERE portfolio_id = ?
       ORDER BY snapshot_date DESC
       LIMIT ?`,
-    [limit],
+    [portfolioId, limit],
   );
 
   return rows.reverse().map((row) => ({
@@ -41,6 +43,7 @@ export async function readSnapshots(
 
 export async function writeSnapshot(
   db: DB,
+  portfolioId: string,
   date: string,
   summary: Pick<
     PortfolioSummary,
@@ -59,9 +62,9 @@ export async function writeSnapshot(
     `INSERT INTO portfolio_snapshots
        (id, snapshot_date, total_market_value, total_cost,
         total_unrealized_pnl, cash_value, positions_json, created_at,
-        realized_pnl, net_deposits, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(snapshot_date) DO UPDATE SET
+        realized_pnl, net_deposits, source, portfolio_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(portfolio_id, snapshot_date) DO UPDATE SET
        total_market_value = excluded.total_market_value,
        total_cost = excluded.total_cost,
        total_unrealized_pnl = excluded.total_unrealized_pnl,
@@ -82,19 +85,27 @@ export async function writeSnapshot(
       summary.realizedPnL.amount,
       summary.netDeposits?.amount ?? null,
       source,
+      portfolioId,
     ],
   );
 }
 
-export async function clearSnapshots(db: DB): Promise<number> {
-  const result = await db.run(`DELETE FROM portfolio_snapshots`);
+export async function clearSnapshots(db: DB, portfolioId: string): Promise<number> {
+  const result = await db.run(
+    `DELETE FROM portfolio_snapshots WHERE portfolio_id = ?`,
+    [portfolioId],
+  );
   return result.changes;
 }
 
-export async function hasSnapshot(db: DB, date: string): Promise<boolean> {
+export async function hasSnapshot(
+  db: DB,
+  portfolioId: string,
+  date: string,
+): Promise<boolean> {
   const row = await db.get(
-    `SELECT 1 FROM portfolio_snapshots WHERE snapshot_date = ?`,
-    [date],
+    `SELECT 1 FROM portfolio_snapshots WHERE portfolio_id = ? AND snapshot_date = ?`,
+    [portfolioId, date],
   );
   return row !== undefined;
 }
@@ -105,6 +116,7 @@ export async function hasSnapshot(db: DB, date: string): Promise<boolean> {
  */
 export async function maybeCreateSnapshot(
   db: DB,
+  portfolioId: string,
   summary: PortfolioSummary,
   positionsJson: string,
   now: Date = new Date(),
@@ -120,7 +132,7 @@ export async function maybeCreateSnapshot(
   )
     return false;
   const date = marketDateString(now);
-  if (await hasSnapshot(db, date)) return false;
-  await writeSnapshot(db, date, summary, positionsJson, now);
+  if (await hasSnapshot(db, portfolioId, date)) return false;
+  await writeSnapshot(db, portfolioId, date, summary, positionsJson, now);
   return true;
 }

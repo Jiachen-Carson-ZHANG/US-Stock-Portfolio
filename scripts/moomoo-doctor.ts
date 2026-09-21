@@ -1,3 +1,4 @@
+import { ensureDefaultPortfolio } from "../src/lib/portfolios";
 import { getDb } from "../src/lib/db";
 import { readConnectionStatus, readConnection } from "../src/lib/moomoo/tokens";
 import { refreshAccessToken, MOOMOO_API_BASE } from "../src/lib/moomoo/oauth";
@@ -27,13 +28,16 @@ async function probe(path: string, token: string, init: RequestInit = {}) {
 
 async function main() {
   const db = await getDb();
+  const portfolio = await ensureDefaultPortfolio(db);
+  if (!portfolio) throw new Error("No portfolio to inspect.");
+  console.log(`\nPortfolio: /${portfolio.slug}`);
 
-  const status = await readConnectionStatus(db);
+  const status = await readConnectionStatus(db, portfolio.id);
   console.log("\n=== stored connection ===");
   console.log(status ? JSON.stringify(status, null, 2) : "none");
   if (!status) return;
 
-  const connection = await readConnection(db);
+  const connection = await readConnection(db, portfolio.id);
   if (!connection) return;
 
   console.log("\n=== refreshing access token ===");

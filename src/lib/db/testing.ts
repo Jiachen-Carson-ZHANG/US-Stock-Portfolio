@@ -11,6 +11,9 @@ import { toPositionalParams } from "./sql";
  */
 export type TestDb = DB & { close: () => Promise<void> };
 
+/** The portfolio every test fixture is scoped to. */
+export const TEST_PORTFOLIO_ID = "00000000-0000-4000-8000-000000000001";
+
 export function testConnectionString(): string | undefined {
   return process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 }
@@ -92,6 +95,16 @@ export async function createTestDb(): Promise<TestDb> {
   } satisfies DB;
 
   await applySchema(runner);
+
+  // Production creates this on first boot, so tests get it too. Without a
+  // portfolio row every scoped insert fails its foreign key, which is a
+  // confusing way to learn that the fixture is incomplete.
+  await runner.run(
+    `INSERT INTO portfolios (id, slug, display_name, kind, base_currency, created_at)
+     VALUES (?, 'carson', 'Test Portfolio', 'broker', 'USD', ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [TEST_PORTFOLIO_ID, new Date().toISOString()],
+  );
 
   return {
     ...runner,
