@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { useT } from "@/lib/i18n/context";
 
 /**
  * What you see when you open a portfolio that is not yours.
@@ -25,6 +26,7 @@ export function RequestAccess({
   ownerName: string | null;
   alreadyAsked: boolean;
 }) {
+  const t = useT();
   const [asked, setAsked] = useState(alreadyAsked);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function RequestAccess({
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body.error ?? "Could not send the request.");
+      setError(body.error ?? t.access.askFailed);
       return;
     }
     setAsked(true);
@@ -54,12 +56,14 @@ export function RequestAccess({
     <div className="mx-auto max-w-lg space-y-5 py-8">
       <div className="flex items-center gap-3">
         <Lock className="size-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="text-lg font-semibold tracking-tight">{name} is private</h1>
+        <h1 className="text-lg font-semibold tracking-tight">
+          {name} {t.access.privateTitle}
+        </h1>
       </div>
 
       <p className="text-sm text-muted-foreground">
-        This portfolio exists, but it is not shared with you.
-        {ownerName ? ` ${ownerName} decides who can see it.` : ""}
+        {t.access.privateBody}
+        {ownerName ? ` ${ownerName} ${t.access.decidesWhoCanSee}` : ""}
       </p>
 
       {asked ? (
@@ -67,16 +71,15 @@ export function RequestAccess({
           role="status"
           className="rounded-lg border border-border bg-surface px-4 py-3 text-sm"
         >
-          Your request has been sent{ownerName ? ` to ${ownerName}` : ""}. You
-          will get a notification either way.
+          {t.access.asked}
         </p>
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="message" className="text-xs text-muted-foreground">
-              Say why, if you like
+              {t.access.sayWhy}
             </Label>
-            <Input id="message" name="message" placeholder="Optional" />
+            <Input id="message" name="message" placeholder={t.access.optional} />
           </div>
 
           {error && (
@@ -86,7 +89,7 @@ export function RequestAccess({
           )}
 
           <Button type="submit" disabled={busy}>
-            {busy ? "Sending…" : "Ask for access"}
+            {busy ? t.access.asking : t.access.ask}
           </Button>
         </form>
       )}

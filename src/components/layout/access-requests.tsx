@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/context";
 import type { AccessRequest } from "@/lib/access";
 
 /**
@@ -13,6 +14,7 @@ import type { AccessRequest } from "@/lib/access";
  * the deployment.
  */
 export function AccessRequests({ requests }: { requests: AccessRequest[] }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -31,10 +33,9 @@ export function AccessRequests({ requests }: { requests: AccessRequest[] }) {
 
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium">Waiting for your answer</h2>
+      <h2 className="text-sm font-medium">{t.access.waiting}</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Approving lets them read the portfolio. It never lets them trade in
-        it or change anything.
+        {t.access.waitingNote}
       </p>
 
       <ul className="mt-4 divide-y divide-border">
@@ -45,8 +46,8 @@ export function AccessRequests({ requests }: { requests: AccessRequest[] }) {
           >
             <div className="min-w-0 flex-1">
               <p className="text-sm">
-                <span className="font-medium">{request.userName}</span> would
-                like to see {request.portfolioName}
+                <span className="font-medium">{request.userName}</span>{" "}
+                {t.access.wouldLikeToSee} {request.portfolioName}
               </p>
               {request.message && (
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -60,7 +61,7 @@ export function AccessRequests({ requests }: { requests: AccessRequest[] }) {
                 disabled={busy === request.id}
                 onClick={() => decide(request.id, true)}
               >
-                Share
+                {t.access.share}
               </Button>
               <Button
                 size="sm"
@@ -68,7 +69,7 @@ export function AccessRequests({ requests }: { requests: AccessRequest[] }) {
                 disabled={busy === request.id}
                 onClick={() => decide(request.id, false)}
               >
-                Decline
+                {t.access.decline}
               </Button>
             </div>
           </li>

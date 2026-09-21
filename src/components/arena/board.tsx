@@ -6,15 +6,8 @@ import { IndexLine } from "@/components/charts/index-line";
 import { ArenaCommentary } from "@/components/arena/commentary";
 import { PERIODS, type Leaderboard, type Period } from "@/lib/arena";
 import type { Trophy as TrophyRecord } from "@/lib/arena/trophies";
+import { useT } from "@/lib/i18n/context";
 import { cn, signClass } from "@/lib/utils";
-
-const LABEL: Record<Period, string> = {
-  day: "Day",
-  week: "Week",
-  month: "Month",
-  year: "Year",
-  max: "All time",
-};
 
 const MEDAL = ["text-chart-4", "text-muted-foreground", "text-chart-3"];
 
@@ -39,17 +32,24 @@ export function ArenaBoard({
   boards: Record<Period, Leaderboard>;
   trophies: TrophyRecord[];
 }) {
+  const t = useT();
   const [period, setPeriod] = useState<Period>("month");
+  const LABEL: Record<Period, string> = {
+    day: t.arena.day,
+    week: t.arena.week,
+    month: t.arena.month,
+    year: t.arena.year,
+    max: t.arena.max,
+  };
   const board = boards[period];
   const ranked = board.standings.filter((s) => s.returnPercent !== null);
 
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-lg font-semibold tracking-tight">Arena</h1>
+        <h1 className="text-lg font-semibold tracking-tight">{t.arena.title}</h1>
         <p className="text-sm text-muted-foreground">
-          Ranked by return, so a bigger account does not simply win. Deposits
-          are neutralised — adding money never looks like skill.
+          {t.arena.subtitle}
         </p>
       </header>
 
@@ -94,7 +94,7 @@ export function ArenaBoard({
                   {standing.displayName}
                   {standing.kind === "mock" && (
                     <span className="ml-2 font-normal text-muted-foreground">
-                      mock
+                      {t.portfolios.mock}
                     </span>
                   )}
                 </p>
@@ -129,7 +129,7 @@ export function ArenaBoard({
             <IndexLine
               key={standing.slug}
               title={`${standing.displayName} · ${pct(standing.returnPercent)}`}
-              note={`Indexed to 100 at the start of the ${LABEL[period].toLowerCase()}.`}
+              note={`${t.arena.indexedTo} ${LABEL[period]}`}
               data={standing.curve}
               colorIndex={index}
             />
@@ -148,6 +148,7 @@ const PLACE = ["1st", "2nd", "3rd"];
  * beside the leaderboard is a live position, this is a result.
  */
 function TrophyCabinet({ trophies }: { trophies: TrophyRecord[] }) {
+  const t = useT();
   if (trophies.length === 0) return null;
 
   const byPortfolio = new Map<string, TrophyRecord[]>();
@@ -159,9 +160,9 @@ function TrophyCabinet({ trophies }: { trophies: TrophyRecord[] }) {
 
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium">Trophy cabinet</h2>
+      <h2 className="text-sm font-medium">{t.arena.cabinet}</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Finished periods only. Nothing here can change.
+        {t.arena.cabinetNote}
       </p>
 
       <ul className="mt-4 space-y-3">
@@ -173,7 +174,7 @@ function TrophyCabinet({ trophies }: { trophies: TrophyRecord[] }) {
               {firsts > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs text-chart-4">
                   <Trophy className="size-3.5" aria-hidden="true" />
-                  {firsts} win{firsts === 1 ? "" : "s"}
+                  {firsts} {t.arena.wins}
                 </span>
               )}
               <span className="text-xs text-muted-foreground">

@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
+import { useT } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/lib/notifications";
 
-function ago(iso: string): string {
+function ago(iso: string, justNow: string): string {
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return "just now";
+  if (minutes < 1) return justNow;
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -24,6 +25,7 @@ function ago(iso: string): string {
  * is a minute stale has never mattered.
  */
 export function NotificationBell({ initialUnread }: { initialUnread: number }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(initialUnread);
@@ -63,7 +65,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={`${t.notifications.title}${unread > 0 ? ` (${unread})` : ""}`}
         className="relative inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <Bell className="size-4" aria-hidden="true" />
@@ -75,22 +77,22 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
       {open && (
         <div className="absolute right-0 z-30 mt-1 w-80 rounded-xl border border-border bg-surface p-2 shadow-lg">
           <div className="flex items-center justify-between px-2 py-1">
-            <p className="text-xs font-medium">Notifications</p>
+            <p className="text-xs font-medium">{t.notifications.title}</p>
             {unread > 0 && (
               <button
                 type="button"
                 onClick={markAllRead}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                Mark all read
+                {t.notifications.markAllRead}
               </button>
             )}
           </div>
 
           {items === null ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">Loading…</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground">{t.common.loading}</p>
           ) : items.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">Nothing yet.</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground">{t.notifications.empty}</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
               {items.map((item) => {
@@ -106,7 +108,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
                       <p className="mt-0.5 text-xs text-muted-foreground">{item.body}</p>
                     )}
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {ago(item.createdAt)}
+                      {ago(item.createdAt, t.notifications.justNow)}
                     </p>
                   </div>
                 );

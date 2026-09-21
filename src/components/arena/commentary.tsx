@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/context";
 import type { Period } from "@/lib/arena";
 
 type Result = {
@@ -18,6 +19,7 @@ type Result = {
  * honest signal that a person chose to invoke it.
  */
 export function ArenaCommentary({ period }: { period: Period }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function ArenaCommentary({ period }: { period: Period }) {
     setBusy(false);
 
     if (!response.ok) {
-      setError(body.error ?? "Could not write the report.");
+      setError(body.error ?? t.arena.commentaryFailed);
       return;
     }
     setResult(body);
@@ -46,15 +48,14 @@ export function ArenaCommentary({ period }: { period: Period }) {
     <section className="rounded-xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-medium">The commentary box</h2>
+          <h2 className="text-sm font-medium">{t.arena.commentary}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Opinionated, occasionally rude, and working only from the
-            percentages above.
+            {t.arena.commentaryNote}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={write} disabled={busy}>
           <Sparkles className="size-3.5" aria-hidden="true" />
-          {busy ? "Writing…" : result ? "Again" : `Report on the ${period}`}
+          {busy ? t.arena.writing : result ? t.arena.again : `${t.arena.report} ${period}`}
         </Button>
       </div>
 
@@ -75,7 +76,7 @@ export function ArenaCommentary({ period }: { period: Period }) {
           {result.sources.length > 0 && (
             <div className="mt-4 border-t border-border pt-3">
               <p className="text-xs text-muted-foreground">
-                Read the news it used:
+                {t.arena.sources}
               </p>
               <ul className="mt-1 space-y-0.5">
                 {result.sources.map((source) => (
@@ -95,8 +96,7 @@ export function ArenaCommentary({ period }: { period: Period }) {
           )}
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Commentary, not advice. It can be wrong, and it is trying to be
-            funny.
+            {t.arena.disclaimer}
           </p>
         </>
       )}

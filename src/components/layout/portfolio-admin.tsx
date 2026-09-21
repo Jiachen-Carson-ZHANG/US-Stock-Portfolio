@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { Badge } from "@/components/ui/misc";
+import { useT } from "@/lib/i18n/context";
 
 export type AdminPerson = { id: string; displayName: string; username: string };
 
@@ -31,6 +32,7 @@ export function PortfolioAdmin({
   portfolios: AdminPortfolio[];
   people: AdminPerson[];
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function PortfolioAdmin({
     setBusy(false);
 
     if (!response.ok) {
-      setError(body.error ?? "Could not create the portfolio.");
+      setError(body.error ?? t.portfolios.createFailed);
       return;
     }
     form.reset();
@@ -94,10 +96,9 @@ export function PortfolioAdmin({
 
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium">Portfolios</h2>
+      <h2 className="text-sm font-medium">{t.portfolios.title}</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        A person sees a portfolio if they own it or if it is ticked for them
-        here. Owners see everything regardless.
+        {t.portfolios.note}
       </p>
 
       <ul className="mt-4 divide-y divide-border">
@@ -114,7 +115,7 @@ export function PortfolioAdmin({
                 </p>
                 <Badge>{portfolio.kind}</Badge>
                 <span className="text-xs text-muted-foreground">
-                  owner: {owner?.displayName ?? "unassigned"}
+                  {t.portfolios.owner}: {owner?.displayName ?? t.portfolios.unassigned}
                 </span>
               </div>
 
@@ -147,7 +148,7 @@ export function PortfolioAdmin({
       <form onSubmit={create} className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="slug" className="text-xs text-muted-foreground">
-            Address
+            {t.portfolios.address}
           </Label>
           <Input
             id="slug"
@@ -161,21 +162,20 @@ export function PortfolioAdmin({
             required
           />
           <p className="text-xs text-muted-foreground">
-            Their page will be at <code>/{address || "…"}</code>. Follows the
-            username unless you change it.
+            <code>/{address || "…"}</code> · {t.portfolios.addressHint}
           </p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="displayName" className="text-xs text-muted-foreground">
-            Name
+            {t.portfolios.displayName}
           </Label>
           <Input id="displayName" name="displayName" placeholder="Mile" required />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="ownerUserId" className="text-xs text-muted-foreground">
-            Belongs to
+            {t.portfolios.belongsTo}
           </Label>
           <select
             id="ownerUserId"
@@ -195,7 +195,7 @@ export function PortfolioAdmin({
 
         <div className="space-y-2">
           <Label htmlFor="kind" className="text-xs text-muted-foreground">
-            Type
+            {t.portfolios.type}
           </Label>
           <select
             id="kind"
@@ -203,20 +203,18 @@ export function PortfolioAdmin({
             onChange={(event) => setKind(event.target.value as "broker" | "mock")}
             className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
           >
-            <option value="broker">Real account</option>
-            <option value="mock">Mock account</option>
+            <option value="broker">{t.portfolios.real}</option>
+            <option value="mock">{t.portfolios.mock}</option>
           </select>
           <p className="text-xs text-muted-foreground">
-            {kind === "broker"
-              ? "Follows a real brokerage. Holdings come from moomoo."
-              : "Practice money, real prices. Nothing is actually bought."}
+            {kind === "broker" ? t.portfolios.realHint : t.portfolios.mockHint}
           </p>
         </div>
 
         {kind === "mock" && (
           <div className="space-y-2">
             <Label htmlFor="openingCash" className="text-xs text-muted-foreground">
-              Starting money
+              {t.portfolios.startingMoney}
             </Label>
             <Input
               id="openingCash"
@@ -236,7 +234,7 @@ export function PortfolioAdmin({
 
         <div className="sm:col-span-2">
           <Button type="submit" disabled={busy}>
-            {busy ? "Working…" : "Create portfolio"}
+            {busy ? t.portfolios.working : t.portfolios.create}
           </Button>
         </div>
       </form>

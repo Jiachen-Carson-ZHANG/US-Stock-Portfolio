@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/http/origin";
 import { requirePortfolioApi } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { recordActivity } from "@/lib/activity";
@@ -31,6 +32,8 @@ async function portfolioContext(portfolioId: string): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   const access = await requirePortfolioApi(portfolioSlugFrom(request));
   if ("response" in access) return access.response;
   const user = access.user;
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
     );
 
     const db = await getDb();
-    await saveAiNote(db, parsed.data.symbol, text);
+    await saveAiNote(db, access.portfolio.id, parsed.data.symbol, text);
     await recordActivity(db, {
       userId: user.id,
       username: user.username,

@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/http/origin";
 import { cookies } from "next/headers";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -21,6 +22,8 @@ import { changePasswordSchema } from "@/lib/schemas";
  * so a password is never silently changed by another family member.
  */
 export async function POST(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   const user = await authenticateRequest();
   if (!user) return unauthorized();
 

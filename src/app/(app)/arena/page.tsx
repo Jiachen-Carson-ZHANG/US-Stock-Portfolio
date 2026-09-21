@@ -5,11 +5,13 @@ import { trophiesFor } from "@/lib/arena/trophies";
 import { visibleTo } from "@/lib/portfolios";
 import { ArenaBoard } from "@/components/arena/board";
 import { EmptyState } from "@/components/ui/misc";
+import { serverDictionary } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ArenaPage() {
   const user = await requireUser();
+  const { t } = await serverDictionary();
   const db = await getDb();
   const boards = await allLeaderboards(db, user);
   const visible = await visibleTo(db, user);
@@ -18,10 +20,10 @@ export default async function ArenaPage() {
   if (boards.max.standings.length < 2) {
     return (
       <div className="space-y-6">
-        <h1 className="text-lg font-semibold tracking-tight">Arena</h1>
+        <h1 className="text-lg font-semibold tracking-tight">{t.arena.title}</h1>
         <EmptyState
-          title="Nobody to compete with yet"
-          description="The Arena ranks every portfolio you can see. It appears once there is more than one."
+          title={t.arena.emptyTitle}
+          description={t.arena.emptyBody}
         />
       </div>
     );

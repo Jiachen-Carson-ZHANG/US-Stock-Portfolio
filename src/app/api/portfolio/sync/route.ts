@@ -1,16 +1,18 @@
+import { rejectCrossOrigin } from "@/lib/http/origin";
 import { recordActivity } from "@/lib/activity";
 import { getDb } from "@/lib/db";
-import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
+import { requirePortfolioApi } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { logger } from "@/lib/logger";
 import { syncPositions } from "@/lib/portfolio/sync";
 import { activeProvider, getBrokerProvider } from "@/providers";
 
 export async function POST(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   const context = await requirePortfolioApi(portfolioSlugFrom(request));
   if ("response" in context) return context.response;
-  const denied = requireWritable(context);
-  if (denied) return denied.response;
+  // Broker synchronization reads upstream data; every authorized reader may request it.
 
   const portfolioId = context.portfolio.id;
   const provider = await activeProvider(portfolioId);

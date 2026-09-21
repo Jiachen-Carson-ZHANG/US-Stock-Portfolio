@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logger } from "@/lib/logger";
 import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
@@ -5,10 +6,13 @@ import { authorizeUrl, createPkcePair, createState } from "@/lib/moomoo/oauth";
 import { redirectUri, storePendingFlow } from "@/lib/moomoo/flow";
 
 export async function POST(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   // Connecting a broker is a write against your own portfolio. Anyone may do
   // it for theirs; nobody may do it for somebody else's.
   const context = await requirePortfolioApi(portfolioSlugFrom(request));
   if ("response" in context) return context.response;
+  if (context.portfolio.kind !== "broker") return Response.json({ error: "Mock accounts cannot connect a broker" }, { status: 400 });
   const denied = requireWritable(context);
   if (denied) return denied.response;
 

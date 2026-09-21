@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   return Response.json({
     entries: await withQuotes(
       context.portfolio.id,
-      await readWatchlist(await getDb()),
+      await readWatchlist(await getDb(), context.portfolio.id),
     ),
   });
 }

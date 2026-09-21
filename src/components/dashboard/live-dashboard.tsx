@@ -54,8 +54,8 @@ export function LiveDashboard({
             // left wondering whether trading is broken or forbidden.
             <p className="text-xs text-muted-foreground">
               {ownerName
-                ? `Only ${ownerName} can trade in this account.`
-                : "Only this account's owner can trade in it."}
+                ? `${ownerName} ${t.mockTrade.onlyOwnerCanTrade}`
+                : t.mockTrade.onlyOwnerCanTradeGeneric}
             </p>
           )}
           {canWrite && !isMock && (
@@ -74,9 +74,7 @@ export function LiveDashboard({
 
       {isMock && data.positions.filter((p) => p.instrumentType !== "cash").length === 0 && (
         <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
-          {canWrite
-            ? "Nothing bought yet. Press Trade, type a ticker and a number of shares — real prices, practice money."
-            : "Nothing bought yet."}
+          {canWrite ? t.mockTrade.nothingYetOwner : t.mockTrade.nothingYet}
         </p>
       )}
 

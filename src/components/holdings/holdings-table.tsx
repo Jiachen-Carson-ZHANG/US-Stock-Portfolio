@@ -7,7 +7,8 @@ import { formatMoney } from "@/lib/money";
 import { spreadPrices } from "@/lib/portfolio/chart-data";
 import { usePortfolioBase } from "@/lib/portfolios/path";
 import { cn, signClass } from "@/lib/utils";
-import { useT } from "@/lib/i18n/context";
+import { useLocale, useT } from "@/lib/i18n/context";
+import { localizedName } from "@/lib/i18n/symbols";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { MoneyDTO, PositionView } from "@/types/portfolio";
 import type { OptionGroupDTO, OptionStrategy } from "@/lib/portfolio/options";
@@ -230,6 +231,7 @@ export function HoldingsTable({
   optionGroups: OptionGroupDTO[];
 }) {
   const t = useT();
+  const locale = useLocale();
   const base = usePortfolioBase();
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = buildHoldingRows(positions, optionGroups);
@@ -367,9 +369,9 @@ export function HoldingsTable({
                           {p.symbol}
                         </Link>
                       )}
-                      {p.name && (
+                      {localizedName(p.symbol, p.name, locale) && (
                         <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {p.name}
+                          {localizedName(p.symbol, p.name, locale)}
                         </span>
                       )}
                     </th>
@@ -443,7 +445,8 @@ export function HoldingsTable({
           const title = isGroup ? row.group.underlying : row.position.symbol;
           const subtitle = isGroup
             ? `${strategyLabel(t, row.group.strategy)} · ${row.group.expirationDate ?? ""}`
-            : (row.position.name ?? typeLabel(t, row.position));
+            : (localizedName(row.position.symbol, row.position.name, locale) ??
+              typeLabel(t, row.position));
           const value = isGroup ? row.group.netMarketValue : row.position.marketValue;
           const unrealized = isGroup
             ? row.group.unrealizedPnL

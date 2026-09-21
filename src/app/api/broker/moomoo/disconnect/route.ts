@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/http/origin";
 import { recordActivity } from "@/lib/activity";
 import { getDb } from "@/lib/db";
 import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
@@ -10,8 +11,11 @@ import { deleteConnection } from "@/lib/moomoo/tokens";
 // to an administrator: the person whose brokerage it is must be able to cut
 // the link themselves, from their own page, without asking anyone.
 export async function POST(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   const context = await requirePortfolioApi(portfolioSlugFrom(request));
   if ("response" in context) return context.response;
+  if (context.portfolio.kind !== "broker") return Response.json({ error: "Mock accounts cannot connect a broker" }, { status: 400 });
   const denied = requireWritable(context);
   if (denied) return denied.response;
 

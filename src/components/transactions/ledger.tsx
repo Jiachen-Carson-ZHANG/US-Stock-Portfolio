@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, useT } from "@/lib/i18n/context";
+import { localizedName } from "@/lib/i18n/symbols";
 import { formatMoney } from "@/lib/money";
 import { cn, signClass } from "@/lib/utils";
 
@@ -16,13 +18,6 @@ export type LedgerEntry = {
   amount: number;
   /** Profit taken on this sale, when it closed something. */
   realized: number | null;
-};
-
-const KIND_LABEL: Record<LedgerEntry["kind"], string> = {
-  buy: "Buy",
-  sell: "Sell",
-  deposit: "Paid in",
-  withdrawal: "Withdrawn",
 };
 
 type Filter = "all" | "trades" | "transfers";
@@ -42,6 +37,8 @@ export function Ledger({
   entries: LedgerEntry[];
   currency: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -56,6 +53,13 @@ export function Ledger({
     });
   }, [entries, filter, query]);
 
+  const kindLabel: Record<LedgerEntry["kind"], string> = {
+    buy: t.ledger.buy,
+    sell: t.ledger.sell,
+    deposit: t.ledger.depositLabel,
+    withdrawal: t.ledger.withdrawalLabel,
+  };
+
   const money = (value: number) =>
     formatMoney({ amount: String(value), currency }, { signed: true });
 
@@ -69,41 +73,41 @@ export function Ledger({
             onClick={() => setFilter(option)}
             aria-pressed={filter === option}
             className={cn(
-              "min-h-9 rounded-lg px-3 text-sm capitalize transition-colors",
+              "min-h-9 rounded-lg px-3 text-sm transition-colors",
               filter === option
                 ? "bg-muted font-medium text-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {option}
+            {t.ledger[option]}
           </button>
         ))}
 
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Filter by symbol"
-          aria-label="Filter by symbol"
+          placeholder={t.ledger.filterBySymbol}
+          aria-label={t.ledger.filterBySymbol}
           className="ml-auto min-h-9 w-40 rounded-lg border border-border bg-background px-3 text-sm"
         />
       </div>
 
       {shown.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface px-4 py-6 text-center text-sm text-muted-foreground">
-          Nothing matches that.
+          {t.ledger.nothingMatches}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface">
           <table className="w-full min-w-[40rem] text-sm">
-            <caption className="sr-only">Every trade and transfer</caption>
+            <caption className="sr-only">{t.nav.transactions}</caption>
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-                <th scope="col" className="px-4 py-3 text-left font-medium">Date</th>
-                <th scope="col" className="px-4 py-3 text-left font-medium">What</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Qty</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Price</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Cash</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Result</th>
+                <th scope="col" className="px-4 py-3 text-left font-medium">{t.ledger.date}</th>
+                <th scope="col" className="px-4 py-3 text-left font-medium">{t.ledger.what}</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">{t.ledger.qty}</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">{t.ledger.price}</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">{t.ledger.cash}</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">{t.ledger.result}</th>
               </tr>
             </thead>
             <tbody>
@@ -125,11 +129,20 @@ export function Ledger({
                               : "text-negative",
                         )}
                       >
-                        {KIND_LABEL[entry.kind]}
+                        {kindLabel[entry.kind]}
                       </span>
-                      {entry.symbol ?? (
+                      {entry.symbol ? (
+                        <>
+                          {entry.symbol}
+                          {localizedName(entry.symbol, entry.name ?? undefined, locale) && (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              {localizedName(entry.symbol, entry.name ?? undefined, locale)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
                         <span className="font-normal text-muted-foreground">
-                          {entry.name ?? "Bank transfer"}
+                          {entry.name ?? t.transfers.bankTransfer}
                         </span>
                       )}
                     </th>
@@ -161,8 +174,7 @@ export function Ledger({
       )}
 
       <p className="text-xs text-muted-foreground">
-        Result is the profit taken on a sale, against the average cost of what
-        it closed. A purchase realizes nothing, and a transfer is not a gain.
+        {t.ledger.resultNote}
       </p>
     </div>
   );

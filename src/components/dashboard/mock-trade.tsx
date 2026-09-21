@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { useT } from "@/lib/i18n/context";
 
 /**
  * Buying and selling in a mock portfolio.
@@ -13,6 +14,7 @@ import { Input, Label } from "@/components/ui/field";
  * what is comfortable to type.
  */
 export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -43,14 +45,14 @@ export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
     setBusy(false);
 
     if (!response.ok) {
-      setMessage({ tone: "bad", text: body.error ?? "Could not place the trade." });
+      setMessage({ tone: "bad", text: body.error ?? t.mockTrade.failed });
       return;
     }
 
     form.reset();
     setMessage({
       tone: "ok",
-      text: `Filled at ${body.price}. Cash now ${body.cash}.`,
+      text: `${t.mockTrade.filledAt} ${body.price} · ${t.mockTrade.cashNow} ${body.cash}`,
     });
     router.refresh();
   }
@@ -58,7 +60,7 @@ export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
   if (!open) {
     return (
       <Button size="sm" onClick={() => setOpen(true)}>
-        Trade
+        {t.mockTrade.trade}
       </Button>
     );
   }
@@ -68,29 +70,28 @@ export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
       onSubmit={submit}
       className="w-full max-w-md space-y-3 rounded-xl border border-border bg-surface p-4"
     >
-      <p className="text-sm font-medium">Mock trade</p>
+      <p className="text-sm font-medium">{t.mockTrade.title}</p>
       <p className="text-xs text-muted-foreground">
-        No real money moves. Prices are live, so a fill is what you would
-        actually have paid.
+        {t.mockTrade.note}
       </p>
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="trade-side" className="text-xs text-muted-foreground">
-            Side
+            {t.mockTrade.side}
           </Label>
           <select
             id="trade-side"
             name="side"
             className="min-h-11 w-full rounded-xl border border-border bg-background px-2 text-base"
           >
-            <option value="buy">Buy</option>
-            <option value="sell">Sell</option>
+            <option value="buy">{t.mockTrade.buy}</option>
+            <option value="sell">{t.mockTrade.sell}</option>
           </select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="trade-symbol" className="text-xs text-muted-foreground">
-            Symbol
+            {t.mockTrade.symbol}
           </Label>
           <Input
             id="trade-symbol"
@@ -103,7 +104,7 @@ export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="trade-quantity" className="text-xs text-muted-foreground">
-            Shares
+            {t.mockTrade.shares}
           </Label>
           <Input
             id="trade-quantity"
@@ -126,10 +127,10 @@ export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
 
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={busy}>
-          {busy ? "Placing…" : "Place trade"}
+          {busy ? t.mockTrade.placing : t.mockTrade.place}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-          Close
+          {t.mockTrade.close}
         </Button>
       </div>
     </form>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { useT } from "@/lib/i18n/context";
 
 const MIN_LENGTH = 10;
 
@@ -16,6 +17,7 @@ type Result = { tone: "ok" | "bad"; message: string };
  * second copy of the password on the wire.
  */
 export function ChangePassword() {
+  const t = useT();
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
@@ -28,14 +30,11 @@ export function ChangePassword() {
     const confirmPassword = String(data.get("confirmPassword") ?? "");
 
     if (newPassword !== confirmPassword) {
-      setResult({ tone: "bad", message: "The two new passwords do not match." });
+      setResult({ tone: "bad", message: t.account.mismatch });
       return;
     }
     if (newPassword.length < MIN_LENGTH) {
-      setResult({
-        tone: "bad",
-        message: `Use at least ${MIN_LENGTH} characters.`,
-      });
+      setResult({ tone: "bad", message: t.account.tooShort });
       return;
     }
 
@@ -51,19 +50,14 @@ export function ChangePassword() {
     setPending(false);
 
     if (!response.ok) {
-      setResult({ tone: "bad", message: body.error ?? "Could not change the password." });
+      setResult({ tone: "bad", message: body.error ?? t.account.changeFailed });
       return;
     }
 
     form.reset();
     setResult({
       tone: "ok",
-      message:
-        body.revoked > 0
-          ? `Password changed. Signed out of ${body.revoked} other session${
-              body.revoked === 1 ? "" : "s"
-            }.`
-          : "Password changed.",
+      message: body.revoked > 0 ? t.account.changedAndRevoked : t.account.changed,
     });
   }
 
@@ -74,7 +68,7 @@ export function ChangePassword() {
 
       <div className="space-y-2">
         <Label htmlFor="currentPassword" className="text-xs text-muted-foreground">
-          Current password
+          {t.account.currentPassword}
         </Label>
         <Input
           id="currentPassword"
@@ -87,7 +81,7 @@ export function ChangePassword() {
 
       <div className="space-y-2">
         <Label htmlFor="newPassword" className="text-xs text-muted-foreground">
-          New password
+          {t.account.newPassword}
         </Label>
         <Input
           id="newPassword"
@@ -98,13 +92,13 @@ export function ChangePassword() {
           required
         />
         <p className="text-xs text-muted-foreground">
-          At least {MIN_LENGTH} characters. Length matters more than symbols.
+          {t.account.lengthHint}
         </p>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="confirmPassword" className="text-xs text-muted-foreground">
-          Confirm new password
+          {t.account.confirmPassword}
         </Label>
         <Input
           id="confirmPassword"
@@ -130,7 +124,7 @@ export function ChangePassword() {
       )}
 
       <Button type="submit" disabled={pending}>
-        {pending ? "Changing…" : "Change password"}
+        {pending ? t.account.changing : t.account.change}
       </Button>
     </form>
   );

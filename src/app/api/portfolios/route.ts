@@ -1,3 +1,4 @@
+import { rejectCrossOrigin } from "@/lib/http/origin";
 import { recordActivity } from "@/lib/activity";
 import { requireApiOwner } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
@@ -35,6 +36,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   const auth = await requireApiOwner();
   if ("response" in auth) return auth.response;
 
@@ -96,6 +99,8 @@ export async function POST(request: Request) {
 
 /** Grants or removes one person's access to one portfolio. */
 export async function PATCH(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
   const auth = await requireApiOwner();
   if ("response" in auth) return auth.response;
 

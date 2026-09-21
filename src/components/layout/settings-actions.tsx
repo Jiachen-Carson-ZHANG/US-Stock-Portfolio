@@ -12,7 +12,7 @@ type AdminUser = {
   activeSessions: number;
 };
 
-export function SyncButton() {
+export function SyncButton({ portfolioSlug }: { portfolioSlug?: string } = {}) {
   const router = useRouter();
   const [state, setState] = useState<{ pending: boolean; message: string | null }>({
     pending: false,
@@ -21,7 +21,7 @@ export function SyncButton() {
 
   async function sync() {
     setState({ pending: true, message: null });
-    const response = await fetch("/api/portfolio/sync", { method: "POST" });
+    const response = await fetch(`/api/portfolio/sync${portfolioSlug ? `?portfolio=${encodeURIComponent(portfolioSlug)}` : ""}`, { method: "POST" });
     const data = await response.json().catch(() => ({}));
 
     setState({
@@ -45,7 +45,7 @@ export function SyncButton() {
   );
 }
 
-export function MoomooConnection({ connected }: { connected: boolean }) {
+export function MoomooConnection({ connected, portfolioSlug }: { connected: boolean; portfolioSlug?: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function MoomooConnection({ connected }: { connected: boolean }) {
     setPending(true);
     setError(null);
 
-    const response = await fetch("/api/broker/moomoo/connect", { method: "POST" });
+    const response = await fetch(`/api/broker/moomoo/connect${portfolioSlug ? `?portfolio=${encodeURIComponent(portfolioSlug)}` : ""}`, { method: "POST" });
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || !data.authorizeUrl) {
@@ -68,7 +68,12 @@ export function MoomooConnection({ connected }: { connected: boolean }) {
 
   async function disconnect() {
     setPending(true);
-    await fetch("/api/broker/moomoo/disconnect", { method: "POST" });
+    const response = await fetch(`/api/broker/moomoo/disconnect${portfolioSlug ? `?portfolio=${encodeURIComponent(portfolioSlug)}` : ""}`, { method: "POST" });
+    if (!response.ok) {
+      setError("Could not disconnect. Please try again.");
+      setPending(false);
+      return;
+    }
     setPending(false);
     router.refresh();
   }

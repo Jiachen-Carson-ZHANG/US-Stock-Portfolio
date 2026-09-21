@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/guards";
 import { EmptyState } from "@/components/ui/misc";
+import { serverDictionary } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +10,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function NoPortfolioPage() {
   const user = await requireUser();
+  const { t } = await serverDictionary();
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold tracking-tight">Nothing to show yet</h1>
+      <h1 className="text-lg font-semibold tracking-tight">{t.access.noPortfolioTitle}</h1>
       <EmptyState
-        title={`No portfolio is shared with ${user.displayName}`}
-        description="Ask whoever set this up to share one with you, or to create your own. Your sign-in works — there is just nothing attached to it."
+        title={user.displayName}
+        description={t.access.noPortfolioBody}
       />
     </div>
   );

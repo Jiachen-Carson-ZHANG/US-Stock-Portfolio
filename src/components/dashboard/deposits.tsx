@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { useT } from "@/lib/i18n/context";
 import { formatMoney } from "@/lib/money";
 
 /**
@@ -21,6 +22,7 @@ export function AddDeposit({
   portfolioSlug: string;
   currency: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,7 +36,7 @@ export function AddDeposit({
     const withdrawal = data.get("direction") === "out";
 
     if (!Number.isFinite(amount) || amount === 0) {
-      setError("Enter an amount.");
+      setError(t.transfers.enterAmount);
       return;
     }
 
@@ -49,7 +51,7 @@ export function AddDeposit({
           action: "flow",
           date: String(data.get("date") ?? ""),
           amount: withdrawal ? -Math.abs(amount) : Math.abs(amount),
-          note: String(data.get("note") ?? "") || "Bank transfer",
+          note: String(data.get("note") ?? "") || t.transfers.bankTransfer,
         }),
       },
     );
@@ -57,7 +59,7 @@ export function AddDeposit({
     setBusy(false);
 
     if (!response.ok) {
-      setError(body.error ?? "Could not record it.");
+      setError(body.error ?? t.transfers.failed);
       return;
     }
     form.reset();
@@ -68,7 +70,7 @@ export function AddDeposit({
   if (!open) {
     return (
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        Record a transfer
+        {t.transfers.record}
       </Button>
     );
   }
@@ -78,16 +80,15 @@ export function AddDeposit({
       onSubmit={submit}
       className="w-full max-w-md space-y-3 rounded-xl border border-border bg-surface p-4"
     >
-      <p className="text-sm font-medium">Money in or out</p>
+      <p className="text-sm font-medium">{t.transfers.title}</p>
       <p className="text-xs text-muted-foreground">
-        Transfers are the only thing the broker does not tell us. Recording
-        them is what keeps the return figures honest.
+        {t.transfers.note}
       </p>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="deposit-date" className="text-xs text-muted-foreground">
-            Date
+            {t.transfers.date}
           </Label>
           <Input
             id="deposit-date"
@@ -99,7 +100,7 @@ export function AddDeposit({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="deposit-amount" className="text-xs text-muted-foreground">
-            Amount ({currency})
+            {t.transfers.amount} ({currency})
           </Label>
           <Input
             id="deposit-amount"
@@ -113,23 +114,23 @@ export function AddDeposit({
 
       <div className="space-y-1.5">
         <Label htmlFor="deposit-direction" className="text-xs text-muted-foreground">
-          Direction
+          {t.transfers.direction}
         </Label>
         <select
           id="deposit-direction"
           name="direction"
           className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
         >
-          <option value="in">Paid in</option>
-          <option value="out">Withdrawn</option>
+          <option value="in">{t.transfers.paidIn}</option>
+          <option value="out">{t.transfers.withdrawn}</option>
         </select>
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="deposit-note" className="text-xs text-muted-foreground">
-          Note
+          {t.transfers.noteLabel}
         </Label>
-        <Input id="deposit-note" name="note" placeholder="Bank transfer" />
+        <Input id="deposit-note" name="note" placeholder={t.transfers.bankTransfer} />
       </div>
 
       {error && (
@@ -140,10 +141,10 @@ export function AddDeposit({
 
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={busy}>
-          {busy ? "Recording…" : "Record"}
+          {busy ? t.transfers.recording : t.transfers.submit}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-          Cancel
+          {t.common.cancel}
         </Button>
       </div>
     </form>
@@ -166,6 +167,7 @@ export function ReconciliationBanner({
   currency: string;
   threshold?: number;
 }) {
+  const t = useT();
   if (Math.abs(residual) < threshold) return null;
 
   const amount = formatMoney({ amount: String(Math.abs(residual)), currency });
@@ -175,11 +177,11 @@ export function ReconciliationBanner({
       role="status"
       className="rounded-lg border border-chart-4/40 bg-chart-4/5 px-4 py-3 text-sm"
     >
-      <strong className="font-medium">{amount}</strong> of this account cannot
-      be explained by the trades and transfers on record
-      {residual > 0 ? " — more than expected" : " — less than expected"}. The
-      usual cause is a transfer that has not been entered. Dividends and fees
-      also land here, so a small figure is normal.
+      <strong className="font-medium">{amount}</strong> {t.transfers.unexplained}
+      {residual > 0
+        ? ` — ${t.transfers.moreThanExpected}. `
+        : ` — ${t.transfers.lessThanExpected}. `}
+      {t.transfers.unexplainedHint}
     </p>
   );
 }
