@@ -5,12 +5,20 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n/context";
 import type { PortfolioSummary } from "@/types/portfolio";
 
+/**
+ * The viewer's own clock, with the zone named.
+ *
+ * Everyone reading this is on UTC+8 today, but a bare "05:25:10 PM" beside a
+ * US market status invites reading it as New York time. Naming the zone costs
+ * a few characters and removes the question.
+ */
 function clockTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    timeZoneName: "short",
   });
 }
 

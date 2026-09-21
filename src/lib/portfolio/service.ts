@@ -88,7 +88,7 @@ export function netDeposits(currency: string): Money | null {
 }
 
 function positionTtlSeconds(): number {
-  return Number(process.env.POSITION_CACHE_SECONDS ?? 60);
+  return Number(process.env.POSITION_CACHE_SECONDS ?? 30);
 }
 
 /**

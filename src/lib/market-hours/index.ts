@@ -50,9 +50,27 @@ export function isMarketOpen(now: Date = new Date()): boolean {
   return marketSession(now) === "regular";
 }
 
-/** Quote poll interval in ms — tighter while the regular session is live (§15). */
-export function quotePollIntervalMs(session: MarketSession): number {
-  return session === "regular" ? 20_000 : 180_000;
+/**
+ * How often to re-ask the server, or null to stop entirely.
+ *
+ * Nothing moves when the market is closed, so polling then spends the broker's
+ * rate limit and the family's battery to re-fetch a number that cannot have
+ * changed. The page already says "Market closed · Last updated", which is the
+ * honest thing to show instead.
+ *
+ * Extended hours do move, just thinly, so they poll at a slower cadence than
+ * the regular session rather than not at all.
+ */
+export function quotePollIntervalMs(session: MarketSession): number | null {
+  switch (session) {
+    case "regular":
+      return 5_000;
+    case "pre-market":
+    case "after-hours":
+      return 30_000;
+    case "closed":
+      return null;
+  }
 }
 
 export function marketSessionLabel(session: MarketSession): string {

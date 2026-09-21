@@ -35,8 +35,20 @@ describe("US market sessions", () => {
     expect(marketSession(new Date("2026-09-20T15:00:00Z"))).toBe("closed");
   });
 
-  it("polls faster while the regular session is live", () => {
-    expect(quotePollIntervalMs("regular")).toBeLessThan(quotePollIntervalMs("closed"));
+  it("stops polling once the market is closed", () => {
+    // Nothing can move, so re-asking spends the broker's rate limit to learn
+    // the same number.
+    expect(quotePollIntervalMs("closed")).toBeNull();
+  });
+
+  it("polls fastest in the regular session and slower in extended hours", () => {
+    const regular = quotePollIntervalMs("regular");
+    const pre = quotePollIntervalMs("pre-market");
+    const after = quotePollIntervalMs("after-hours");
+    expect(regular).not.toBeNull();
+    expect(pre).not.toBeNull();
+    expect(regular!).toBeLessThan(pre!);
+    expect(after).toBe(pre);
   });
 
   it("reports the market-local date, not the UTC date", () => {

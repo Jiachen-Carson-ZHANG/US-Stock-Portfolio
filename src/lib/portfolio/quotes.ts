@@ -22,7 +22,7 @@ export type QuoteResult = {
 };
 
 function cacheTtlSeconds(): number {
-  return Number(process.env.QUOTE_CACHE_SECONDS ?? 15);
+  return Number(process.env.QUOTE_CACHE_SECONDS ?? 5);
 }
 
 function toQuote(row: QuoteRow): Quote {

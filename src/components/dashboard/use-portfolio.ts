@@ -67,10 +67,15 @@ export function usePortfolio(initial: LivePortfolio) {
     function schedule() {
       clearTimeout(timer);
       if (document.visibilityState === "hidden") return;
+      // Null means the market is closed and the number cannot change. The
+      // manual refresh button still works, and re-showing the tab still
+      // re-checks once in case the session has opened since.
+      const interval = quotePollIntervalMs(data.summary.marketStatus);
+      if (interval === null) return;
       timer = setTimeout(async () => {
         await refresh();
         schedule();
-      }, quotePollIntervalMs(data.summary.marketStatus));
+      }, interval);
     }
 
     function onVisibility() {

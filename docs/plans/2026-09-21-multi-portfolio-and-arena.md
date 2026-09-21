@@ -207,6 +207,22 @@ Everyone with a portfolio, paper or real, appears in one ranking.
 What is deliberately dropped: nominations, sealed predictions, savings goals,
 the quiz. They can come back individually if missed.
 
+### What the Arena must not show
+
+Ranking the family against each other means each of them can see the others'
+page. Account sizes are nobody else's business — a paper account starting at
+$10,000 next to a real one at $22,000 invites exactly the comparison this is
+meant to avoid.
+
+So the Arena shows **percentages and an index only**: return over the period,
+the indexed curve from 100, rank and trophies. No account value, no position
+sizes, no cash balance, no dollar P&L. The portfolio pages keep their real
+figures and stay behind the same access rule as before — the Arena is a view
+over them, not a hole in them.
+
+That also makes the comparison meaningful, since a percentage is the only
+thing comparable across accounts of different sizes.
+
 ### Fairness
 
 Ranking by percentage return means a $10,000 paper account and a $22,000 real
