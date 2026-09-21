@@ -6,6 +6,16 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(512),
 });
 
+/**
+ * A minimum length rather than a character-class rule: length is what actually
+ * resists guessing, and forcing a symbol mostly produces "Password1!". The
+ * confirmation is checked in the form, not here, so the API stays one object.
+ */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(512),
+  newPassword: z.string().min(10, "Use at least 10 characters").max(512),
+});
+
 export const activitySchema = z.object({
   kind: z.enum(["view_position", "view_page", "watchlist_add", "watchlist_remove"]),
   target: z.string().trim().max(64).optional(),

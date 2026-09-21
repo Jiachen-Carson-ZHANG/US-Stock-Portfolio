@@ -4,6 +4,7 @@ import type { DB } from "@/lib/db";
 export type ActivityKind =
   | "login"
   | "logout"
+  | "password_change"
   | "view_position"
   | "view_page"
   | "watchlist_add"

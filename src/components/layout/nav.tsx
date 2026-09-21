@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   MessagesSquare,
   LineChart,
+  UserRound,
   Languages,
   Receipt,
   Settings,
@@ -25,6 +26,7 @@ const ITEMS = [
   { href: "/transactions", key: "transactions", icon: Receipt, ownerOnly: false },
   { href: "/watchlist", key: "watchlist", icon: Star, ownerOnly: false },
   { href: "/family", key: "family", icon: MessagesSquare, ownerOnly: false },
+  { href: "/account", key: "account", icon: UserRound, ownerOnly: false },
   { href: "/settings", key: "settings", icon: Settings, ownerOnly: true },
 ] as const;
 

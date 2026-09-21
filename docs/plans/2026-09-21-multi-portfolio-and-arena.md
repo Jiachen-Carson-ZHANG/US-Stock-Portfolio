@@ -267,3 +267,65 @@ connection.
 
 **Paper trades need a fresh quote.** Filling at a stale price is how a game
 stops being interesting. The fifteen-minute rule already exists; keep it.
+
+---
+
+## Accounts, secrets, and what "only they can see it" can actually mean
+
+Carson's requirement: each person's password and broker token should be theirs
+alone, unreadable even by the project owner. Part of that is already true, part
+is achievable, and part is not achievable while one person runs the server.
+Worth stating precisely, because the gap is easy to mistake for a bug later.
+
+**Passwords are already safe.** They are stored as Argon2id hashes
+(`src/lib/auth/password.ts`, m=19456 t=2 p=1). Nobody reads them back —
+not Carson, not anyone holding the database. This needs no change.
+
+**Changing your own password does not exist yet.** There is no route, no form,
+no server action; the only way a password changes is `seed.ts --reset-passwords`
+run from a terminal with `SEED_*` set. So today Carson sets everyone's password
+and they cannot change it, which is exactly backwards.
+
+Build: a signed-in user posts current + new password, the current one is
+verified, the new hash is written, and every *other* session of theirs is
+revoked. Owners get no ability to read a password, only to disable an account.
+Log it to `activity_events` so a change is visible after the fact.
+
+**The broker token cannot be hidden from whoever runs the server.** It is
+encrypted at rest with `TOKEN_ENCRYPTION_KEY`, which lives in the deployment's
+environment. Anyone who can read that environment can decrypt any token in the
+table. That is Carson, on both Vercel and EdgeOne.
+
+The only way to change that is to derive the encryption key from the user's own
+password, so the server holds ciphertext it cannot open unless that person is
+signed in. The cost is severe and structural: background sync, snapshots, the
+monthly reconstruction and any cron would stop working for anyone not currently
+logged in, because the server could no longer reach their broker. For a family
+dashboard whose entire premise is that the data is there when someone opens it,
+that trade is not worth making.
+
+So the honest position is: **the server can act as any connected account, and
+the person who controls the server controls the token.** What limits it is
+scope and evidence, not cryptography —
+
+- moomoo tokens are requested read-only; they cannot place a trade.
+- `portfolio_access` (above) keeps *family members* out of each other's data.
+- Every broker refresh and every admin action lands in `activity_events`.
+- Revoking access is one click in moomoo, on the person's own device, and does
+  not depend on trusting this app.
+
+That should be written into the app where people connect their account, not
+left implicit. A person deciding whether to link a brokerage deserves to read
+it before they click, not discover it afterwards.
+
+**Database access is the same story.** `DATABASE_URL` grants full read/write to
+every table; Neon's `neondb_owner` role has no row-level restrictions. Access
+control in this app is enforced in application code, not in the database. Anyone
+with the connection string bypasses all of it. Keep the string in the two
+deployment environments and nowhere else, and rotate it whenever it is exposed.
+
+**`TOTAL_DEPOSITS` is still load-bearing** (`service.ts:80`) even though
+`analysis_flows` now holds the same $22,100 with dates and reconciles to the
+cent. The env var should be retired in favour of summing the ledger per
+portfolio — it cannot survive multi-portfolio anyway, since one global number
+cannot describe several accounts.

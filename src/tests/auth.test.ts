@@ -8,6 +8,7 @@ vi.mock("next/headers", () => ({
 }));
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/lib/db/testing";
+import { changePasswordSchema } from "@/lib/schemas";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import {
   MAX_FAILED_ATTEMPTS,
@@ -18,6 +19,7 @@ import {
 import {
   createSession,
   revokeAllSessionsForUser,
+  revokeOtherSessionsForUser,
   revokeSession,
   validateSession,
   type UserRole,
@@ -206,5 +208,76 @@ describe("login page without a database", () => {
       if (previous === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = previous;
     }
+  });
+});
+
+describe("revoking other sessions", () => {
+  it("keeps the caller signed in and closes their other devices", async () => {
+    const userId = await addUser("viewer", "mile");
+    const phone = await createSession(db, userId);
+    const laptop = await createSession(db, userId);
+    const tablet = await createSession(db, userId);
+
+    const revoked = await revokeOtherSessionsForUser(db, userId, laptop.token);
+
+    expect(revoked).toBe(2);
+    expect(await validateSession(db, laptop.token)).not.toBeNull();
+    expect(await validateSession(db, phone.token)).toBeNull();
+    expect(await validateSession(db, tablet.token)).toBeNull();
+  });
+
+  it("leaves other people's sessions alone", async () => {
+    const mile = await addUser("viewer", "mile");
+    const carson = await addUser("owner", "carson");
+    const hers = await createSession(db, mile);
+    const his = await createSession(db, carson);
+
+    await revokeOtherSessionsForUser(db, mile, undefined);
+
+    expect(await validateSession(db, hers.token)).toBeNull();
+    expect(await validateSession(db, his.token)).not.toBeNull();
+  });
+
+  it("revokes every session when no token is spared", async () => {
+    const userId = await addUser("viewer", "zizhe");
+    const a = await createSession(db, userId);
+    const b = await createSession(db, userId);
+
+    expect(await revokeOtherSessionsForUser(db, userId, undefined)).toBe(2);
+    expect(await validateSession(db, a.token)).toBeNull();
+    expect(await validateSession(db, b.token)).toBeNull();
+  });
+});
+
+describe("password change rules", () => {
+  it("requires at least ten characters", () => {
+    const short = changePasswordSchema.safeParse({
+      currentPassword: "whatever",
+      newPassword: "short1",
+    });
+    expect(short.success).toBe(false);
+
+    const ok = changePasswordSchema.safeParse({
+      currentPassword: "whatever",
+      newPassword: "a-long-enough-one",
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("rejects an empty current password", () => {
+    const parsed = changePasswordSchema.safeParse({
+      currentPassword: "",
+      newPassword: "a-long-enough-one",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("changing a password does not make the old one work", async () => {
+    const first = await hashPassword("original-password");
+    const second = await hashPassword("replacement-password");
+
+    expect(await verifyPassword(first, "original-password")).toBe(true);
+    expect(await verifyPassword(second, "original-password")).toBe(false);
+    expect(await verifyPassword(second, "replacement-password")).toBe(true);
   });
 });

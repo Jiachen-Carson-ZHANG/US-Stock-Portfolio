@@ -117,3 +117,28 @@ export async function revokeAllSessionsForUser(
   );
   return result.changes;
 }
+
+/**
+ * Signs the user out everywhere except the device asking.
+ *
+ * Used when a password changes: whoever knew the old one may still be holding
+ * a live session, and rotating the password has to close those. The current
+ * session is spared so changing your password does not immediately log you
+ * out of the page you are standing on.
+ */
+export async function revokeOtherSessionsForUser(
+  db: DB,
+  userId: string,
+  keepToken: string | undefined,
+  now: Date = new Date(),
+): Promise<number> {
+  const result = await db.run(
+    `UPDATE sessions
+        SET revoked_at = ?
+      WHERE user_id = ?
+        AND revoked_at IS NULL
+        AND token_hash <> ?`,
+    [now.toISOString(), userId, keepToken ? hashToken(keepToken) : ""],
+  );
+  return result.changes;
+}
