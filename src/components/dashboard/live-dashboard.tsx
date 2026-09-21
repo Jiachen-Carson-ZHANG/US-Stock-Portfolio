@@ -52,9 +52,10 @@ export function LiveDashboard({
         <UnrealizedPnLBars
               positions={data.positions}
               optionGroups={data.optionGroups}
-              closedRealized={
+              realizedBySymbol={data.realizedBySymbol ?? {}}
+              unattributed={
                 Number(data.summary.realizedPnL.amount) -
-                data.positions.reduce((n, p) => n + (p.reportedRealizedPnL ?? 0), 0)
+                Object.values(data.realizedBySymbol ?? {}).reduce((n, v) => n + v, 0)
               }
             />
         <ConcentrationTiles data={data.concentration ?? concentration} />

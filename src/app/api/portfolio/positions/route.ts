@@ -5,8 +5,15 @@ export async function GET() {
   const user = await authenticateRequest();
   if (!user) return unauthorized();
 
-  const { positions, allocations, summary, totalInvested, optionGroups, concentration } =
-    await loadPortfolio();
+  const {
+    positions,
+    allocations,
+    summary,
+    totalInvested,
+    optionGroups,
+    concentration,
+    realizedBySymbol,
+  } = await loadPortfolio();
   return Response.json({
     positions,
     concentration,
@@ -14,5 +21,6 @@ export async function GET() {
     summary,
     totalInvested,
     optionGroups,
+    realizedBySymbol,
   });
 }

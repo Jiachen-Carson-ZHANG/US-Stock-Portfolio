@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconstruct, type PriceSeries } from "@/lib/portfolio/reconstruct";
+import { realizedBySymbol, reconstruct, type PriceSeries } from "@/lib/portfolio/reconstruct";
 import type { BrokerTransaction } from "@/types/broker";
 
 function fill(
@@ -159,5 +159,42 @@ describe("deposits that land off the series", () => {
     ];
     const out = reconstruct([], flows, prices({}), weekdays);
     expect(out[out.length - 1].netDeposits.toNumber()).toBe(2400);
+  });
+});
+
+describe("realized per symbol", () => {
+  it("attributes a profit to the name that earned it, even once sold out", () => {
+    const bySymbol = realizedBySymbol([
+      fill("2026-06-01", "buy", "AAA", 10, 100),
+      fill("2026-06-02", "sell", "AAA", 10, 110),
+    ]);
+    expect(bySymbol.get("AAA")).toBeCloseTo(100, 6);
+  });
+
+  it("keeps names apart", () => {
+    const bySymbol = realizedBySymbol([
+      fill("2026-06-01", "buy", "AAA", 10, 100),
+      fill("2026-06-01", "buy", "BBB", 10, 50),
+      fill("2026-06-02", "sell", "AAA", 10, 110),
+      fill("2026-06-02", "sell", "BBB", 10, 45),
+    ]);
+    expect(bySymbol.get("AAA")).toBeCloseTo(100, 6);
+    expect(bySymbol.get("BBB")).toBeCloseTo(-50, 6);
+  });
+
+  it("omits a name that has only ever been bought", () => {
+    expect(realizedBySymbol([fill("2026-06-01", "buy", "AAA", 10, 100)]).has("AAA")).toBe(false);
+  });
+
+  it("sums to the same realized the full replay reports", () => {
+    const fills = [
+      fill("2026-06-01", "buy", "AAA", 10, 100),
+      fill("2026-06-02", "sell", "AAA", 4, 110),
+      fill("2026-06-02", "sell", "BBB260101C00100000", 1, 8),
+      fill("2026-06-03", "buy", "BBB260101C00100000", 1, 6),
+    ];
+    const perSymbol = [...realizedBySymbol(fills).values()].reduce((a, b) => a + b, 0);
+    const replayed = reconstruct(fills, [], prices({}), days);
+    expect(perSymbol).toBeCloseTo(replayed[replayed.length - 1].realized.toNumber(), 6);
   });
 });

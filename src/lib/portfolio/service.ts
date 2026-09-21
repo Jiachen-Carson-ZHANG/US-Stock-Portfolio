@@ -38,6 +38,7 @@ import { money, toDTO } from "@/lib/money";
 import { getQuotes } from "./quotes";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
+import { realizedBySymbol } from "./reconstruct";
 import {
   lastTransactionSync,
   readTransactions,
@@ -61,6 +62,8 @@ export type PortfolioData = {
   totalInvested: MoneyDTO;
   optionGroups: OptionGroupDTO[];
   byAssetClass: AssetClassPerformance[];
+  /** Realized profit per symbol, replayed from the fills. */
+  realizedBySymbol: Record<string, number>;
 };
 
 export function baseCurrency(): string {
@@ -205,6 +208,11 @@ export async function loadPortfolio(
       toOptionGroupDTO(group, invested),
     ),
     byAssetClass: performanceByAssetClass(positions, currency),
+    // From the fills, which cover the whole account, rather than the broker's
+    // figure, which only covers positions still open.
+    realizedBySymbol: Object.fromEntries(
+      realizedBySymbol(await readTransactions(await getDb(), 5000)),
+    ),
   };
 }
 

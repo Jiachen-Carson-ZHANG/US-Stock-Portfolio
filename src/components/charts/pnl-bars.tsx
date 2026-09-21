@@ -39,20 +39,21 @@ import {
 export function UnrealizedPnLBars({
   positions,
   optionGroups,
-  closedRealized = 0,
+  realizedBySymbol = {},
+  unattributed = 0,
 }: {
   positions: PositionView[];
   optionGroups: OptionGroupDTO[];
-  /** Banked on holdings since sold, so the bars still reach total return. */
-  closedRealized?: number;
+  /** Realized per symbol, replayed from the fills. */
+  realizedBySymbol?: Record<string, number>;
+  /** What the fills cannot explain — dividends, interest, the gift share. */
+  unattributed?: number;
 }) {
   const t = useT();
-  const data = returnByHolding(
-    positions,
-    optionGroups,
-    closedRealized,
-    t.charts.closedPositions,
-  );
+  const data = returnByHolding(positions, optionGroups, realizedBySymbol, unattributed, {
+    closed: t.charts.closedPositions,
+    other: t.charts.unattributed,
+  });
   if (data.length === 0) return null;
 
   // Two series, so a legend is required: colour alone must not carry which

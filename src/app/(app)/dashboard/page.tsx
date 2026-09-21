@@ -16,7 +16,8 @@ export default async function DashboardPage() {
     concentration,
     totalInvested,
     optionGroups,
-  } = await loadPortfolio();
+    realizedBySymbol,
+} = await loadPortfolio();
 
   if (positions.length === 0) {
     return (
@@ -29,7 +30,7 @@ export default async function DashboardPage() {
 
   return (
     <LiveDashboard
-      initial={{ summary, positions, allocations, totalInvested, optionGroups }}
+      initial={{ summary, positions, allocations, totalInvested, optionGroups, realizedBySymbol }}
       concentration={concentration}
     />
   );

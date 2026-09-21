@@ -72,48 +72,60 @@ export type ReturnDatum = {
  * Both halves of each holding's result in one row: what it is still carrying
  * and what it has already banked.
  *
- * The broker reports realized only against positions still open, so the two
- * columns alone do not reach the portfolio's total return. `closedRealized`
- * carries the remainder — everything banked on holdings since sold, which is
- * $949 here and would otherwise simply vanish from the chart. With it the bars
- * sum to the total return on the summary card.
+ * Realized comes from replaying the fills rather than from the broker, which
+ * attributes it only to open positions. That is what lets a name sold out of
+ * — META, MRVL, LITE — appear under its own name instead of disappearing into
+ * an anonymous "closed positions" bar.
+ *
+ * `unattributed` carries whatever the fills cannot explain: the gift share and
+ * a few dollars of dividends and interest. It is shown rather than dropped, so
+ * the bars still sum to the total return on the summary card.
  */
 export function returnByHolding(
   positions: PositionView[],
   groups: OptionGroupDTO[],
-  closedRealized: number,
-  closedLabel: string,
+  realizedBySymbol: Record<string, number>,
+  unattributed: number,
+  labels: { closed: string; other: string },
 ): ReturnDatum[] {
   const legIds = new Set(
     groups.flatMap((g) => (g.legs as PositionView[]).map((leg) => leg.id)),
   );
-  const realizedOf = (p: PositionView) => p.reportedRealizedPnL ?? 0;
+  const accounted = new Set<string>();
 
-  const rows: ReturnDatum[] = [
+  const take = (symbol: string) => {
+    accounted.add(symbol);
+    return realizedBySymbol[symbol] ?? 0;
+  };
+
+  const rows: Omit<ReturnDatum, "total">[] = [
     ...positions
       .filter((p) => p.instrumentType !== "cash" && !legIds.has(p.id))
       .map((p) => ({
         symbol: p.symbol,
         unrealized: Number(p.unrealizedPnL.amount),
-        realized: realizedOf(p),
+        realized: take(p.symbol),
       })),
     ...groups.map((g) => ({
       symbol: `${g.underlying} ${g.expirationDate ?? ""}`.trim(),
       unrealized: Number(g.unrealizedPnL.amount),
-      realized: (g.legs as PositionView[]).reduce((n, l) => n + realizedOf(l), 0),
+      realized: (g.legs as PositionView[]).reduce((n, l) => n + take(l.symbol), 0),
     })),
-  ].map((r) => ({ ...r, total: r.unrealized + r.realized }));
+  ];
 
-  if (Math.abs(closedRealized) >= 0.005) {
-    rows.push({
-      symbol: closedLabel,
-      unrealized: 0,
-      realized: closedRealized,
-      total: closedRealized,
-    });
+  // Anything with a realized result and no position left is a name sold out
+  // of. It gets its own row, marked, rather than being bundled away.
+  for (const [symbol, amount] of Object.entries(realizedBySymbol)) {
+    if (accounted.has(symbol) || amount === 0) continue;
+    rows.push({ symbol: `${symbol} · ${labels.closed}`, unrealized: 0, realized: amount });
+  }
+
+  if (Math.abs(unattributed) >= 0.005) {
+    rows.push({ symbol: labels.other, unrealized: 0, realized: unattributed });
   }
 
   return rows
+    .map((r) => ({ ...r, total: r.unrealized + r.realized }))
     .filter((r) => r.unrealized !== 0 || r.realized !== 0)
     .sort((a, b) => b.total - a.total);
 }

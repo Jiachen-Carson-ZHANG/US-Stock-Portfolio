@@ -22,6 +22,8 @@ export type LivePortfolio = {
   };
   totalInvested: MoneyDTO;
   optionGroups: OptionGroupDTO[];
+  /** Realized per symbol, replayed from the fills. */
+  realizedBySymbol?: Record<string, number>;
 };
 
 /**

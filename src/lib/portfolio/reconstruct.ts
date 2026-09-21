@@ -151,3 +151,55 @@ export function reconstruct(
 
   return days;
 }
+
+/**
+ * Realized profit per symbol, from the fills alone.
+ *
+ * The broker attributes realized P&L only to positions still open, so every
+ * name sold out of — META, MRVL, LITE — carried none of its result, and the
+ * chart had to bundle them into a single anonymous "closed positions" bar.
+ * Replaying the fills attributes all of it, because the ledger now covers the
+ * account from its first trade.
+ */
+export function realizedBySymbol(fills: BrokerTransaction[]): Map<string, number> {
+  const lots = new Map<string, Lot>();
+  const realized = new Map<string, Decimal>();
+
+  for (const fill of fills) {
+    const multiplier = multiplierFor(fill.symbol);
+    const signed = new Decimal(fill.quantity).times(fill.side === "buy" ? 1 : -1);
+    const unit = new Decimal(fill.price).times(multiplier);
+    const lot = lots.get(fill.symbol) ?? { quantity: new Decimal(0), cost: new Decimal(0) };
+
+    if (lot.quantity.isZero() || lot.quantity.isNegative() === signed.isNegative()) {
+      lot.quantity = lot.quantity.plus(signed);
+      lot.cost = lot.cost.plus(signed.times(unit));
+    } else {
+      const closed = Decimal.min(signed.abs(), lot.quantity.abs());
+      const direction = lot.quantity.isNegative() ? -1 : 1;
+      const closedCost = lot.cost.dividedBy(lot.quantity).times(closed).times(direction);
+      const closedCash = closed.times(unit).times(direction);
+
+      realized.set(
+        fill.symbol,
+        (realized.get(fill.symbol) ?? new Decimal(0)).plus(closedCash.minus(closedCost)),
+      );
+      lot.quantity = lot.quantity.minus(closed.times(direction));
+      lot.cost = lot.cost.minus(closedCost);
+
+      const remainder = signed.abs().minus(closed);
+      if (remainder.greaterThan(0)) {
+        const opened = signed.isNegative() ? remainder.negated() : remainder;
+        lot.quantity = lot.quantity.plus(opened);
+        lot.cost = lot.cost.plus(opened.times(unit));
+      }
+    }
+
+    if (lot.quantity.isZero()) lot.cost = new Decimal(0);
+    lots.set(fill.symbol, lot);
+  }
+
+  return new Map(
+    [...realized].filter(([, v]) => !v.isZero()).map(([k, v]) => [k, v.toNumber()]),
+  );
+}
