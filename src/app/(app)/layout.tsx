@@ -47,9 +47,9 @@ export default async function AppLayout({
             <p className="truncate text-sm font-semibold tracking-tight">
               {t.appName}
             </p>
-            <div className="flex shrink-0 items-center">
+            <div className="flex shrink-0 items-center gap-1">
+              <LanguageToggle />
               {canSignOut && <NotificationBell initialUnread={unread} />}
-              <LanguageToggle className="px-2" />
               {canSignOut && <SignOutButton className="w-auto px-2 py-1" />}
             </div>
           </header>
@@ -58,7 +58,7 @@ export default async function AppLayout({
               the bottom of the sidebar, below the navigation, where nobody
               looked for it. Top right is where people look. */}
           <div className="hidden items-center justify-end gap-1 px-8 pt-4 md:flex">
-            <LanguageToggle className="px-2" />
+            <LanguageToggle />
             {canSignOut && <NotificationBell initialUnread={unread} />}
           </div>
 

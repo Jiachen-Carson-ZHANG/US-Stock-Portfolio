@@ -7,7 +7,6 @@ import {
   Trophy,
   LineChart,
   UserRound,
-  Languages,
   Receipt,
   Settings,
   Star,
@@ -114,23 +113,50 @@ function PortfolioSwitcher({
   );
 }
 
+/**
+ * English / 中文, as a pair.
+ *
+ * It used to be one button labelled with the language you were not using —
+ * "中文" while reading English. That is the conventional pattern and it was
+ * missed entirely: a lone word beside a small icon does not read as a
+ * control. Showing both, with the current one marked, is unambiguous in
+ * either language and needs no icon to explain it.
+ */
 export function LanguageToggle({ className }: { className?: string }) {
-  const t = useT();
   const locale = useLocale();
   const setLocale = useSetLocale();
 
+  const options = [
+    { value: "en" as const, label: "EN" },
+    { value: "zh" as const, label: "中文" },
+  ];
+
   return (
-    <button
-      type="button"
-      onClick={() => setLocale(locale === "en" ? "zh" : "en")}
+    <div
+      role="group"
+      aria-label="Language"
       className={cn(
-        "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+        "inline-flex items-center rounded-lg border border-border p-0.5",
         className,
       )}
     >
-      <Languages className="size-4" aria-hidden="true" />
-      {t.nav.language}
-    </button>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => setLocale(option.value)}
+          aria-pressed={locale === option.value}
+          className={cn(
+            "min-h-8 rounded-md px-2.5 text-xs transition-colors",
+            locale === option.value
+              ? "bg-muted font-medium text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
