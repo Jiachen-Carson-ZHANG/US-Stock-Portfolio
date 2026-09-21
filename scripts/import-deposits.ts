@@ -37,6 +37,21 @@ function parse(csv: string): Flow[] {
   return flows;
 }
 
+/**
+ * Valuations exist for weekdays only, and the return series needs every cash
+ * flow to land on a day it has a closing value for — otherwise it refuses to
+ * show returns at all. One of these transfers arrived on a Saturday, so flows
+ * are carried to the next business day, which is also when the money first
+ * became usable. The date the bank actually moved it is kept in the note.
+ */
+function toBusinessDay(date: string): string {
+  const cursor = new Date(`${date}T00:00:00Z`);
+  while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return cursor.toISOString().slice(0, 10);
+}
+
 async function main() {
   const path = process.argv[2] ?? "data/deposits.csv";
   const flows = parse(readFileSync(path, "utf8"));
@@ -47,13 +62,34 @@ async function main() {
     // rather than an append-only pile that double-counts on a second run.
     await tx.run("DELETE FROM analysis_flows WHERE created_by = ?", ["import"]);
     for (const flow of flows) {
+      const landing = toBusinessDay(flow.date);
+      const note =
+        landing === flow.date ? flow.note : `${flow.note} (received ${flow.date})`;
       await tx.run(
         `INSERT INTO analysis_flows (id, date, amount, note, created_by)
          VALUES (?, ?, ?, ?, 'import')`,
-        [randomUUID(), flow.date, flow.amount, flow.note],
+        [randomUUID(), landing, flow.amount, note],
       );
+      if (landing !== flow.date) {
+        console.log(`  ${flow.date} fell on a weekend — carried to ${landing}`);
+      }
     }
   });
+
+  // The performance series refuses to show returns until someone attests the
+  // ledger is complete for the period — a deposit missed there is read as a
+  // gain. Pass --reviewed only when the statement really is complete; on
+  // moomoo that is the Transfers tab reporting "All Loaded".
+  if (process.argv.includes("--reviewed")) {
+    const from = flows[0]?.date;
+    const to = new Date().toISOString().slice(0, 10);
+    await db.run(
+      `INSERT INTO analysis_config (key, value) VALUES ('review', ?)
+       ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+      [JSON.stringify({ from, to })],
+    );
+    console.log(`Marked ${from} to ${to} as reviewed.`);
+  }
 
   const total = flows.reduce((n, f) => n + f.amount, 0);
   console.log(`\nRecorded ${flows.length} cash flows, ${flows[0]?.date} to ${flows[flows.length - 1]?.date}.`);
