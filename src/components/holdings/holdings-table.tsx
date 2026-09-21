@@ -199,7 +199,6 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
 
 function PositionDetail({ position }: { position: PositionView }) {
   const t = useT();
-  const base = usePortfolioBase();
 
   const rows = [
     { label: t.position.costBasis, value: formatMoney(position.costBasis) },

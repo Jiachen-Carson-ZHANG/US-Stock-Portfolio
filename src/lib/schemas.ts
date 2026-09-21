@@ -44,6 +44,38 @@ export const historyRangeSchema = z.object({
 
 export const userIdSchema = z.string().uuid();
 
+/**
+ * A slug becomes the first segment of every URL for that portfolio, so it is
+ * restricted to what survives a link: lowercase, no spaces, no punctuation
+ * beyond a hyphen. Mirrors SLUG_PATTERN in @/lib/portfolios.
+ */
+export const createPortfolioSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(
+      /^[a-z][a-z0-9-]{1,30}$/,
+      "Use lowercase letters, digits and hyphens, starting with a letter",
+    ),
+  displayName: z.string().trim().min(1).max(60),
+  ownerUserId: z.string().uuid(),
+  kind: z.enum(["broker", "paper"]),
+  // Only meaningful for a paper portfolio; a broker one takes its opening
+  // position from the cash-flow ledger.
+  openingCash: z
+    .string()
+    .trim()
+    .regex(/^\d{1,12}(\.\d{1,2})?$/, "Enter an amount like 10000")
+    .optional(),
+});
+
+export const portfolioAccessSchema = z.object({
+  portfolioId: z.string().uuid(),
+  userId: z.string().uuid(),
+  grant: z.boolean(),
+});
+
 export const searchSchema = z.object({
   q: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/, "Unsupported query"),
 });

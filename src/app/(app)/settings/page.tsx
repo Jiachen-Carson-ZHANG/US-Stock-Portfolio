@@ -11,6 +11,8 @@ import {
 } from "@/components/layout/settings-actions";
 import { Badge } from "@/components/ui/misc";
 import { FamilyActivity } from "@/components/layout/family-activity";
+import { PortfolioAdmin } from "@/components/layout/portfolio-admin";
+import { listPortfolios, readersOf } from "@/lib/portfolios";
 import { activityByMember, mostViewedAssets } from "@/lib/activity";
 
 const CONNECT_OUTCOME: Record<string, { tone: "ok" | "bad"; message: string }> = {
@@ -75,6 +77,17 @@ export default async function SettingsPage({
   const mostViewed = await mostViewedAssets(db);
   const byMember = await activityByMember(db);
   const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];
+
+  const portfolios = await Promise.all(
+    (await listPortfolios(db)).map(async (item) => ({
+      id: item.id,
+      slug: item.slug,
+      displayName: item.displayName,
+      ownerUserId: item.ownerUserId,
+      kind: item.kind,
+      readers: await readersOf(db, item.id),
+    })),
+  );
 
   return (
     <div className="space-y-6">
@@ -175,6 +188,15 @@ export default async function SettingsPage({
           <SyncButton />
         </div>
       </section>
+
+      <PortfolioAdmin
+        portfolios={portfolios}
+        people={users.map((user) => ({
+          id: user.id,
+          displayName: user.display_name,
+          username: user.username,
+        }))}
+      />
 
       <FamilyActivity mostViewed={mostViewed} byMember={byMember} />
 

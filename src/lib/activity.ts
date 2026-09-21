@@ -12,7 +12,10 @@ export type ActivityKind =
   | "broker_connect"
   | "broker_disconnect"
   | "sync"
-  | "ai_insight";
+  | "ai_insight"
+  | "portfolio_create"
+  | "access_grant"
+  | "access_revoke";
 
 export type ActivityEvent = {
   username: string;

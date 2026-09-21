@@ -1,3 +1,4 @@
+import { canWrite } from "@/lib/portfolios";
 import { requirePortfolio } from "@/lib/portfolios/context";
 import { loadPortfolio } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
@@ -11,7 +12,7 @@ export default async function DashboardPage({
 }: {
   params: Promise<{ portfolio: string }>;
 }) {
-  const { portfolio } = await requirePortfolio((await params).portfolio);
+  const { user, portfolio } = await requirePortfolio((await params).portfolio);
   const { t } = await serverDictionary();
   const {
     summary,
@@ -34,6 +35,9 @@ export default async function DashboardPage({
 
   return (
     <LiveDashboard
+      portfolioSlug={portfolio.slug}
+      portfolioName={portfolio.displayName}
+      canWrite={canWrite(user, portfolio)}
       initial={{ summary, positions, allocations, totalInvested, optionGroups, realizedBySymbol }}
       concentration={concentration}
     />

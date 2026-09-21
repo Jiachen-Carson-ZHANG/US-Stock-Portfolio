@@ -6,6 +6,7 @@ import { ShareBar } from "@/components/charts/share-bar";
 import { ConcentrationTiles } from "@/components/dashboard/concentration";
 import { MarketStatus } from "@/components/dashboard/market-status";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
+import { AddDeposit, ReconciliationBanner } from "@/components/dashboard/deposits";
 import { usePortfolio, type LivePortfolio } from "@/components/dashboard/use-portfolio";
 import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { useT } from "@/lib/i18n/context";
@@ -14,23 +15,49 @@ import type { Concentration } from "@/types/portfolio";
 export function LiveDashboard({
   initial,
   concentration,
+  portfolioSlug,
+  portfolioName,
+  canWrite,
 }: {
   initial: LivePortfolio;
   concentration: Concentration;
+  portfolioSlug: string;
+  portfolioName: string;
+  canWrite: boolean;
 }) {
   const t = useT();
   const { data, refreshing, refresh } = usePortfolio(initial);
 
+  // What the fills cannot account for. Dividends, interest and fees live
+  // here legitimately; a transfer nobody recorded also does, and is much
+  // larger.
+  const unattributed =
+    Number(data.summary.realizedPnL.amount) -
+    Object.values(data.realizedBySymbol ?? {}).reduce((n, v) => n + v, 0);
+
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-lg font-semibold tracking-tight">{t.nav.overview}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-lg font-semibold tracking-tight">{portfolioName}</h1>
+          {canWrite && (
+            <AddDeposit
+              portfolioSlug={portfolioSlug}
+              currency={data.summary.totalMarketValue.currency}
+            />
+          )}
+        </div>
         <MarketStatus
           summary={data.summary}
           refreshing={refreshing}
           onRefresh={refresh}
         />
       </header>
+
+      <ReconciliationBanner
+        residual={unattributed}
+        currency={data.summary.totalMarketValue.currency}
+      />
 
       <SummaryCards summary={data.summary} totalInvested={data.totalInvested} />
 
@@ -53,10 +80,7 @@ export function LiveDashboard({
               positions={data.positions}
               optionGroups={data.optionGroups}
               realizedBySymbol={data.realizedBySymbol ?? {}}
-              unattributed={
-                Number(data.summary.realizedPnL.amount) -
-                Object.values(data.realizedBySymbol ?? {}).reduce((n, v) => n + v, 0)
-              }
+              unattributed={unattributed}
             />
         <ConcentrationTiles data={data.concentration ?? concentration} />
       </div>
