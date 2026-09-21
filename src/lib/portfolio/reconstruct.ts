@@ -188,8 +188,25 @@ export function reconstruct(
  * account from its first trade.
  */
 export function realizedBySymbol(fills: BrokerTransaction[]): Map<string, number> {
+  return new Map(
+    [...realizedByFill(fills).bySymbol].filter(([, value]) => value !== 0),
+  );
+}
+
+/**
+ * Realized profit attributed to the individual fill that closed it.
+ *
+ * The same replay as realizedBySymbol, kept as one implementation so the
+ * per-trade figures always add up to the per-symbol ones. A buy realizes
+ * nothing and is absent from the map rather than present as zero.
+ */
+export function realizedByFill(fills: BrokerTransaction[]): {
+  byDeal: Map<string, number>;
+  bySymbol: Map<string, number>;
+} {
   const lots = new Map<string, Lot>();
   const realized = new Map<string, Decimal>();
+  const byDeal = new Map<string, number>();
 
   for (const fill of fills) {
     const multiplier = multiplierFor(fill.symbol);
@@ -205,10 +222,12 @@ export function realizedBySymbol(fills: BrokerTransaction[]): Map<string, number
       const direction = lot.quantity.isNegative() ? -1 : 1;
       const closedCost = lot.cost.dividedBy(lot.quantity).times(closed).times(direction);
       const closedCash = closed.times(unit).times(direction);
+      const gain = closedCash.minus(closedCost);
 
+      byDeal.set(fill.dealId, gain.toNumber());
       realized.set(
         fill.symbol,
-        (realized.get(fill.symbol) ?? new Decimal(0)).plus(closedCash.minus(closedCost)),
+        (realized.get(fill.symbol) ?? new Decimal(0)).plus(gain),
       );
       lot.quantity = lot.quantity.minus(closed.times(direction));
       lot.cost = lot.cost.minus(closedCost);
@@ -225,7 +244,8 @@ export function realizedBySymbol(fills: BrokerTransaction[]): Map<string, number
     lots.set(fill.symbol, lot);
   }
 
-  return new Map(
-    [...realized].filter(([, v]) => !v.isZero()).map(([k, v]) => [k, v.toNumber()]),
-  );
+  return {
+    byDeal,
+    bySymbol: new Map([...realized].map(([k, v]) => [k, v.toNumber()])),
+  };
 }

@@ -130,7 +130,16 @@ export function analysisStats(result: Analysis): SeriesStats {
   };
 }
 
-export function monthlyReturns(result: Analysis) {
+/**
+ * Per-month return, and the money behind it.
+ *
+ * The percentage is time-weighted, which is the fair way to compare months.
+ * The amount is simply what the account gained after taking out anything
+ * paid in — which is the number a person actually means by "how did
+ * September go". Both are useful and they answer different questions, so
+ * the calendar shows the percentage large and the amount beneath it.
+ */
+export function monthlyReturns(result: Analysis, flows: CashFlow[] = []) {
   const months = new Map<
     string,
     {
@@ -138,6 +147,8 @@ export function monthlyReturns(result: Analysis) {
       factor: number;
       from: string;
       to: string;
+      fromValue: number;
+      toValue: number;
       observations: number;
     }
   >();
@@ -156,17 +167,29 @@ export function monthlyReturns(result: Analysis) {
       factor: 1,
       from: previous.date,
       to: point.date,
+      fromValue: previous.value,
+      toValue: point.value,
       observations: 0,
     };
     row.factor *= 1 + point.intervalReturn!;
     row.to = point.date;
+    row.toValue = point.value;
     row.observations++;
     months.set(month, row);
   }
-  return [...months.values()].map((row) => ({
-    ...row,
-    percent: (row.factor - 1) * 100,
-  }));
+  return [...months.values()].map((row) => {
+    // End-of-day convention, matching adjustedSeries: a flow dated on the
+    // opening day landed after that day's close, so it belongs to this month.
+    const within = flows
+      .filter((flow) => flow.date >= row.from && flow.date <= row.to)
+      .reduce((sum, flow) => sum + flow.amount, 0);
+    return {
+      ...row,
+      percent: (row.factor - 1) * 100,
+      amount: row.toValue - row.fromValue - within,
+      flows: within,
+    };
+  });
 }
 
 export function benchmarkComparison(

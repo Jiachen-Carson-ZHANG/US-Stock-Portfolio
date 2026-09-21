@@ -1,4 +1,7 @@
 import { requirePortfolio } from "@/lib/portfolios/context";
+import { getDb } from "@/lib/db";
+import { realizedByFill } from "@/lib/portfolio/reconstruct";
+import { Ledger, type LedgerEntry } from "@/components/transactions/ledger";
 import { loadPortfolio, loadTransactions } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { EmptyState } from "@/components/ui/misc";
@@ -27,6 +30,44 @@ export default async function TransactionsPage({
   ]);
 
   const realized = Number(summary.realizedPnL.amount);
+
+  // Trades and transfers in one list. A ledger that leaves out the money
+  // paid in is not the account's history, and the reconciliation banner
+  // points people here to check exactly that.
+  const db = await getDb();
+  const flows = await db.all<{ id: string; date: string; amount: number; note: string }>(
+    `SELECT id, date, amount, note FROM analysis_flows WHERE portfolio_id = ? ORDER BY date DESC`,
+    [portfolio.id],
+  );
+
+  // Attributed on the fills in the order they happened, so the per-trade
+  // figures sum to the totals shown above.
+  const { byDeal } = realizedByFill([...transactions].reverse());
+
+  const entries: LedgerEntry[] = [
+    ...transactions.map((item) => ({
+      id: item.dealId,
+      date: item.tradedAt,
+      kind: item.side,
+      symbol: item.symbol,
+      name: item.name ?? null,
+      quantity: item.quantity,
+      price: item.price,
+      amount: item.amount,
+      realized: byDeal.get(item.dealId) ?? null,
+    })),
+    ...flows.map((flow) => ({
+      id: flow.id,
+      date: flow.date,
+      kind: (Number(flow.amount) >= 0 ? "deposit" : "withdrawal") as LedgerEntry["kind"],
+      symbol: null,
+      name: flow.note,
+      quantity: null,
+      price: null,
+      amount: Number(flow.amount),
+      realized: null,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   const tiles = [
     {
@@ -75,88 +116,13 @@ export default async function TransactionsPage({
         ))}
       </div>
 
-      {transactions.length === 0 ? (
+      {entries.length === 0 ? (
         <EmptyState
           title={t.transactions.none}
           description={t.transactions.noneHint}
         />
       ) : (
-        <>
-          <div className="hidden overflow-hidden rounded-xl border border-border bg-surface lg:block">
-            <table className="w-full text-sm">
-              <caption className="sr-only">{t.transactions.title}</caption>
-              <thead>
-                <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-                  <th scope="col" className="px-4 py-3 text-left font-medium">{t.transactions.date}</th>
-                  <th scope="col" className="px-4 py-3 text-left font-medium">{t.transactions.symbol}</th>
-                  <th scope="col" className="px-4 py-3 text-left font-medium">{t.transactions.side}</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">{t.transactions.qty}</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">{t.transactions.price}</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">{t.transactions.amount}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((item) => (
-                  <tr key={item.dealId} className="border-b border-border last:border-0">
-                    <td className="tabular px-4 py-3 text-muted-foreground">
-                      {new Date(item.tradedAt).toLocaleDateString()}
-                    </td>
-                    <th scope="row" className="px-4 py-3 text-left font-medium">
-                      {item.symbol}
-                      {item.name && (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {item.name}
-                        </span>
-                      )}
-                    </th>
-                    <td
-                      className={`px-4 py-3 ${item.side === "buy" ? "text-positive" : "text-negative"}`}
-                    >
-                      {item.side === "buy" ? t.transactions.buy : t.transactions.sell}
-                    </td>
-                    <td className="tabular px-4 py-3 text-right">{item.quantity}</td>
-                    <td className="tabular px-4 py-3 text-right">
-                      {usd(item.price, currency)}
-                    </td>
-                    <td className={`tabular px-4 py-3 text-right ${signClass(item.amount)}`}>
-                      {formatMoney({ amount: String(item.amount), currency }, { signed: true })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <ul className="space-y-2 lg:hidden">
-            {transactions.map((item) => (
-              <li
-                key={item.dealId}
-                className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{item.symbol}</p>
-                  <p className="text-xs text-muted-foreground">
-                    <span
-                      className={item.side === "buy" ? "text-positive" : "text-negative"}
-                    >
-                      {item.side === "buy" ? t.transactions.buy : t.transactions.sell}
-                    </span>
-                    {" · "}
-                    {item.quantity} @ {usd(item.price, currency)}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className={`tabular text-sm font-medium ${signClass(item.amount)}`}>
-                    {formatMoney({ amount: String(item.amount), currency }, { signed: true })}
-                  </p>
-                  <p className="tabular text-xs text-muted-foreground">
-                    {new Date(item.tradedAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
+        <Ledger entries={entries} currency={currency} />
       )}
     </div>
   );

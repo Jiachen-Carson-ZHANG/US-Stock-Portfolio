@@ -20,6 +20,7 @@ export function LiveDashboard({
   portfolioName,
   canWrite,
   isMock,
+  since,
 }: {
   initial: LivePortfolio;
   concentration: Concentration;
@@ -27,6 +28,7 @@ export function LiveDashboard({
   portfolioName: string;
   canWrite: boolean;
   isMock: boolean;
+  since: string | null;
 }) {
   const t = useT();
   const { data, refreshing, refresh } = usePortfolio(initial);
@@ -63,7 +65,11 @@ export function LiveDashboard({
         currency={data.summary.totalMarketValue.currency}
       />
 
-      <SummaryCards summary={data.summary} totalInvested={data.totalInvested} />
+      <SummaryCards
+        summary={data.summary}
+        totalInvested={data.totalInvested}
+        since={since}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AllocationDonut

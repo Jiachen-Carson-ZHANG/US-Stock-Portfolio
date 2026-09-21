@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { realizedBySymbol, reconstruct, type PriceSeries } from "@/lib/portfolio/reconstruct";
+import {
+  realizedByFill,
+  realizedBySymbol,
+  reconstruct,
+  type PriceSeries,
+} from "@/lib/portfolio/reconstruct";
 import { parseSymbol } from "@/lib/moomoo/symbols";
 import type { BrokerTransaction } from "@/types/broker";
 
@@ -263,5 +268,43 @@ describe("option contract size", () => {
     ]);
     // 12 of price improvement, two contracts, a hundred shares each.
     expect(realized.get("VRT270319C280000")).toBeCloseTo(2_400, 2);
+  });
+});
+
+describe("attributing realized profit to the trade that took it", () => {
+  it("credits the sale, not the purchase", () => {
+    const { byDeal } = realizedByFill([
+      fill("2026-06-03", "buy", "NVDA", 10, 200),
+      fill("2026-07-01", "sell", "NVDA", 4, 250),
+    ]);
+
+    const buy = "2026-06-03-NVDA-buy-10";
+    const sell = "2026-07-01-NVDA-sell-4";
+
+    expect(byDeal.get(buy)).toBeUndefined();
+    expect(byDeal.get(sell)).toBeCloseTo(200, 6);
+  });
+
+  it("adds up to the per-symbol totals", () => {
+    const fills = [
+      fill("2026-06-03", "buy", "NVDA", 10, 200),
+      fill("2026-06-10", "buy", "NVDA", 10, 220),
+      fill("2026-07-01", "sell", "NVDA", 5, 250),
+      fill("2026-07-15", "sell", "NVDA", 5, 180),
+    ];
+
+    const { byDeal, bySymbol } = realizedByFill(fills);
+    const summed = [...byDeal.values()].reduce((total, value) => total + value, 0);
+
+    expect(summed).toBeCloseTo(bySymbol.get("NVDA")!, 6);
+    expect(realizedBySymbol(fills).get("NVDA")).toBeCloseTo(summed, 6);
+  });
+
+  it("scales a closed option contract by a hundred", () => {
+    const { byDeal } = realizedByFill([
+      fill("2026-06-03", "buy", "VRT270319C280000", 1, 20),
+      fill("2026-07-01", "sell", "VRT270319C280000", 1, 32),
+    ]);
+    expect(byDeal.get("2026-07-01-VRT270319C280000-sell-1")).toBeCloseTo(1_200, 6);
   });
 });

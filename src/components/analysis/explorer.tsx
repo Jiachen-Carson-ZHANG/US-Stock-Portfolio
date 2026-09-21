@@ -65,7 +65,7 @@ export function PerformanceExplorer({
   }, [snapshots, period, latest]);
   const result = adjustedSeries(selected, data.flows, data.coverage);
   const stats = analysisStats(result);
-  const months = monthlyReturns(result);
+  const months = monthlyReturns(result, data.flows);
   const comparison =
     currency === "USD"
       ? benchmarkComparison(result.points, data.benchmark)
@@ -337,8 +337,19 @@ export function PerformanceExplorer({
                   >
                     {pct(m.percent)}
                   </strong>
+                  {/* The percentage is time-weighted and comparable between
+                      months; the amount is what actually landed in the
+                      account. People ask for both. */}
+                  <span
+                    className={`block text-xs tabular ${
+                      m.amount < 0 ? "text-negative" : "text-positive"
+                    }`}
+                  >
+                    {m.amount >= 0 ? "+" : "−"}
+                    {fmt(Math.abs(m.amount))}
+                  </span>
                   <span className="block text-[10px] text-muted-foreground">
-                    {say("Observed period", "已观察期间")}
+                    {m.from.slice(5)} → {m.to.slice(5)}
                   </span>
                 </button>
               ))}
@@ -348,7 +359,16 @@ export function PerformanceExplorer({
               .map((m) => (
                 <p key={m.month} className="mt-3 text-sm">
                   {m.from} → {m.to} · {m.observations}{" "}
-                  {say("intervals", "个区间")} · {pct(m.percent)}
+                  {say("intervals", "个区间")} · {pct(m.percent)} ·{" "}
+                  {m.amount >= 0 ? "+" : "−"}
+                  {fmt(Math.abs(m.amount))}
+                  {m.flows !== 0 && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({say("excludes", "不含")} {fmt(m.flows)}{" "}
+                      {say("paid in", "转入")})
+                    </span>
+                  )}
                 </p>
               ))}
           </section>
