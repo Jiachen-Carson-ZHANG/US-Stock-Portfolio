@@ -329,3 +329,42 @@ deployment environments and nowhere else, and rotate it whenever it is exposed.
 cent. The env var should be retired in favour of summing the ledger per
 portfolio — it cannot survive multi-portfolio anyway, since one global number
 cannot describe several accounts.
+
+---
+
+## Status, 2026-09-21
+
+Built and on `feat/family-exploration`:
+
+1. **Schema, migration, access rule** — `portfolios`, `portfolio_access`, a
+   `portfolio_id` on every table that needed one, and one access rule applied
+   in every loader. Existing rows adopted on boot.
+2. **Routing and the switcher** — `/carson` and friends, old paths redirect,
+   switcher appears only when there is more than one portfolio.
+3. **A second person can connect moomoo** — the consent now carries the
+   portfolio it was started for, and the token cache is keyed by portfolio.
+   Mile needs an account and a portfolio row; the code path is done.
+4. **Paper portfolios** — opening balance, server-validated trades, holdings
+   written into the same tables so every existing view works on them.
+5. **The Arena** — leaderboard and indexed curves over five periods, ranked by
+   time-weighted return, percentages only.
+6. **Deposit recording** — a control on the dashboard and a reconciliation
+   banner past $200.
+7. **Monthly reconstruction backstop** — `POST /api/cron/reconstruct`.
+
+Also done, from the security discussion: change-your-own-password, wider
+behaviour logging, credential redaction in log values, and a read-only
+`analyst` database role.
+
+### Not built
+
+- **AI commentary and comments in the Arena.** The leaderboard is there; the
+  daily/weekly/monthly write-up and the comment threads are not. The grounded
+  AI context exists but covers one portfolio, so it needs widening first.
+- **Trophy cabinet.** Ranks and medals show for the current period; nothing is
+  recorded when a period ends, so there is no history of who won what.
+- **The polish list** — stat-card dates, the realized/unrealized toggle,
+  dollar amounts on the monthly calendar, and finishing the transactions tab.
+- **Deleting the Family Room.** The nav points at the Arena; `/family` still
+  works. Deleting roughly a thousand lines of working features should happen
+  after someone has used the replacement, not before.

@@ -466,3 +466,56 @@ All new tables are created additively on first use. Existing holdings, history,
 accounts and original watchlist notes are preserved. Back up the SQLite database
 before deployment. Optional AI watchlist opinions are generated model output,
 not verified portfolio facts; the factual analytics do not depend on AI.
+
+## Portfolios, access and the Arena
+
+Every portfolio has an address. Carson's is `/carson`; Mile's would be
+`/mirat`. The old paths (`/dashboard`, `/holdings`, `/performance`,
+`/transactions`) still work and redirect to whichever portfolio is yours.
+
+**Who can see what** is one rule, applied server-side in every loader:
+you may read a portfolio if you own it, if someone granted you access, or if
+you hold the owner role. Writing is narrower — only the person who owns a
+portfolio may connect a broker, record a transfer or place a paper trade.
+An administrator can look; they cannot act as you.
+
+A portfolio you cannot read answers 404 rather than 403, so guessing a slug
+tells you nothing about whether it exists.
+
+**Creating one:** Settings → Portfolios. Choose an address, a name, whose it
+is, and whether it follows a real brokerage or starts from a stated balance.
+Paper portfolios trade against live prices with no real money.
+
+**The Arena** (`/arena`) ranks every portfolio you can see by time-weighted
+return over Day / Week / Month / Year / All time. It shows percentages and an
+indexed curve only — never an account value, a position size or a cash
+balance. That is enforced by the data type, not by the template.
+
+### Scheduled jobs
+
+| Endpoint | When | Why |
+|---|---|---|
+| `POST /api/cron/snapshot` | daily, after the close | records the day for every portfolio |
+| `POST /api/cron/reconstruct` | monthly | rebuilds all history from fills; the backstop for days nobody was there to capture |
+
+Both take `Authorization: Bearer $SNAPSHOT_CRON_SECRET`. Neither is required
+for correctness — history can always be re-derived — but without the monthly
+one nothing re-derives it if nobody opens the app.
+
+### Recording transfers
+
+The broker API returns trades and never transfers, so a deposit nobody
+records looks exactly like a gain of the same size. Use **Record a transfer**
+on the dashboard. A banner appears when cash the fills cannot explain passes
+$200, which is above what dividends and fees account for.
+
+`TOTAL_DEPOSITS` is now only a fallback for a portfolio whose flows have not
+been entered, and will be removed.
+
+### Database roles
+
+`scripts/sql/roles.sql` creates a read-only `analyst` role that cannot read
+`broker_connections` or `users.password_hash`. Use it for anything you run by
+hand; keep the owner connection string in the deployment environments only.
+Read the comments at the top — it is a guard against accidents, not against a
+determined operator.
