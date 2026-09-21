@@ -8,7 +8,11 @@ export type ActivityKind =
   | "view_position"
   | "view_page"
   | "watchlist_add"
-  | "watchlist_remove";
+  | "watchlist_remove"
+  | "broker_connect"
+  | "broker_disconnect"
+  | "sync"
+  | "ai_insight";
 
 export type ActivityEvent = {
   username: string;

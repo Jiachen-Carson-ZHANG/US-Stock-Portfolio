@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { realizedBySymbol, reconstruct, type PriceSeries } from "@/lib/portfolio/reconstruct";
+import { parseSymbol } from "@/lib/moomoo/symbols";
 import type { BrokerTransaction } from "@/types/broker";
 
 function fill(
@@ -9,7 +10,9 @@ function fill(
   quantity: number,
   price: number,
 ): BrokerTransaction {
-  const multiplier = /\d{6}[CP]\d{8}$/.test(symbol) ? 100 : 1;
+  // Same rule the replay uses, so a fixture's recorded amount cannot quietly
+  // disagree with the quantity and price beside it.
+  const multiplier = parseSymbol(symbol).instrumentType === "option" ? 100 : 1;
   return {
     dealId: `${date}-${symbol}-${side}-${quantity}`,
     orderId: "",
@@ -196,5 +199,69 @@ describe("realized per symbol", () => {
     const perSymbol = [...realizedBySymbol(fills).values()].reduce((a, b) => a + b, 0);
     const replayed = reconstruct(fills, [], prices({}), days);
     expect(perSymbol).toBeCloseTo(replayed[replayed.length - 1].realized.toNumber(), 6);
+  });
+});
+
+describe("option contract size", () => {
+  // The symbols below are the real ones held in the account. An earlier local
+  // pattern required a zero-padded eight-digit strike and matched none of
+  // them, so every option was replayed as if it were a single share.
+  const OPTIONS = [
+    "GOOGL270319C350000",
+    "GOOGL270319C380000",
+    "INTC270115P92500",
+    "NBIS261218C200000",
+    "UUUU280121C10000",
+    "VRT270319C280000",
+  ];
+  const SHARES = ["ASTS", "AVGO", "GOOGL", "NVDA", "XE", "INV", "FLY"];
+
+  it("values a bought contract at a hundred times the quoted price", () => {
+    const days = reconstruct(
+      [fill("2026-06-03", "buy", "GOOGL270319C350000", 1, 30)],
+      [{ date: "2026-06-02", amount: 10_000 }],
+      new Map([["GOOGL270319C350000", new Map([["2026-06-03", 30]])]]),
+      ["2026-06-02", "2026-06-03"],
+    );
+
+    const last = days[days.length - 1];
+    // 10,000 paid in, 3,000 spent on the contract, 3,000 of contract held.
+    expect(last.cash.toNumber()).toBeCloseTo(7_000, 2);
+    expect(last.costBasis.toNumber()).toBeCloseTo(3_000, 2);
+    expect(last.marketValue.toNumber()).toBeCloseTo(10_000, 2);
+    expect(last.totalReturn.toNumber()).toBeCloseTo(0, 2);
+  });
+
+  it("treats every option this account holds as a hundred-share contract", () => {
+    for (const symbol of OPTIONS) {
+      const days = reconstruct(
+        [fill("2026-06-03", "buy", symbol, 1, 10)],
+        [{ date: "2026-06-02", amount: 5_000 }],
+        new Map([[symbol, new Map([["2026-06-03", 10]])]]),
+        ["2026-06-02", "2026-06-03"],
+      );
+      expect(days[days.length - 1].cash.toNumber(), symbol).toBeCloseTo(4_000, 2);
+    }
+  });
+
+  it("leaves ordinary shares at one", () => {
+    for (const symbol of SHARES) {
+      const days = reconstruct(
+        [fill("2026-06-03", "buy", symbol, 1, 10)],
+        [{ date: "2026-06-02", amount: 5_000 }],
+        new Map([[symbol, new Map([["2026-06-03", 10]])]]),
+        ["2026-06-02", "2026-06-03"],
+      );
+      expect(days[days.length - 1].cash.toNumber(), symbol).toBeCloseTo(4_990, 2);
+    }
+  });
+
+  it("scales realized profit on a closed contract too", () => {
+    const realized = realizedBySymbol([
+      fill("2026-06-03", "buy", "VRT270319C280000", 2, 20),
+      fill("2026-07-01", "sell", "VRT270319C280000", 2, 32),
+    ]);
+    // 12 of price improvement, two contracts, a hundred shares each.
+    expect(realized.get("VRT270319C280000")).toBeCloseTo(2_400, 2);
   });
 });

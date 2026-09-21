@@ -7,20 +7,56 @@ type LogFields = Record<string, string | number | boolean | null | undefined>;
 const FORBIDDEN = new Set([
   "password",
   "passwordhash",
+  "currentpassword",
+  "newpassword",
   "token",
   "accesstoken",
   "refreshtoken",
+  "sessiontoken",
+  "tokenhash",
   "authorization",
   "cookie",
-  "sessiontoken",
+  "secret",
+  "apikey",
+  "clientsecret",
+  "encryptionkey",
+  "iv",
+  "authtag",
   "accountnumber",
+  "accountid",
 ]);
+
+/**
+ * A secret can also arrive inside a value nobody thought of as secret — most
+ * often a provider's error text quoting the request it rejected. Field names
+ * cannot catch that, so three shapes are redacted wherever they appear.
+ *
+ * Deliberately blunt. Losing a stack frame from a log line costs an afternoon;
+ * printing a live refresh token costs the account.
+ */
+const SECRET_PATTERNS: RegExp[] = [
+  // Anything introduced as a credential, however it is punctuated:
+  // "refresh_token=ya29…", "Authorization: Bearer …", "api key: …".
+  /((?:access[_-]?token|refresh[_-]?token|id[_-]?token|token|bearer|secret|api[_-]?key|password|authorization)\s*[:=]?\s+|(?:token|secret|key|password)\s*=\s*)(\S+)/gi,
+  // A JWT, whose individual segments are too short for the length rule below.
+  /\beyJ[A-Za-z0-9_-]{6,}(?:\.[A-Za-z0-9_-]+){0,2}/g,
+  // Anything else long enough to be a credential and shaped like one.
+  /\b[A-Za-z0-9_\-+/=]{28,}\b/g,
+];
+
+function redactValue(value: string): string {
+  let out = value;
+  out = out.replace(SECRET_PATTERNS[0], (_match, label: string) => `${label}[redacted]`);
+  out = out.replace(SECRET_PATTERNS[1], "[redacted]");
+  out = out.replace(SECRET_PATTERNS[2], "[redacted]");
+  return out;
+}
 
 function scrub(fields: LogFields): LogFields {
   const safe: LogFields = {};
   for (const [key, value] of Object.entries(fields)) {
     if (FORBIDDEN.has(key.toLowerCase().replace(/[^a-z]/g, ""))) continue;
-    safe[key] = value;
+    safe[key] = typeof value === "string" ? redactValue(value) : value;
   }
   return safe;
 }

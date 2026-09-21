@@ -16,6 +16,12 @@ import { reconstruct, type CashFlow, type PriceSeries } from "../src/lib/portfol
 import { writeSnapshot } from "../src/lib/portfolio/snapshots";
 import { readTransactions } from "../src/lib/portfolio/transactions";
 import { getMarketDataProvider } from "../src/providers";
+import { parseSymbol } from "../src/lib/moomoo/symbols";
+
+/** Matches the replay's own rule, so the two cannot drift apart. */
+function multiplierFor(symbol: string): number {
+  return parseSymbol(symbol).instrumentType === "option" ? 100 : 1;
+}
 
 const usd = (value: { toFixed(dp: number): string }) => ({
   amount: value.toFixed(2),
@@ -39,6 +45,37 @@ async function main() {
       "No cash flows recorded. Run db:import-deposits first — without dates a " +
         "deposit cannot be told apart from a gain.",
     );
+  }
+
+  // The broker records the cash each fill actually moved. Recomputing it from
+  // quantity x price x multiplier and comparing is what would have caught the
+  // option multiplier being wrong for every contract: the replay agreed with
+  // itself and with the account total, because understating a purchase and
+  // understating the resulting holding cancel out. Only the broker's own
+  // amount is independent of that mistake.
+  const mismatched = fills.filter((fill) => {
+    const expected = fill.quantity * fill.price * multiplierFor(fill.symbol);
+    const actual = Math.abs(fill.amount);
+    if (!Number.isFinite(actual) || actual === 0) return false;
+    return Math.abs(expected - actual) > Math.max(1, actual * 0.01);
+  });
+  if (mismatched.length > 0) {
+    console.error(
+      `\n${mismatched.length} fill(s) disagree with the cash the broker says they moved:`,
+    );
+    for (const fill of mismatched.slice(0, 10)) {
+      const expected = fill.quantity * fill.price * multiplierFor(fill.symbol);
+      console.error(
+        `  ${fill.tradedAt.slice(0, 10)}  ${fill.symbol.padEnd(20)}` +
+          `  computed ${expected.toFixed(2).padStart(11)}` +
+          `  recorded ${Math.abs(fill.amount).toFixed(2).padStart(11)}`,
+      );
+    }
+    console.error(
+      "\nRe-run db:import-fills so the recorded amounts match, then try again.\n",
+    );
+    await closeDb();
+    process.exit(1);
   }
 
   const from = fills[0].tradedAt.slice(0, 10);

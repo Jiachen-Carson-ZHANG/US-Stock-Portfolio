@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { parseSymbol } from "@/lib/moomoo/symbols";
 import type { BrokerTransaction } from "@/types/broker";
 
 export type CashFlow = { date: string; amount: number };
@@ -17,9 +18,18 @@ export type ReconstructedDay = {
 
 type Lot = { quantity: Decimal; cost: Decimal };
 
-/** Options are quoted per share but trade in hundreds. */
+/**
+ * Options are quoted per share but trade in hundreds.
+ *
+ * Delegated to the shared parser rather than matched here. An earlier local
+ * pattern required an eight-digit strike (`\d{6}[CP]\d{8}$`), which is the
+ * padded OCC form; moomoo does not pad, so every real symbol —
+ * GOOGL270319C350000, INTC270115P92500 — failed it and was valued as a share.
+ * That understated every option position by 99% and overstated cash by the
+ * same amount, which very nearly cancelled in the total and so went unnoticed.
+ */
 function multiplierFor(symbol: string): number {
-  return /\d{6}[CP]\d{8}$/.test(symbol) ? 100 : 1;
+  return parseSymbol(symbol).instrumentType === "option" ? 100 : 1;
 }
 
 /**

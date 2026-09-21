@@ -18,6 +18,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { closeDb, getDb } from "../src/lib/db";
+import { parseSymbol } from "../src/lib/moomoo/symbols";
 
 type Row = {
   date: string;
@@ -27,9 +28,15 @@ type Row = {
   price: number;
 };
 
-/** An option symbol carries its contract size; a share does not. */
+/**
+ * An option symbol carries its contract size; a share does not.
+ *
+ * Uses the shared parser. The pattern that used to live here demanded a padded
+ * eight-digit strike and therefore matched none of moomoo's real symbols, so
+ * every imported option fill recorded one-hundredth of the cash it moved.
+ */
 function multiplierFor(symbol: string): number {
-  return /^[A-Z]+\d{6}[CP]\d{8}$/.test(symbol) ? 100 : 1;
+  return parseSymbol(symbol).instrumentType === "option" ? 100 : 1;
 }
 
 function parse(csv: string): Row[] {

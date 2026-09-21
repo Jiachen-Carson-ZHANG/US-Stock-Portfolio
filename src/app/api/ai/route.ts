@@ -1,4 +1,5 @@
 import { authenticateRequest, unauthorized } from "@/lib/auth/guards";
+import { recordActivity } from "@/lib/activity";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { aiSchema } from "@/lib/schemas";
@@ -89,7 +90,14 @@ export async function POST(request: Request) {
       { maxTokens: 6000 },
     );
 
-    await saveAiNote(await getDb(), parsed.data.symbol, text);
+    const db = await getDb();
+    await saveAiNote(db, parsed.data.symbol, text);
+    await recordActivity(db, {
+      userId: user.id,
+      username: user.username,
+      kind: "ai_insight",
+      target: parsed.data.symbol,
+    });
     logger.info("ai.view", {
       symbol: parsed.data.symbol,
       by: user.username,

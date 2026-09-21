@@ -1,4 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/guards";
+import { recordActivity } from "@/lib/activity";
+import { authenticateRequest } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { exchangeCode, writeScopesIn } from "@/lib/moomoo/oauth";
@@ -66,6 +68,15 @@ export async function GET(request: Request) {
     });
     clearTokenCache();
 
+    const connector = await authenticateRequest();
+    if (connector) {
+      await recordActivity(db, {
+        userId: connector.id,
+        username: connector.username,
+        kind: "broker_connect",
+        detail: `moomoo · ${tokens.scope ?? "no scope reported"}`,
+      });
+    }
     logger.info("broker.connect.success", {
       provider: "moomoo",
       scope: tokens.scope,

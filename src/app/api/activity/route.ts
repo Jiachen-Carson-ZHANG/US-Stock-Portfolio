@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid activity" }, { status: 400 });
   }
 
-  recordActivity(await getDb(), {
+  await recordActivity(await getDb(), {
     userId: user.id,
     username: user.username,
     kind: parsed.data.kind,
@@ -41,9 +41,12 @@ export async function GET() {
   if ("response" in auth) return auth.response;
 
   const db = await getDb();
-  return Response.json({
-    mostViewed: mostViewedAssets(db),
-    byMember: activityByMember(db),
-    recent: recentActivity(db, 30),
-  });
+  // Awaited rather than passed as promises: JSON.stringify turns a pending
+  // promise into {}, so this endpoint was returning three empty objects.
+  const [mostViewed, byMember, recent] = await Promise.all([
+    mostViewedAssets(db),
+    activityByMember(db),
+    recentActivity(db, 30),
+  ]);
+  return Response.json({ mostViewed, byMember, recent });
 }

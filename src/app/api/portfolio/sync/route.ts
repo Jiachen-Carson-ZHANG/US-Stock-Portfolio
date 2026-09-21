@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/activity";
 import { requireApiOwner } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -9,13 +10,20 @@ export async function POST() {
   if ("response" in auth) return auth.response;
 
   const provider = await activeProvider();
+  const db = await getDb();
 
   try {
     const count = await syncPositions(
-      await getDb(),
+      db,
       await getBrokerProvider(),
       provider === "moomoo" ? "moomoo" : "mock",
     );
+    await recordActivity(db, {
+      userId: auth.user.id,
+      username: auth.user.username,
+      kind: "sync",
+      detail: `${count} positions from ${provider}`,
+    });
     logger.info("broker.sync.success", { provider, positions: count });
     return Response.json({ synced: count, provider });
   } catch (error) {
