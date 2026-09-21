@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import Decimal from "decimal.js";
 import { reconstruct, type PriceSeries } from "@/lib/portfolio/reconstruct";
 import type { BrokerTransaction } from "@/types/broker";
 

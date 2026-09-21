@@ -26,7 +26,7 @@ import {
   exactUsd,
   shortSymbol,
 } from "./chart-kit";
-import { HorizontalRoundedBar, VerticalRoundedBar } from "./rounded-bar";
+import { VerticalRoundedBar } from "./rounded-bar";
 import { useT } from "@/lib/i18n/context";
 import type { OptionGroupDTO } from "@/lib/portfolio/options";
 import {
