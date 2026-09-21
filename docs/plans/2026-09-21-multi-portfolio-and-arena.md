@@ -356,15 +356,33 @@ Also done, from the security discussion: change-your-own-password, wider
 behaviour logging, credential redaction in log values, and a read-only
 `analyst` database role.
 
+8. **Arena commentary** — a grounded, deliberately rude write-up per period,
+   with optional Tavily news search to explain what moved.
+9. **Trophy cabinet** — placings for finished weeks, months and years,
+   recorded by the daily job and unchangeable afterwards.
+10. **Asking for access** — a portfolio that is not yours says so and offers
+    to ask; the owner approves or declines and both sides are notified.
+11. **The polish list** — stat-card periods, the realized/unrealized toggle,
+    money on the monthly calendar, and the transactions tab as a full ledger
+    of trades and transfers with per-sale results.
+
 ### Not built
 
-- **AI commentary and comments in the Arena.** The leaderboard is there; the
-  daily/weekly/monthly write-up and the comment threads are not. The grounded
-  AI context exists but covers one portfolio, so it needs widening first.
-- **Trophy cabinet.** Ranks and medals show for the current period; nothing is
-  recorded when a period ends, so there is no history of who won what.
-- **The polish list** — stat-card dates, the realized/unrealized toggle,
-  dollar amounts on the monthly calendar, and finishing the transactions tab.
+- **Comment threads in the Arena.** The commentary is there; arguing with it
+  in writing is not. Reactions and threads exist in the Family Room and can
+  move across when the room is retired.
 - **Deleting the Family Room.** The nav points at the Arena; `/family` still
   works. Deleting roughly a thousand lines of working features should happen
   after someone has used the replacement, not before.
+
+### Decisions worth remembering
+
+- **Slugs follow the username**, except Mile's, which she asked to be
+  `/mirat`. A mock account carries `-mock` in the address so a link cannot be
+  mistaken for a real one.
+- **A private portfolio admits it exists.** The safer default is a flat 404,
+  which hides whether the address is taken. Among five family members, being
+  able to ask is worth more than that concealment — but it is a trade, and it
+  is the reason the page says "private" rather than "not found".
+- **Only the owner answers an access request.** Administrators run the
+  deployment; that is not the same as owning the money.
