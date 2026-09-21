@@ -106,22 +106,65 @@ is the "entry point" Carson asked for in both directions.
 
 ## Per-portfolio configuration
 
-Today `MOOMOO_CLIENT_ID` and `TOKEN_ENCRYPTION_KEY` are environment variables,
-which works for exactly one broker account. Mile's is a second.
+**`MOOMOO_CLIENT_ID` stays a single shared environment variable.** It
+identifies *this application* to moomoo, not a person — the registration sends
+`client_name` and `redirect_uris`, and the grant types are
+`authorization_code` and `refresh_token` with no client secret. Every user
+authorizes the same client and receives their own refresh token. Mile does not
+need her own, and neither does anyone after her.
 
-`broker_connections` already has one row per provider and already stores the
-encrypted refresh token. Adding `portfolio_id` makes it one row per portfolio,
-and `client_id` moves onto that row. `TOKEN_ENCRYPTION_KEY` stays an
-environment variable — it is the key that protects all of them, not a
-per-account secret.
+`TOKEN_ENCRYPTION_KEY` likewise stays one shared variable: it is the key those
+tokens are encrypted with, not a per-account secret.
 
-So Mile connecting her account is a normal OAuth round trip against her own
-portfolio row. No new environment variables, ever, for a new person.
+What *is* per portfolio is the refresh token, which already lives in
+`broker_connections`. Adding `portfolio_id` to that table makes it one row per
+portfolio, and connecting a new account becomes an ordinary OAuth round trip.
 
-`TOTAL_DEPOSITS` likewise stops being an environment variable: deposits live in
-`analysis_flows`, which is already dated, already per-portfolio after the
-migration, and already reconciles. The env var becomes a fallback for a
-portfolio with no ledger.
+**No new environment variable is ever needed for a new person.**
+
+`TOTAL_DEPOSITS` stops being an environment variable entirely: deposits live
+in `analysis_flows`, which is dated, per-portfolio after the migration, and
+already reconciles to the cent. A new person records their own deposits and
+nothing in the environment changes.
+
+---
+
+## Recording deposits
+
+The broker API does not report transfers, and no amount of engineering will
+change that — moomoo's `fills_history` returns trades only. A deposit is the
+one fact the app cannot derive, and getting it wrong moves every return figure
+by the same amount.
+
+So it needs to be asked for, prominently, not buried in a settings page:
+
+- **An "Add deposit" action on the portfolio header**, beside the value, for
+  anyone who owns that portfolio. Date, amount, optional note.
+- **A banner when the numbers stop reconciling.** Cash that trades and
+  recorded deposits cannot explain is a strong signal that money went in
+  unrecorded. Today's residual is $23 on $22,100; a threshold of roughly $200
+  would catch a real transfer without firing on dividends.
+- Withdrawals are the same form with a negative amount.
+
+Everything else — fills, prices, valuations — derives. This is the only thing
+a person has to tell the app.
+
+---
+
+## Keeping history current without anyone visiting
+
+Snapshots are a cache of a derivation, so a missed day can always be rebuilt
+later from fills and historical prices. But "later" still has to happen, and
+if nobody opens the app for a month nothing triggers it.
+
+A **monthly scheduled run of the reconstruction** is the backstop: it fills
+every missing day in one pass and corrects any day already recorded. It needs
+no secret beyond the scheduler's own auth, and if it fails nothing is lost —
+the next visit or the next run rebuilds the same days.
+
+This is different from the per-day capture that was originally planned. That
+one needed to fire at a precise time or the day was gone forever. This one
+only needs to run eventually.
 
 ---
 
@@ -183,7 +226,9 @@ the other.
 3. Mile connects her moomoo to `/mirat`
 4. Paper portfolios; parents create theirs
 5. The Arena, replacing the Family room
-6. Only then: the stat-card dates, the realized/unrealized toggle, dollar
+6. Deposit recording: the header action and the reconciliation banner
+7. The monthly reconstruction backstop
+8. Only then: the stat-card dates, the realized/unrealized toggle, dollar
    amounts on the monthly calendar, and the transactions tab
 
 ---
@@ -198,9 +243,11 @@ token cannot be rebuilt from anything.
 and re-checks permission. Worth a test per route asserting a viewer without
 access gets a 403 — cheaper to write than to discover.
 
-**Two moomoo accounts mean two OAuth clients** and two consent flows. Each
-portfolio's `client_id` lives on its own row, so they cannot be confused, but
-Mile has to approve read-only scopes herself.
+**Two moomoo accounts share one OAuth client but need two consent flows.**
+Mile approves read-only scopes on her own device and her refresh token lands
+on her portfolio's row. The risk is mixing the tokens up, not the client id —
+every broker call must take a portfolio id rather than reading "the"
+connection.
 
 **Paper trades need a fresh quote.** Filling at a stale price is how a game
 stops being interesting. The fifteen-minute rule already exists; keep it.
