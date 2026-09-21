@@ -1,0 +1,178 @@
+import { randomUUID } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
+import type { AuthUser } from "@/lib/auth/session";
+import { leaderboard, type Standing } from "@/lib/arena";
+import { createPortfolio, grantAccess } from "@/lib/portfolios";
+
+let db: TestDb;
+const NOW = new Date("2026-09-21T20:00:00.000Z");
+
+async function addUser(username: string, role: "owner" | "viewer" = "viewer") {
+  const id = randomUUID();
+  await db.run(
+    `INSERT INTO users (id, username, display_name, password_hash, role, created_at)
+     VALUES (?, ?, ?, 'hash', ?, ?)`,
+    [id, username, username, role, NOW.toISOString()],
+  );
+  return { id, username, displayName: username, role } satisfies AuthUser;
+}
+
+/** A straight-line climb from `start` to `end` over `days` weekdays. */
+async function history(
+  portfolioId: string,
+  start: number,
+  end: number,
+  days = 40,
+) {
+  const cursor = new Date("2026-08-01T00:00:00Z");
+  const points: string[] = [];
+  while (points.length < days) {
+    const weekday = cursor.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) points.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  for (const [i, date] of points.entries()) {
+    const value = start + ((end - start) * i) / (points.length - 1);
+    await db.run(
+      `INSERT INTO portfolio_snapshots
+         (id, snapshot_date, total_market_value, total_cost, total_unrealized_pnl,
+          cash_value, positions_json, created_at, realized_pnl, net_deposits,
+          source, portfolio_id)
+       VALUES (?, ?, ?, '0', '0', '0', '[]', ?, '0', '0', 'reconstructed', ?)`,
+      [randomUUID(), date, value.toFixed(2), NOW.toISOString(), portfolioId],
+    );
+  }
+
+  // The series refuses to report returns until the cash ledger is attested.
+  await db.run(
+    `INSERT INTO analysis_flows (id, date, amount, note, created_by, portfolio_id)
+     VALUES (?, ?, ?, 'seed', 'test', ?)`,
+    [randomUUID(), points[0], start, portfolioId],
+  );
+  await db.run(
+    `INSERT INTO analysis_config (portfolio_id, key, value) VALUES (?, 'review', ?)
+     ON CONFLICT (portfolio_id, key) DO UPDATE SET value = excluded.value`,
+    [portfolioId, JSON.stringify({ from: points[0], to: points[points.length - 1] })],
+  );
+}
+
+beforeEach(async () => {
+  db = await createTestDb();
+});
+
+afterEach(async () => {
+  await db.close();
+});
+
+describe("the leaderboard", () => {
+  it("ranks by return, so the bigger account does not simply win", async () => {
+    const admin = await addUser("carson", "owner");
+    const mum = await addUser("mother");
+
+    // A large account that grew 10%, and a small one that grew 50%.
+    await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
+    const small = await createPortfolio(db, {
+      slug: "mum-paper",
+      displayName: "Mum",
+      ownerUserId: mum.id,
+      kind: "paper",
+      openingCash: "10000",
+    });
+    await history(small.id, 10_000, 15_000);
+
+    const board = await leaderboard(db, admin, "max", NOW);
+    expect(board.standings.map((s) => s.slug)).toEqual(["mum-paper", "carson"]);
+    expect(board.standings[0].returnPercent).toBeGreaterThan(
+      board.standings[1].returnPercent!,
+    );
+  });
+
+  it("shows only the portfolios a viewer may open", async () => {
+    const mile = await addUser("mile");
+    const mum = await addUser("mother");
+
+    const hers = await createPortfolio(db, {
+      slug: "mirat",
+      displayName: "Mile",
+      ownerUserId: mile.id,
+      kind: "broker",
+    });
+    await history(hers.id, 5_000, 6_000);
+    const mums = await createPortfolio(db, {
+      slug: "mum-paper",
+      displayName: "Mum",
+      ownerUserId: mum.id,
+      kind: "paper",
+      openingCash: "10000",
+    });
+    await history(mums.id, 10_000, 9_000);
+
+    expect((await leaderboard(db, mile, "max", NOW)).standings.map((s) => s.slug)).toEqual([
+      "mirat",
+    ]);
+
+    await grantAccess(db, mums.id, mile.id);
+    const after = await leaderboard(db, mile, "max", NOW);
+    expect(after.standings.map((s) => s.slug).sort()).toEqual(["mirat", "mum-paper"]);
+  });
+
+  it("puts anyone without a figure below everyone who has one", async () => {
+    const admin = await addUser("carson", "owner");
+    const mum = await addUser("mother");
+
+    await history(TEST_PORTFOLIO_ID, 20_000, 19_000); // a loss, but a figure
+    await createPortfolio(db, {
+      slug: "mum-paper",
+      displayName: "Mum",
+      ownerUserId: mum.id,
+      kind: "paper",
+      openingCash: "10000",
+    }); // no history at all
+
+    const board = await leaderboard(db, admin, "max", NOW);
+    expect(board.standings[0].slug).toBe("carson");
+    expect(board.standings[1].returnPercent).toBeNull();
+    expect(board.standings[1].unavailable).toBeTruthy();
+  });
+
+  it("rebases every period to 100 so the curves are comparable", async () => {
+    const admin = await addUser("carson", "owner");
+    await history(TEST_PORTFOLIO_ID, 10_000, 12_000);
+
+    const board = await leaderboard(db, admin, "max", NOW);
+    const curve = board.standings[0].curve;
+    expect(curve[0].index).toBeCloseTo(100, 6);
+    expect(curve[curve.length - 1].index).toBeGreaterThan(100);
+  });
+});
+
+// The privacy rule is meant to be enforced by the shape of the data, not by
+// remembering not to render a field. This is the test that says so.
+describe("what the Arena must never disclose", () => {
+  it("carries no account value, cash balance or dollar profit", async () => {
+    const admin = await addUser("carson", "owner");
+    await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
+
+    const board = await leaderboard(db, admin, "max", NOW);
+    const standing: Standing = board.standings[0];
+
+    expect(Object.keys(standing).sort()).toEqual([
+      "curve",
+      "displayName",
+      "kind",
+      "returnPercent",
+      "slug",
+      "unavailable",
+    ]);
+
+    // Nothing anywhere in the payload is large enough to be a balance.
+    const serialised = JSON.stringify(board);
+    expect(serialised).not.toContain("20000");
+    expect(serialised).not.toContain("22000");
+    for (const point of standing.curve) {
+      expect(Math.abs(point.index)).toBeLessThan(1000);
+    }
+  });
+});
