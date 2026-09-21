@@ -54,11 +54,13 @@ export default async function AppLayout({
             </div>
           </header>
 
-          {canSignOut && (
-            <div className="hidden justify-end px-8 pt-4 md:flex">
-              <NotificationBell initialUnread={unread} />
-            </div>
-          )}
+          {/* The desktop toolbar. The language switch used to sit alone at
+              the bottom of the sidebar, below the navigation, where nobody
+              looked for it. Top right is where people look. */}
+          <div className="hidden items-center justify-end gap-1 px-8 pt-4 md:flex">
+            <LanguageToggle className="px-2" />
+            {canSignOut && <NotificationBell initialUnread={unread} />}
+          </div>
 
           <main className="flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-4 md:pb-10">
             <div className="mx-auto w-full max-w-6xl">{children}</div>

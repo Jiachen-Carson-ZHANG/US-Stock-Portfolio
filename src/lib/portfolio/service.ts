@@ -1,6 +1,6 @@
 import "server-only";
 import { getDb, type DB } from "@/lib/db";
-import { findById } from "@/lib/portfolios";
+import { DEFAULT_SLUG, findById, type Portfolio } from "@/lib/portfolios";
 import { mockState, syncMockPositions } from "./mock";
 import { getMarketDataProvider } from "@/providers";
 import {
@@ -85,17 +85,32 @@ export function baseCurrency(): string {
  */
 export async function netDeposits(
   db: DB,
-  portfolioId: string,
+  portfolio: Portfolio,
   currency: string,
 ): Promise<Money | null> {
   const row = await db.get<{ total: string | null }>(
     `SELECT SUM(amount)::text AS total FROM analysis_flows WHERE portfolio_id = ?`,
-    [portfolioId],
+    [portfolio.id],
   );
   const ledger = row?.total === null || row?.total === undefined ? null : Number(row.total);
+
+  // A mock account starts from a stated balance. That balance is its
+  // deposit, and any later transfer adds to it.
+  if (portfolio.kind === "mock") {
+    const opening = Number(portfolio.openingCash ?? "0");
+    const total = (Number.isFinite(opening) ? opening : 0) + (ledger ?? 0);
+    return total > 0 ? money(total, currency) : null;
+  }
+
   if (ledger !== null && Number.isFinite(ledger) && ledger > 0) {
     return money(ledger, currency);
   }
+
+  // TOTAL_DEPOSITS describes one account — the original one — and applying
+  // it to every portfolio that has no ledger yet is how a brand-new mock
+  // account came to report $22,100 paid in and a $12,100 loss on its first
+  // day. It is on its way out; until then it is scoped to where it is true.
+  if (portfolio.slug !== DEFAULT_SLUG) return null;
 
   const raw = process.env.TOTAL_DEPOSITS;
   if (!raw) return null;
@@ -105,6 +120,36 @@ export async function netDeposits(
     return null;
   }
   return money(parsed, currency);
+}
+
+/**
+ * The first day this portfolio has any record of — a transfer in, or the
+ * earliest valuation.
+ *
+ * Two queries and a comparison rather than one clever SELECT: the previous
+ * version reused a positional parameter inside two subqueries wrapped in
+ * LEAST, which is exactly the kind of thing that quietly returns null and
+ * leaves a card with no date under it.
+ */
+export async function portfolioStart(
+  db: DB,
+  portfolioId: string,
+): Promise<string | null> {
+  const [flow, snapshot] = await Promise.all([
+    db.get<{ date: string | null }>(
+      `SELECT MIN(date) AS date FROM analysis_flows WHERE portfolio_id = ?`,
+      [portfolioId],
+    ),
+    db.get<{ date: string | null }>(
+      `SELECT MIN(snapshot_date) AS date FROM portfolio_snapshots WHERE portfolio_id = ?`,
+      [portfolioId],
+    ),
+  ]);
+
+  const dates = [flow?.date, snapshot?.date].filter(
+    (date): date is string => typeof date === "string" && date.length > 0,
+  );
+  return dates.length > 0 ? dates.sort()[0] : null;
 }
 
 function positionTtlSeconds(): number {
@@ -197,13 +242,16 @@ export async function loadPortfolio(
 ): Promise<PortfolioData> {
   const currency = baseCurrency();
   const db = await getDb();
+  const portfolio = await findById(db, portfolioId);
+  if (!portfolio) throw new Error(`No portfolio ${portfolioId}`);
+
   const { positions, dataTimestamp, isStale } = await pricedPositions(portfolioId, now);
 
   const summary = summarize(
     positions,
     currency,
     { status: marketSession(now), dataTimestamp, isStale },
-    await netDeposits(db, portfolioId, currency),
+    await netDeposits(db, portfolio, currency),
   );
 
   // From the fills, which cover the whole account, rather than the broker's

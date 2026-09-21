@@ -196,8 +196,9 @@ export function Sidebar({
         </ul>
       </nav>
 
+      {/* Language moved to the toolbar at the top of the page; keeping a
+          second copy here would just mean two places to look. */}
       <div className="space-y-0.5 px-3 pb-4">
-        <LanguageToggle className="w-full justify-start" />
         {canSignOut && <SignOutButton />}
       </div>
     </aside>

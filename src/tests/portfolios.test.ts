@@ -13,6 +13,7 @@ import {
   revokeAccess,
   visibleTo,
 } from "@/lib/portfolios";
+import { portfolioStart } from "@/lib/portfolio/service";
 
 let db: TestDb;
 
@@ -219,5 +220,42 @@ describe("slugs", () => {
         }),
       ).rejects.toThrow();
     }
+  });
+});
+
+describe("when a portfolio's history starts", () => {
+  it("takes the earliest of a transfer and a valuation", async () => {
+    await db.run(
+      `INSERT INTO analysis_flows (id, date, amount, note, created_by, portfolio_id)
+       VALUES (?, '2026-05-20', 5000, 'seed', 'test', ?)`,
+      [randomUUID(), TEST_PORTFOLIO_ID],
+    );
+    await db.run(
+      `INSERT INTO portfolio_snapshots
+         (id, snapshot_date, total_market_value, total_cost, total_unrealized_pnl,
+          cash_value, positions_json, created_at, source, portfolio_id)
+       VALUES (?, '2026-06-03', '5000', '0', '0', '5000', '[]', ?, 'reconstructed', ?)`,
+      [randomUUID(), new Date().toISOString(), TEST_PORTFOLIO_ID],
+    );
+
+    expect(await portfolioStart(db, TEST_PORTFOLIO_ID)).toBe("2026-05-20");
+  });
+
+  // The bug this replaces: one clever SELECT reusing a positional parameter
+  // across two subqueries returned null, and the card lost its date.
+  it("still answers when only one of the two exists", async () => {
+    await db.run(
+      `INSERT INTO portfolio_snapshots
+         (id, snapshot_date, total_market_value, total_cost, total_unrealized_pnl,
+          cash_value, positions_json, created_at, source, portfolio_id)
+       VALUES (?, '2026-06-03', '5000', '0', '0', '5000', '[]', ?, 'reconstructed', ?)`,
+      [randomUUID(), new Date().toISOString(), TEST_PORTFOLIO_ID],
+    );
+
+    expect(await portfolioStart(db, TEST_PORTFOLIO_ID)).toBe("2026-06-03");
+  });
+
+  it("returns nothing for a portfolio with no history at all", async () => {
+    expect(await portfolioStart(db, TEST_PORTFOLIO_ID)).toBeNull();
   });
 });

@@ -21,6 +21,7 @@ export function LiveDashboard({
   canWrite,
   isMock,
   since,
+  ownerName,
 }: {
   initial: LivePortfolio;
   concentration: Concentration;
@@ -29,6 +30,8 @@ export function LiveDashboard({
   canWrite: boolean;
   isMock: boolean;
   since: string | null;
+  /** Whose account it is, for explaining why you cannot trade in it. */
+  ownerName: string | null;
 }) {
   const t = useT();
   const { data, refreshing, refresh } = usePortfolio(initial);
@@ -45,7 +48,16 @@ export function LiveDashboard({
       <header className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold tracking-tight">{portfolioName}</h1>
-          {canWrite && isMock && <MockTrade portfolioSlug={portfolioSlug} />}
+          {isMock && canWrite && <MockTrade portfolioSlug={portfolioSlug} />}
+          {isMock && !canWrite && (
+            // Without this the page simply has no button and the reader is
+            // left wondering whether trading is broken or forbidden.
+            <p className="text-xs text-muted-foreground">
+              {ownerName
+                ? `Only ${ownerName} can trade in this account.`
+                : "Only this account's owner can trade in it."}
+            </p>
+          )}
           {canWrite && !isMock && (
             <AddDeposit
               portfolioSlug={portfolioSlug}
@@ -59,6 +71,14 @@ export function LiveDashboard({
           onRefresh={refresh}
         />
       </header>
+
+      {isMock && data.positions.filter((p) => p.instrumentType !== "cash").length === 0 && (
+        <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
+          {canWrite
+            ? "Nothing bought yet. Press Trade, type a ticker and a number of shares — real prices, practice money."
+            : "Nothing bought yet."}
+        </p>
+      )}
 
       <ReconciliationBanner
         residual={unattributed}
