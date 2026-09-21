@@ -88,5 +88,5 @@ export async function loginAction(
   logger.info("auth.login.success", { username });
 
   // redirect throws, so it must sit outside any try/catch above.
-  redirect("/dashboard");
+  redirect("/");
 }

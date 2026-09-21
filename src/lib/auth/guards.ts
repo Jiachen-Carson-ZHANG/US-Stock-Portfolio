@@ -38,10 +38,15 @@ export async function requireUser(): Promise<AuthUser> {
   return user;
 }
 
-/** Server Component guard for owner-only pages. Viewers land back on /dashboard. */
+/**
+ * Server Component guard for owner-only pages.
+ *
+ * Viewers land on "/", which resolves to whichever portfolio is theirs —
+ * "/dashboard" is no longer a page, only a redirect to the same place.
+ */
 export async function requireOwner(): Promise<AuthUser> {
   const user = await requireUser();
-  if (user.role !== "owner") redirect("/dashboard");
+  if (user.role !== "owner") redirect("/");
   return user;
 }
 

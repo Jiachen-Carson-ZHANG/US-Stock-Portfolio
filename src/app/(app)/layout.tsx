@@ -1,4 +1,6 @@
 import { isOpenAccess, requireUser } from "@/lib/auth/guards";
+import { getDb } from "@/lib/db";
+import { defaultFor, visibleTo } from "@/lib/portfolios";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/context";
 import {
@@ -15,6 +17,17 @@ export default async function AppLayout({
   const { locale, t } = await serverDictionary();
   const canSignOut = !isOpenAccess();
 
+  // The nav needs the list to build links and to decide whether a switcher is
+  // worth showing. It is the same access rule as everywhere else, so a
+  // portfolio you cannot open never appears in it.
+  const db = await getDb();
+  const portfolios = (await visibleTo(db, user)).map((portfolio) => ({
+    slug: portfolio.slug,
+    displayName: portfolio.displayName,
+    kind: portfolio.kind,
+  }));
+  const defaultSlug = (await defaultFor(db, user))?.slug ?? "";
+
   return (
     <LocaleProvider locale={locale}>
       <div className="flex min-h-dvh">
@@ -22,6 +35,8 @@ export default async function AppLayout({
           role={user.role}
           displayName={user.displayName}
           canSignOut={canSignOut}
+          portfolios={portfolios}
+          defaultSlug={defaultSlug}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -40,7 +55,11 @@ export default async function AppLayout({
           </main>
         </div>
 
-        <BottomNav role={user.role} />
+        <BottomNav
+          role={user.role}
+          portfolios={portfolios}
+          defaultSlug={defaultSlug}
+        />
       </div>
     </LocaleProvider>
   );

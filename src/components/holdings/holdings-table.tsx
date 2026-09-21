@@ -5,6 +5,7 @@ import { Fragment, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { spreadPrices } from "@/lib/portfolio/chart-data";
+import { usePortfolioBase } from "@/lib/portfolios/path";
 import { cn, signClass } from "@/lib/utils";
 import { useT } from "@/lib/i18n/context";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -129,6 +130,7 @@ function Outcome({
 
 function GroupDetail({ group }: { group: OptionGroupDTO }) {
   const t = useT();
+  const base = usePortfolioBase();
 
   return (
     <div className="space-y-4 px-4 py-3">
@@ -175,7 +177,7 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
               className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-sm"
             >
               <Link
-                href={`/holdings/${encodeURIComponent(leg.symbol)}`}
+                href={`${base}/holdings/${encodeURIComponent(leg.symbol)}`}
                 onClick={() => recordView(leg.symbol)}
                 className="font-medium hover:underline"
               >
@@ -197,6 +199,7 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
 
 function PositionDetail({ position }: { position: PositionView }) {
   const t = useT();
+  const base = usePortfolioBase();
 
   const rows = [
     { label: t.position.costBasis, value: formatMoney(position.costBasis) },
@@ -228,6 +231,7 @@ export function HoldingsTable({
   optionGroups: OptionGroupDTO[];
 }) {
   const t = useT();
+  const base = usePortfolioBase();
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = buildHoldingRows(positions, optionGroups);
 
@@ -354,7 +358,7 @@ export function HoldingsTable({
                         p.symbol
                       ) : (
                         <Link
-                          href={`/holdings/${encodeURIComponent(p.symbol)}`}
+                          href={`${base}/holdings/${encodeURIComponent(p.symbol)}`}
                           className="hover:underline"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -493,7 +497,7 @@ export function HoldingsTable({
                       {!isCash && (
                         <div className="px-4 pb-3">
                           <Link
-                            href={`/holdings/${encodeURIComponent(row.position.symbol)}`}
+                            href={`${base}/holdings/${encodeURIComponent(row.position.symbol)}`}
                             onClick={() => recordView(row.position.symbol)}
                             className="text-sm underline underline-offset-4"
                           >

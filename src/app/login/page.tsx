@@ -7,7 +7,7 @@ import { LanguageToggle } from "@/components/layout/nav";
 import { BrandMark } from "@/components/layout/brand-mark";
 
 export default async function LoginPage() {
-  if (await getCurrentUser()) redirect("/dashboard");
+  if (await getCurrentUser()) redirect("/");
   const { locale, t } = await serverDictionary();
 
   return (
