@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { allLeaderboards } from "@/lib/arena";
+import { trophiesFor } from "@/lib/arena/trophies";
+import { visibleTo } from "@/lib/portfolios";
 import { ArenaBoard } from "@/components/arena/board";
 import { EmptyState } from "@/components/ui/misc";
 
@@ -8,7 +10,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ArenaPage() {
   const user = await requireUser();
-  const boards = await allLeaderboards(await getDb(), user);
+  const db = await getDb();
+  const boards = await allLeaderboards(db, user);
+  const visible = await visibleTo(db, user);
+  const trophies = await trophiesFor(db, visible.map((p) => p.id));
 
   if (boards.max.standings.length < 2) {
     return (
@@ -22,5 +27,5 @@ export default async function ArenaPage() {
     );
   }
 
-  return <ArenaBoard boards={boards} />;
+  return <ArenaBoard boards={boards} trophies={trophies} />;
 }

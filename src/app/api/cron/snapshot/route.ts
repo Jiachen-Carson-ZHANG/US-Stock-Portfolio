@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { loadPortfolio } from "@/lib/portfolio/service";
 import { getDb } from "@/lib/db";
 import { listPortfolios } from "@/lib/portfolios";
+import { awardCompletedPeriods } from "@/lib/arena/trophies";
 import { hasSnapshot } from "@/lib/portfolio/snapshots";
 import { isAfterMarketClose, marketDateString } from "@/lib/market-hours";
 export async function POST(request: Request) {
@@ -47,9 +48,13 @@ export async function POST(request: Request) {
     }
   }
 
+  // After the day is recorded, not before: a period that ended yesterday is
+  // only fully measurable once yesterday's close is in.
+  const { awarded } = await awardCompletedPeriods(db, now);
+
   const captured = results.filter((r) => r.captured).length;
   return Response.json(
-    { date, captured, results },
+    { date, captured, awarded, results },
     // A partial failure is still a failure worth retrying, but only when
     // nothing at all was recorded and something was expected to be.
     { status: captured > 0 || results.length === 0 ? 200 : 503 },

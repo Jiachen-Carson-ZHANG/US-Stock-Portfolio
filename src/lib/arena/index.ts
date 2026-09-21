@@ -139,7 +139,21 @@ export async function leaderboard(
   period: Period,
   now: Date = new Date(),
 ): Promise<Leaderboard> {
-  const portfolios = await visibleTo(db, user);
+  return { period, standings: await rank(db, await visibleTo(db, user), period, now) };
+}
+
+/**
+ * Standings for a given set of portfolios, ranked.
+ *
+ * Separated from the viewer-scoped leaderboard because awarding a trophy has
+ * to consider everybody, not only whoever happens to be looking.
+ */
+export async function rank(
+  db: DB,
+  portfolios: Portfolio[],
+  period: Period,
+  now: Date,
+): Promise<Standing[]> {
   const standings = await Promise.all(
     portfolios.map((portfolio) => standingFor(db, portfolio, period, now)),
   );
@@ -155,7 +169,7 @@ export async function leaderboard(
     return b.returnPercent - a.returnPercent;
   });
 
-  return { period, standings };
+  return standings;
 }
 
 export async function allLeaderboards(

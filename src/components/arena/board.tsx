@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Trophy } from "lucide-react";
 import { IndexLine } from "@/components/charts/index-line";
+import { ArenaCommentary } from "@/components/arena/commentary";
 import { PERIODS, type Leaderboard, type Period } from "@/lib/arena";
+import type { Trophy as TrophyRecord } from "@/lib/arena/trophies";
 import { cn, signClass } from "@/lib/utils";
 
 const LABEL: Record<Period, string> = {
@@ -30,7 +32,13 @@ function pct(value: number | null): string {
  * A percentage is also the only figure that compares honestly across
  * accounts of different sizes.
  */
-export function ArenaBoard({ boards }: { boards: Record<Period, Leaderboard> }) {
+export function ArenaBoard({
+  boards,
+  trophies,
+}: {
+  boards: Record<Period, Leaderboard>;
+  trophies: TrophyRecord[];
+}) {
   const [period, setPeriod] = useState<Period>("month");
   const board = boards[period];
   const ranked = board.standings.filter((s) => s.returnPercent !== null);
@@ -110,6 +118,10 @@ export function ArenaBoard({ boards }: { boards: Record<Period, Leaderboard> }) 
         </ul>
       </section>
 
+      <ArenaCommentary period={period} />
+
+      <TrophyCabinet trophies={trophies} />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {board.standings
           .filter((standing) => standing.curve.length > 1)
@@ -124,5 +136,59 @@ export function ArenaBoard({ boards }: { boards: Record<Period, Leaderboard> }) 
           ))}
       </div>
     </div>
+  );
+}
+
+const PLACE = ["1st", "2nd", "3rd"];
+
+/**
+ * What has actually been won, rather than who is ahead right now.
+ *
+ * Recorded when a period ends, so it does not change under you: the medal
+ * beside the leaderboard is a live position, this is a result.
+ */
+function TrophyCabinet({ trophies }: { trophies: TrophyRecord[] }) {
+  if (trophies.length === 0) return null;
+
+  const byPortfolio = new Map<string, TrophyRecord[]>();
+  for (const trophy of trophies) {
+    const bucket = byPortfolio.get(trophy.portfolioName) ?? [];
+    bucket.push(trophy);
+    byPortfolio.set(trophy.portfolioName, bucket);
+  }
+
+  return (
+    <section className="rounded-xl border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium">Trophy cabinet</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Finished periods only. Nothing here can change.
+      </p>
+
+      <ul className="mt-4 space-y-3">
+        {[...byPortfolio].map(([name, won]) => {
+          const firsts = won.filter((t) => t.rank === 1).length;
+          return (
+            <li key={name} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-sm font-medium">{name}</span>
+              {firsts > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs text-chart-4">
+                  <Trophy className="size-3.5" aria-hidden="true" />
+                  {firsts} win{firsts === 1 ? "" : "s"}
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {won
+                  .slice(0, 6)
+                  .map(
+                    (t) =>
+                      `${PLACE[t.rank - 1] ?? `${t.rank}th`} · ${t.period} to ${t.periodEnd}`,
+                  )
+                  .join("  ·  ")}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

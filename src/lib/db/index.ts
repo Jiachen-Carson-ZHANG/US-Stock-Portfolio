@@ -210,6 +210,21 @@ CREATE TABLE IF NOT EXISTS portfolio_access (
 );
 CREATE INDEX IF NOT EXISTS idx_portfolio_access_user ON portfolio_access(user_id);
 
+-- Who won which period. Recorded once a period has ended, because a trophy
+-- for a week still running would change hands all week.
+CREATE TABLE IF NOT EXISTS trophies (
+  id             TEXT PRIMARY KEY,
+  portfolio_id   TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  period         TEXT NOT NULL CHECK (period IN ('week','month','year')),
+  -- The last day of the period, so the pair identifies it exactly.
+  period_end     TEXT NOT NULL,
+  rank           INTEGER NOT NULL,
+  return_percent DOUBLE PRECISION NOT NULL,
+  awarded_at     TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trophy_period
+  ON trophies(period, period_end, portfolio_id);
+
 -- Asking for access, and being told about it.
 CREATE TABLE IF NOT EXISTS access_requests (
   id           TEXT PRIMARY KEY,

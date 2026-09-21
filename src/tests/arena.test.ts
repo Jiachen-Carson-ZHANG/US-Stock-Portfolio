@@ -4,6 +4,12 @@ import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
 import type { AuthUser } from "@/lib/auth/session";
 import { leaderboard, type Standing } from "@/lib/arena";
 import { createPortfolio, grantAccess } from "@/lib/portfolios";
+import {
+  awardCompletedPeriods,
+  lastCompletedEnd,
+  trophiesFor,
+} from "@/lib/arena/trophies";
+import { notificationsFor } from "@/lib/notifications";
 
 let db: TestDb;
 const NOW = new Date("2026-09-21T20:00:00.000Z");
@@ -174,5 +180,71 @@ describe("what the Arena must never disclose", () => {
     for (const point of standing.curve) {
       expect(Math.abs(point.index)).toBeLessThan(1000);
     }
+  });
+});
+
+describe("the trophy cabinet", () => {
+  it("names the last completed week, month and year", () => {
+    // A Monday. The week that ended is the Sunday before it.
+    const monday = new Date("2026-09-21T10:00:00Z");
+    expect(lastCompletedEnd("week", monday)).toBe("2026-09-20");
+    expect(lastCompletedEnd("month", monday)).toBe("2026-08-31");
+    expect(lastCompletedEnd("year", monday)).toBe("2025-12-31");
+
+    // A Sunday counts its own week as still running.
+    const sunday = new Date("2026-09-20T10:00:00Z");
+    expect(lastCompletedEnd("week", sunday)).toBe("2026-09-13");
+  });
+
+  it("records placings once and not again", async () => {
+    const admin = await addUser("carson", "owner");
+    const mum = await addUser("mother");
+
+    await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
+    const hers = await createPortfolio(db, {
+      slug: "mother-mock",
+      displayName: "Mum",
+      ownerUserId: mum.id,
+      kind: "mock",
+      openingCash: "10000",
+    });
+    await history(hers.id, 10_000, 15_000);
+
+    const first = await awardCompletedPeriods(db, NOW);
+    expect(first.awarded).toBeGreaterThan(0);
+
+    const again = await awardCompletedPeriods(db, NOW);
+    expect(again.awarded).toBe(0);
+
+    const cabinet = await trophiesFor(db, [TEST_PORTFOLIO_ID, hers.id]);
+    const winners = cabinet.filter((t) => t.rank === 1);
+    expect(winners.length).toBeGreaterThan(0);
+    // The smaller account grew more, so it takes first place.
+    expect(winners.every((t) => t.portfolioSlug === "mother-mock")).toBe(true);
+    expect(admin.role).toBe("owner");
+  });
+
+  it("tells the winner", async () => {
+    await addUser("carson", "owner");
+    const mum = await addUser("mother");
+    await history(TEST_PORTFOLIO_ID, 20_000, 20_100);
+    const hers = await createPortfolio(db, {
+      slug: "mother-mock",
+      displayName: "Mum",
+      ownerUserId: mum.id,
+      kind: "mock",
+      openingCash: "10000",
+    });
+    await history(hers.id, 10_000, 14_000);
+
+    await awardCompletedPeriods(db, NOW);
+    const told = await notificationsFor(db, mum.id);
+    expect(told.some((n) => n.kind === "trophy")).toBe(true);
+  });
+
+  it("awards nothing when there is nobody to compete with", async () => {
+    await addUser("carson", "owner");
+    await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
+    expect((await awardCompletedPeriods(db, NOW)).awarded).toBe(0);
   });
 });
