@@ -84,7 +84,7 @@ export async function requestAccess(
         kind: "access_request",
         title: `${input.userName} would like to see ${portfolio.displayName}`,
         body: input.message ?? null,
-        link: "/settings#access",
+        link: "/account",
       },
       now,
     );
