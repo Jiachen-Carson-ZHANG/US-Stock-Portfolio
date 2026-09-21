@@ -1,5 +1,7 @@
 import "server-only";
 import { getDb, type DB } from "@/lib/db";
+import { findById } from "@/lib/portfolios";
+import { paperState, syncPaperPositions } from "./paper";
 import { getMarketDataProvider } from "@/providers";
 import {
   marketSession,
@@ -115,9 +117,26 @@ function positionTtlSeconds(): number {
  * rather than one each. A failure leaves the previous holdings in place.
  */
 async function ensureFreshPositions(portfolioId: string, now: Date): Promise<void> {
+  const db = await getDb();
+
+  // A paper portfolio has no broker to ask. Its holdings are the replay of
+  // its own trades, rewritten into the same table the broker sync uses so
+  // every page downstream cannot tell the difference.
+  const portfolio = await findById(db, portfolioId);
+  if (portfolio?.kind === "paper") {
+    const { holdings } = await paperState(db, portfolio);
+    const symbols = [...holdings]
+      .filter(([, lot]) => !lot.quantity.isZero())
+      .map(([symbol]) => symbol);
+    const { quotes } = symbols.length
+      ? await getQuotes(db, symbols, await getMarketDataProvider(portfolioId), now)
+      : { quotes: new Map() };
+    await syncPaperPositions(db, portfolio, quotes, now);
+    return;
+  }
+
   if ((await activeProvider(portfolioId)) !== "moomoo") return;
 
-  const db = await getDb();
   const synced = await lastSyncedAt(db, portfolioId);
   if (synced) {
     const age = now.getTime() - new Date(synced).getTime();

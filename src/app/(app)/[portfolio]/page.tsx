@@ -38,6 +38,7 @@ export default async function DashboardPage({
       portfolioSlug={portfolio.slug}
       portfolioName={portfolio.displayName}
       canWrite={canWrite(user, portfolio)}
+      isPaper={portfolio.kind === "paper"}
       initial={{ summary, positions, allocations, totalInvested, optionGroups, realizedBySymbol }}
       concentration={concentration}
     />

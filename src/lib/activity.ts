@@ -15,7 +15,8 @@ export type ActivityKind =
   | "ai_insight"
   | "portfolio_create"
   | "access_grant"
-  | "access_revoke";
+  | "access_revoke"
+  | "paper_trade";
 
 export type ActivityEvent = {
   username: string;

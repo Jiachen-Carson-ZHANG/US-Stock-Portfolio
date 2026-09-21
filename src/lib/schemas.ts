@@ -70,6 +70,16 @@ export const createPortfolioSchema = z.object({
     .optional(),
 });
 
+/**
+ * Whole shares only, and a sane upper bound. Fractional paper shares would
+ * not match how the real account trades, which is the thing being compared.
+ */
+export const paperTradeSchema = z.object({
+  side: z.enum(["buy", "sell"]),
+  symbol: symbolSchema,
+  quantity: z.number().int().positive().max(1_000_000),
+});
+
 export const portfolioAccessSchema = z.object({
   portfolioId: z.string().uuid(),
   userId: z.string().uuid(),
