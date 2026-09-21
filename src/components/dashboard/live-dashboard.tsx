@@ -7,7 +7,7 @@ import { ConcentrationTiles } from "@/components/dashboard/concentration";
 import { MarketStatus } from "@/components/dashboard/market-status";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { AddDeposit, ReconciliationBanner } from "@/components/dashboard/deposits";
-import { PaperTrade } from "@/components/dashboard/paper-trade";
+import { MockTrade } from "@/components/dashboard/mock-trade";
 import { usePortfolio, type LivePortfolio } from "@/components/dashboard/use-portfolio";
 import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { useT } from "@/lib/i18n/context";
@@ -19,14 +19,14 @@ export function LiveDashboard({
   portfolioSlug,
   portfolioName,
   canWrite,
-  isPaper,
+  isMock,
 }: {
   initial: LivePortfolio;
   concentration: Concentration;
   portfolioSlug: string;
   portfolioName: string;
   canWrite: boolean;
-  isPaper: boolean;
+  isMock: boolean;
 }) {
   const t = useT();
   const { data, refreshing, refresh } = usePortfolio(initial);
@@ -43,8 +43,8 @@ export function LiveDashboard({
       <header className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold tracking-tight">{portfolioName}</h1>
-          {canWrite && isPaper && <PaperTrade portfolioSlug={portfolioSlug} />}
-          {canWrite && !isPaper && (
+          {canWrite && isMock && <MockTrade portfolioSlug={portfolioSlug} />}
+          {canWrite && !isMock && (
             <AddDeposit
               portfolioSlug={portfolioSlug}
               currency={data.summary.totalMarketValue.currency}

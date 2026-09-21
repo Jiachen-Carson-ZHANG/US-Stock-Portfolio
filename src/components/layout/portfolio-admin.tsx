@@ -13,7 +13,7 @@ export type AdminPortfolio = {
   slug: string;
   displayName: string;
   ownerUserId: string | null;
-  kind: "broker" | "paper";
+  kind: "broker" | "mock";
   readers: string[];
 };
 
@@ -34,7 +34,21 @@ export function PortfolioAdmin({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [kind, setKind] = useState<"broker" | "paper">("broker");
+  const [kind, setKind] = useState<"broker" | "mock">("broker");
+  const [ownerId, setOwnerId] = useState(people[0]?.id ?? "");
+  const [slug, setSlug] = useState("");
+  const [touchedSlug, setTouchedSlug] = useState(false);
+
+  // The address follows the person's username unless they ask for something
+  // else — Mile wanted /mirat. A mock account says so in the address, because
+  // a link that looks like a real portfolio and is not would be confusing in
+  // exactly the place it matters.
+  const suggested = (() => {
+    const username = people.find((p) => p.id === ownerId)?.username ?? "";
+    if (!username) return "";
+    return kind === "mock" ? `${username}-mock` : username;
+  })();
+  const address = touchedSlug ? slug : suggested;
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,11 +61,11 @@ export function PortfolioAdmin({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        slug: String(data.get("slug") ?? ""),
+        slug: address,
         displayName: String(data.get("displayName") ?? ""),
         ownerUserId: String(data.get("ownerUserId") ?? ""),
         kind,
-        openingCash: kind === "paper" ? String(data.get("openingCash") ?? "") : undefined,
+        openingCash: kind === "mock" ? String(data.get("openingCash") ?? "") : undefined,
       }),
     });
     const body = await response.json().catch(() => ({}));
@@ -62,6 +76,8 @@ export function PortfolioAdmin({
       return;
     }
     form.reset();
+    setTouchedSlug(false);
+    setSlug("");
     router.refresh();
   }
 
@@ -133,8 +149,21 @@ export function PortfolioAdmin({
           <Label htmlFor="slug" className="text-xs text-muted-foreground">
             Address
           </Label>
-          <Input id="slug" name="slug" placeholder="mirat" required />
-          <p className="text-xs text-muted-foreground">Appears as /mirat</p>
+          <Input
+            id="slug"
+            name="slug"
+            value={address}
+            onChange={(event) => {
+              setTouchedSlug(true);
+              setSlug(event.target.value);
+            }}
+            placeholder="mirat"
+            required
+          />
+          <p className="text-xs text-muted-foreground">
+            Their page will be at <code>/{address || "…"}</code>. Follows the
+            username unless you change it.
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -152,6 +181,8 @@ export function PortfolioAdmin({
             id="ownerUserId"
             name="ownerUserId"
             required
+            value={ownerId}
+            onChange={(event) => setOwnerId(event.target.value)}
             className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
           >
             {people.map((person) => (
@@ -169,18 +200,23 @@ export function PortfolioAdmin({
           <select
             id="kind"
             value={kind}
-            onChange={(event) => setKind(event.target.value as "broker" | "paper")}
+            onChange={(event) => setKind(event.target.value as "broker" | "mock")}
             className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
           >
-            <option value="broker">Real — connects a brokerage</option>
-            <option value="paper">Paper — starts with a stated balance</option>
+            <option value="broker">Real account</option>
+            <option value="mock">Mock account</option>
           </select>
+          <p className="text-xs text-muted-foreground">
+            {kind === "broker"
+              ? "Follows a real brokerage. Holdings come from moomoo."
+              : "Practice money, real prices. Nothing is actually bought."}
+          </p>
         </div>
 
-        {kind === "paper" && (
+        {kind === "mock" && (
           <div className="space-y-2">
             <Label htmlFor="openingCash" className="text-xs text-muted-foreground">
-              Opening balance
+              Starting money
             </Label>
             <Input
               id="openingCash"

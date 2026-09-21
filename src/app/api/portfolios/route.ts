@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       displayName: parsed.data.displayName,
       ownerUserId: parsed.data.ownerUserId,
       kind: parsed.data.kind,
-      openingCash: parsed.data.kind === "paper" ? parsed.data.openingCash : null,
+      openingCash: parsed.data.kind === "mock" ? parsed.data.openingCash : null,
     });
 
     logger.info("portfolio.created", { slug: portfolio.slug, kind: portfolio.kind });

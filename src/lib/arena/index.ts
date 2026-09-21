@@ -27,12 +27,12 @@ const WINDOW_DAYS: Record<Period, number | null> = {
  * field.
  *
  * It is also the only fair comparison: a percentage is the one thing that
- * means the same for a $10,000 paper account and a $22,000 real one.
+ * means the same for a $10,000 mock account and a $22,000 real one.
  */
 export type Standing = {
   slug: string;
   displayName: string;
-  kind: "broker" | "paper";
+  kind: "broker" | "mock";
   /** Return over the period, in percent. Null when history is too short. */
   returnPercent: number | null;
   /** The curve, rebased to 100 at the start of the period. */

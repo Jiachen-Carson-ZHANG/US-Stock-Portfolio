@@ -1,6 +1,8 @@
 import { isOpenAccess, requireUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { defaultFor, visibleTo } from "@/lib/portfolios";
+import { unreadCount } from "@/lib/notifications";
+import { NotificationBell } from "@/components/layout/notifications";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/context";
 import {
@@ -27,6 +29,7 @@ export default async function AppLayout({
     kind: portfolio.kind,
   }));
   const defaultSlug = (await defaultFor(db, user))?.slug ?? "";
+  const unread = isOpenAccess() ? 0 : await unreadCount(db, user.id);
 
   return (
     <LocaleProvider locale={locale}>
@@ -45,12 +48,19 @@ export default async function AppLayout({
               {t.appName}
             </p>
             <div className="flex shrink-0 items-center">
+              {canSignOut && <NotificationBell initialUnread={unread} />}
               <LanguageToggle className="px-2" />
               {canSignOut && <SignOutButton className="w-auto px-2 py-1" />}
             </div>
           </header>
 
-          <main className="flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-10">
+          {canSignOut && (
+            <div className="hidden justify-end px-8 pt-4 md:flex">
+              <NotificationBell initialUnread={unread} />
+            </div>
+          )}
+
+          <main className="flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-4 md:pb-10">
             <div className="mx-auto w-full max-w-6xl">{children}</div>
           </main>
         </div>

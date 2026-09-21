@@ -1,6 +1,8 @@
 import { isOpenAccess, requireUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { AccessRequests } from "@/components/layout/access-requests";
 import { ChangePassword } from "@/components/layout/account-actions";
+import { pendingRequestsFor } from "@/lib/access";
 import { Badge } from "@/components/ui/misc";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +43,8 @@ export default async function AccountPage() {
         [user.id],
       );
 
+  const requests = open ? [] : await pendingRequestsFor(db, user.id);
+
   return (
     <div className="space-y-6">
       <header>
@@ -49,6 +53,8 @@ export default async function AccountPage() {
           {user.displayName} · @{user.username}
         </p>
       </header>
+
+      <AccessRequests requests={requests} />
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

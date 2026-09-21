@@ -84,9 +84,9 @@ export function ArenaBoard({ boards }: { boards: Record<Period, Leaderboard> }) 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
                   {standing.displayName}
-                  {standing.kind === "paper" && (
+                  {standing.kind === "mock" && (
                     <span className="ml-2 font-normal text-muted-foreground">
-                      paper
+                      mock
                     </span>
                   )}
                 </p>

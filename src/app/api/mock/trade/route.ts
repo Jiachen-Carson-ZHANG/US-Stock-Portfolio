@@ -2,14 +2,14 @@ import { recordActivity } from "@/lib/activity";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logger } from "@/lib/logger";
-import { PaperTradeError, placePaperTrade } from "@/lib/portfolio/paper";
+import { MockTradeError, placeMockTrade } from "@/lib/portfolio/mock";
 import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
-import { paperTradeSchema } from "@/lib/schemas";
+import { mockTradeSchema } from "@/lib/schemas";
 import { getMarketDataProvider } from "@/providers";
 
 /**
- * Places a trade in a paper portfolio.
+ * Places a trade in a mock portfolio.
  *
  * Only in your own: watching someone else's account does not let you trade
  * in it, and being an administrator does not either.
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const parsed = paperTradeSchema.safeParse(body);
+  const parsed = mockTradeSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid trade" },
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const quote = (await provider.getQuotes([symbol])).find((q) => q.symbol === symbol);
 
     const db = await getDb();
-    const result = await placePaperTrade(
+    const result = await placeMockTrade(
       db,
       context.portfolio,
       { side: parsed.data.side, symbol, quantity: parsed.data.quantity },
@@ -55,14 +55,14 @@ export async function POST(request: Request) {
     await recordActivity(db, {
       userId: context.user.id,
       username: context.user.username,
-      kind: "paper_trade",
+      kind: "mock_trade",
       target: symbol,
       detail: `${parsed.data.side} ${parsed.data.quantity} at ${result.price}`,
     });
 
     return Response.json({ ...result, symbol });
   } catch (error) {
-    if (error instanceof PaperTradeError) {
+    if (error instanceof MockTradeError) {
       return Response.json({ error: error.message }, { status: 409 });
     }
     logger.error("paper.trade.failure", {

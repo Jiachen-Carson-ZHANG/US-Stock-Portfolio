@@ -193,9 +193,9 @@ CREATE TABLE IF NOT EXISTS portfolios (
   -- Nullable so removing a person does not delete the portfolio with them;
   -- an orphan is visible to owners and can be reassigned.
   owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-  kind          TEXT NOT NULL CHECK (kind IN ('broker','paper')),
+  kind          TEXT NOT NULL CHECK (kind IN ('broker','mock')),
   base_currency TEXT NOT NULL DEFAULT 'USD',
-  -- Paper portfolios start from a stated balance. Broker ones take their
+  -- Mock portfolios start from a stated balance. Broker ones take their
   -- opening position from the cash-flow ledger instead.
   opening_cash  TEXT,
   created_at    TEXT NOT NULL
@@ -209,6 +209,36 @@ CREATE TABLE IF NOT EXISTS portfolio_access (
   PRIMARY KEY (portfolio_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_portfolio_access_user ON portfolio_access(user_id);
+
+-- Asking for access, and being told about it.
+CREATE TABLE IF NOT EXISTS access_requests (
+  id           TEXT PRIMARY KEY,
+  portfolio_id TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message      TEXT,
+  status       TEXT NOT NULL CHECK (status IN ('pending','approved','declined')),
+  created_at   TEXT NOT NULL,
+  decided_at   TEXT,
+  decided_by   TEXT REFERENCES users(id) ON DELETE SET NULL
+);
+-- One live request per person per portfolio: asking twice is the same ask,
+-- and a queue of duplicates is noise for whoever has to answer it.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_access_request_pending
+  ON access_requests(portfolio_id, user_id)
+  WHERE status = 'pending';
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT,
+  link       TEXT,
+  created_at TEXT NOT NULL,
+  read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user
+  ON notifications(user_id, read_at, created_at DESC);
 
 -- Columns introduced after the first release. Postgres supports IF NOT EXISTS
 -- here, so the SQLite era's PRAGMA-driven migration helper is no longer needed.
@@ -252,6 +282,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_config_scope
 -- attach a second token to the same account.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_broker_connection_portfolio
   ON broker_connections(portfolio_id, provider);
+
+-- "Paper" was the accounting term; "mock" is what the family calls it, and
+-- what the address says. Renamed before anyone had one, so this only has to
+-- run for a database created in the hours between.
+ALTER TABLE portfolios DROP CONSTRAINT IF EXISTS portfolios_kind_check;
+UPDATE portfolios SET kind = 'mock' WHERE kind = 'paper';
+ALTER TABLE portfolios ADD CONSTRAINT portfolios_kind_check CHECK (kind IN ('broker','mock'));
 `;
 
 /** Identifies our schema lock so two booting containers cannot race each other. */

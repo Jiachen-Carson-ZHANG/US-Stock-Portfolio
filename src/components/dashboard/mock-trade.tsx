@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 
 /**
- * Buying and selling in a paper portfolio.
+ * Buying and selling in a mock portfolio.
  *
  * Every rule that matters — enough cash, whole shares, a price no more than
  * fifteen minutes old — is enforced on the server. This form only decides
  * what is comfortable to type.
  */
-export function PaperTrade({ portfolioSlug }: { portfolioSlug: string }) {
+export function MockTrade({ portfolioSlug }: { portfolioSlug: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,7 +28,7 @@ export function PaperTrade({ portfolioSlug }: { portfolioSlug: string }) {
     setBusy(true);
     setMessage(null);
     const response = await fetch(
-      `/api/paper/trade?portfolio=${encodeURIComponent(portfolioSlug)}`,
+      `/api/mock/trade?portfolio=${encodeURIComponent(portfolioSlug)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +68,7 @@ export function PaperTrade({ portfolioSlug }: { portfolioSlug: string }) {
       onSubmit={submit}
       className="w-full max-w-md space-y-3 rounded-xl border border-border bg-surface p-4"
     >
-      <p className="text-sm font-medium">Paper trade</p>
+      <p className="text-sm font-medium">Mock trade</p>
       <p className="text-xs text-muted-foreground">
         No real money moves. Prices are live, so a fill is what you would
         actually have paid.

@@ -4,7 +4,7 @@
 
 **Version:** 1.0
 **Date:** 2026-09-18
-**Primary deployment target:** Coze
+**Deployment targets:** Vercel / EdgeOne
 **Secondary optional deployment target:** Vercel
 **Broker:** Moomoo
 **Users:** Owner + three family viewers
@@ -199,54 +199,12 @@ and equivalent `robots.txt` rules.
 
 # 5. Deployment Strategy
 
-## Phase 1
+Deploy the shared GitHub repository to Vercel or EdgeOne, using a Node.js
+runtime and PostgreSQL. Keep platform-specific configuration separate from
+business logic and verify connectivity from mainland China and Singapore.
 
-Deploy only to:
-
-```text
-Coze
-```
-
-using the default:
-
-```text
-*.coze.site
-```
-
-domain initially.
-
-Reason:
-
-* mainland-China access is a primary requirement;
-* Vercel has already failed practical mainland-China testing;
-* only four users exist;
-* dual-production deployment adds unnecessary complexity.
-
-Keep all source code in GitHub.
-
-Coze should import/deploy the GitHub repository.
-
-The application must avoid Coze-specific business logic wherever possible.
-
-The repository must remain portable.
-
-## Phase 2 — Optional
-
-If Singapore access to Coze is unsatisfactory, deploy the same repository to Vercel.
-
-Example:
-
-```text
-China:
-family-portfolio.coze.site
-
-Singapore fallback:
-family-portfolio.vercel.app
-```
-
-Do not fork the codebase.
-
-Both deployments must originate from the same Git repository.
+Use the same codebase for each deployment; do not fork it by platform.
+Configure each deployment's public origin and register its broker callback.
 
 ---
 
@@ -257,7 +215,7 @@ Do not make a custom domain a V1 requirement.
 Use:
 
 ```text
-xxxxx.coze.site
+your-project.vercel.app
 ```
 
 first.
@@ -334,7 +292,7 @@ High-level architecture:
              ┌─────────────────────┐
              │     Web App         │
              │                     │
-             │ Next.js / Coze      │
+             │ Next.js / Node.js   │
              └──────────┬──────────┘
                         │
              authenticated server
@@ -1168,7 +1126,7 @@ Initial dashboard target:
 First Contentful Paint < 2.5 seconds
 ```
 
-under a normal mainland-China broadband connection when using the Coze deployment.
+under a normal mainland-China broadband connection against the production deployment.
 
 Avoid loading every historical chart before rendering the dashboard.
 
@@ -1618,35 +1576,19 @@ trade:write absent
 
 ---
 
-## Phase 7 — Coze Deployment
+## Phase 7 — Deployment
 
-Push code to GitHub.
-
-Import GitHub repository into Coze.
-
-Configure production secrets.
-
-Deploy using:
-
-```text
-*.coze.site
-```
-
-Run mainland-China connectivity tests.
+Deploy the GitHub repository to the selected Node.js hosting platform.
+Configure production secrets, PostgreSQL and the public origin, then register
+the matching broker callback and test sign-in and mainland-China connectivity.
 
 ---
 
-# 38. Optional Vercel Deployment
+# 38. Additional Deployment
 
-Only do this after the Coze version is stable.
-
-Deploy the same GitHub repository to Vercel.
-
-Vercel is a fallback endpoint primarily for Singapore users.
-
-Do not create a separate Vercel code branch.
-
-Platform-specific code is prohibited unless isolated behind a deployment adapter.
+Deploy the same GitHub repository when adding another hosting endpoint.
+Do not create a platform-specific code branch. Keep platform-specific code
+isolated behind a deployment adapter.
 
 ---
 
@@ -1669,7 +1611,7 @@ The project is considered V1 complete when all conditions are true:
 13. Charts display factual portfolio analytics.
 14. Application works from a real mainland-China connection.
 15. Secrets are absent from Git and client bundles.
-16. The codebase remains deployable outside Coze.
+16. The codebase remains portable across Node.js hosting platforms.
 
 ---
 

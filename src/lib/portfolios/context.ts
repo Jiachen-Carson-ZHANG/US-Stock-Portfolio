@@ -15,34 +15,46 @@ export type PortfolioContext = { user: AuthUser; portfolio: Portfolio };
  * The switcher only shows portfolios you can open, but a hidden link is not
  * access control — someone who guesses "/mirat" has to be stopped here.
  *
- * A portfolio you cannot read is reported as missing rather than forbidden.
- * Answering "403" to a guessed slug confirms the portfolio exists, which is
- * information the guesser did not have.
+ * A portfolio that exists but is not yours reports itself as such, so the
+ * page can offer to ask for it. That does disclose that the address is
+ * taken, which is a deliberate trade: among five family members, being able
+ * to ask is worth more than hiding that a sister has an account.
  */
-async function resolve(
-  user: AuthUser,
-  slug: string | undefined,
-): Promise<Portfolio | null> {
+type Resolution =
+  | { kind: "ok"; portfolio: Portfolio }
+  | { kind: "missing" }
+  | { kind: "locked"; portfolio: Portfolio };
+
+async function resolve(user: AuthUser, slug: string | undefined): Promise<Resolution> {
   const db = await getDb();
 
-  if (!slug) return defaultFor(db, user);
+  if (!slug) {
+    const own = await defaultFor(db, user);
+    return own ? { kind: "ok", portfolio: own } : { kind: "missing" };
+  }
 
   const portfolio = await findBySlug(db, slug);
-  if (!portfolio) return null;
-  return (await canRead(db, user, portfolio.id)) ? portfolio : null;
+  if (!portfolio) return { kind: "missing" };
+  return (await canRead(db, user, portfolio.id))
+    ? { kind: "ok", portfolio }
+    : { kind: "locked", portfolio };
 }
 
-/** Server Component guard. Sends the signed-out to /login, the rest to 404. */
+/**
+ * Server Component guard.
+ *
+ * Signed-out goes to /login. No portfolio at all goes to an explanation
+ * rather than a 404 to stare at. A portfolio that exists but is not yours
+ * goes to a page offering to ask for it.
+ */
 export async function requirePortfolio(slug?: string): Promise<PortfolioContext> {
   const user = await requireUser();
-  const portfolio = await resolve(user, slug);
+  const resolution = await resolve(user, slug);
 
-  // No slug and nothing visible means the account has no portfolio at all,
-  // which is a state to explain rather than a 404 to stare at.
-  if (!portfolio && !slug) redirect("/no-portfolio");
-  if (!portfolio) notFound();
-
-  return { user, portfolio };
+  if (resolution.kind === "ok") return { user, portfolio: resolution.portfolio };
+  if (resolution.kind === "locked") redirect(`/request-access/${resolution.portfolio.slug}`);
+  if (!slug) redirect("/no-portfolio");
+  notFound();
 }
 
 /** Route Handler guard. Returns a Response instead of redirecting. */
@@ -52,14 +64,22 @@ export async function requirePortfolioApi(
   const user = await getCurrentUser();
   if (!user) return { response: unauthorized() };
 
-  const portfolio = await resolve(user, slug);
-  if (!portfolio) {
+  const resolution = await resolve(user, slug);
+  if (resolution.kind === "locked") {
+    return {
+      response: Response.json(
+        { error: "You do not have access to this portfolio", canRequest: true },
+        { status: 403 },
+      ),
+    };
+  }
+  if (resolution.kind === "missing") {
     return {
       response: Response.json({ error: "No such portfolio" }, { status: 404 }),
     };
   }
 
-  return { user, portfolio };
+  return { user, portfolio: resolution.portfolio };
 }
 
 /** Writing is narrower than reading: only the owner of the money may write. */

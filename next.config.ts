@@ -24,18 +24,12 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pg", "@node-rs/argon2"],
   poweredByHeader: false,
   experimental: {
-    // Coze terminates TLS on its own domain and proxies to us, so a Server
-    // Action arrives with an Origin that does not match Host. Next rejects
-    // that as a forgery unless the host is named here — without it, signing in
-    // fails on Coze while working perfectly in local dev.
+    // Allow an explicitly configured public host when running behind a proxy.
     serverActions: {
       // Entries are matched against the *host* of the Origin header, so a value
       // carrying a scheme never matches and fails silently. Strip it, since a
       // hosting panel asking for a URL is the obvious thing to paste.
       allowedOrigins: [
-        "*.coze.site",
-        "*.dev.coze.site",
-        "*.sandbox-dev.coze-coding.bytedance.net",
         ...(process.env.PUBLIC_ORIGIN
           ? [process.env.PUBLIC_ORIGIN.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "")]
           : []),

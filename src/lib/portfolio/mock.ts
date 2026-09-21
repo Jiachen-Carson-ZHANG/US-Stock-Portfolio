@@ -9,26 +9,26 @@ import { readTransactions } from "./transactions";
 /** A fill priced from a quote older than this is not a game, it is a cheat. */
 export const MAX_QUOTE_AGE_MS = 15 * 60_000;
 
-export type PaperTrade = {
+export type MockTrade = {
   side: "buy" | "sell";
   symbol: string;
   quantity: number;
 };
 
-export class PaperTradeError extends Error {}
+export class MockTradeError extends Error {}
 
 function multiplierFor(symbol: string): number {
   return parseSymbol(symbol).instrumentType === "option" ? 100 : 1;
 }
 
 /**
- * Cash and holdings implied by a paper portfolio's own trades.
+ * Cash and holdings implied by a mock portfolio's own trades.
  *
- * A paper portfolio has no broker to ask, so its state is always the replay
+ * A mock portfolio has no broker to ask, so its state is always the replay
  * of what it has done since its opening balance. That keeps it honest: there
  * is no separate balance to drift out of step with the trade list.
  */
-export async function paperState(
+export async function mockState(
   db: DB,
   portfolio: Portfolio,
 ): Promise<{ cash: Decimal; holdings: Map<string, { quantity: Decimal; cost: Decimal }> }> {
@@ -74,7 +74,7 @@ export async function paperState(
 }
 
 /**
- * Validates and records one paper trade.
+ * Validates and records one mock trade.
  *
  * Every rule here is server-side. A client that skips the form and posts
  * directly must hit exactly the same checks, or the leaderboard measures who
@@ -83,46 +83,46 @@ export async function paperState(
  * Short selling is not allowed: it is the one position whose loss is not
  * bounded by the opening balance, which makes the ranking meaningless.
  */
-export async function placePaperTrade(
+export async function placeMockTrade(
   db: DB,
   portfolio: Portfolio,
-  trade: PaperTrade,
+  trade: MockTrade,
   quote: Quote | undefined,
   now: Date = new Date(),
 ): Promise<{ price: number; cash: string }> {
-  if (portfolio.kind !== "paper") {
-    throw new PaperTradeError("This portfolio follows a real brokerage account.");
+  if (portfolio.kind !== "mock") {
+    throw new MockTradeError("This portfolio follows a real brokerage account.");
   }
   if (!Number.isInteger(trade.quantity) || trade.quantity <= 0) {
-    throw new PaperTradeError("Enter a whole number of shares.");
+    throw new MockTradeError("Enter a whole number of shares.");
   }
   if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
-    throw new PaperTradeError(`No usable price for ${trade.symbol} right now.`);
+    throw new MockTradeError(`No usable price for ${trade.symbol} right now.`);
   }
 
   const quotedAt = quote.dataTimestamp
     ? new Date(quote.dataTimestamp).getTime()
     : now.getTime();
   if (now.getTime() - quotedAt > MAX_QUOTE_AGE_MS) {
-    throw new PaperTradeError(
+    throw new MockTradeError(
       "That price is more than fifteen minutes old. Try again in a moment.",
     );
   }
 
-  const { cash, holdings } = await paperState(db, portfolio);
+  const { cash, holdings } = await mockState(db, portfolio);
   const multiplier = multiplierFor(trade.symbol);
   const value = new Decimal(trade.quantity).times(quote.price).times(multiplier);
 
   if (trade.side === "buy") {
     if (value.greaterThan(cash)) {
-      throw new PaperTradeError(
+      throw new MockTradeError(
         `Not enough cash: that costs ${value.toFixed(2)} and you have ${cash.toFixed(2)}.`,
       );
     }
   } else {
     const held = holdings.get(trade.symbol)?.quantity ?? new Decimal(0);
     if (held.lessThan(trade.quantity)) {
-      throw new PaperTradeError(
+      throw new MockTradeError(
         `You hold ${held.toFixed(0)} of ${trade.symbol}, so you cannot sell ${trade.quantity}.`,
       );
     }
@@ -147,26 +147,26 @@ export async function placePaperTrade(
     ],
   );
 
-  const after = await paperState(db, portfolio);
+  const after = await mockState(db, portfolio);
   return { price: quote.price, cash: after.cash.toFixed(2) };
 }
 
 /**
- * Writes a paper portfolio's holdings into `positions`.
+ * Writes a mock portfolio's holdings into `positions`.
  *
  * Deliberately the same table the broker sync writes to, so the holdings
  * table, the allocation donut, the reconstruction, the performance chart and
- * the AI context all work on a paper portfolio without knowing it is one.
+ * the AI context all work on a mock portfolio without knowing it is one.
  * That is the whole reason to model it this way rather than build a
  * separate game.
  */
-export async function syncPaperPositions(
+export async function syncMockPositions(
   db: DB,
   portfolio: Portfolio,
   quotes: Map<string, Quote>,
   now: Date = new Date(),
 ): Promise<number> {
-  const { cash, holdings } = await paperState(db, portfolio);
+  const { cash, holdings } = await mockState(db, portfolio);
   const syncedAt = now.toISOString();
   const currency = portfolio.baseCurrency;
 
@@ -185,7 +185,7 @@ export async function syncPaperPositions(
 
     rows.push([
       randomUUID(),
-      "paper",
+      "mock",
       parsed.instrumentType,
       symbol,
       parsed.underlyingSymbol ?? null,
@@ -210,7 +210,7 @@ export async function syncPaperPositions(
 
   rows.push([
     randomUUID(),
-    "paper",
+    "mock",
     "cash",
     currency,
     null,

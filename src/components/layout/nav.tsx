@@ -37,7 +37,7 @@ const ITEMS = [
 export type NavPortfolio = {
   slug: string;
   displayName: string;
-  kind: "broker" | "paper";
+  kind: "broker" | "mock";
 };
 
 function useVisibleItems(role: UserRole) {
@@ -106,7 +106,7 @@ function PortfolioSwitcher({
         {portfolios.map((portfolio) => (
           <option key={portfolio.slug} value={portfolio.slug}>
             {portfolio.displayName}
-            {portfolio.kind === "paper" ? " · paper" : ""}
+            {portfolio.kind === "mock" ? " · mock" : ""}
           </option>
         ))}
       </select>

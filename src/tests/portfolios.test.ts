@@ -52,7 +52,7 @@ describe("who can see what", () => {
       slug: "zizhe",
       displayName: "Zizhe",
       ownerUserId: zizhe.id,
-      kind: "paper",
+      kind: "mock",
       openingCash: "10000",
     });
 
@@ -215,7 +215,7 @@ describe("slugs", () => {
           slug,
           displayName: "x",
           ownerUserId: mile.id,
-          kind: "paper",
+          kind: "mock",
         }),
       ).rejects.toThrow();
     }

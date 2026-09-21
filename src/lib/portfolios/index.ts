@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DB } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth/session";
 
-export type PortfolioKind = "broker" | "paper";
+export type PortfolioKind = "broker" | "mock";
 
 export type Portfolio = {
   id: string;

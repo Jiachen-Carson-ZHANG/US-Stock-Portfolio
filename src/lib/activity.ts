@@ -16,7 +16,7 @@ export type ActivityKind =
   | "portfolio_create"
   | "access_grant"
   | "access_revoke"
-  | "paper_trade";
+  | "mock_trade";
 
 export type ActivityEvent = {
   username: string;

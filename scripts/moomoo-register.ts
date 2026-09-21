@@ -7,7 +7,7 @@ import { registerClient } from "../src/lib/moomoo/oauth";
  * A client may hold several redirect URIs, so pass every origin the app will
  * ever be served from and one client_id covers them all:
  *
- *   npm run moomoo:register -- https://portfolio.vercel.app https://x.coze.site
+ *   npm run moomoo:register -- https://portfolio.vercel.app https://portfolio.example.com
  *
  * That matters because the URIs must be registered before the first sign-in
  * there, and moomoo compares them character for character. Registering the

@@ -238,98 +238,9 @@ and sessions reference account ids, so carrying them into a database that had
 already seeded its own accounts would fail the foreign key. Everyone signs in
 once after the move.
 
-### Deploying to coze.cn
-
-Coze 编程 (`code.coze.cn`) hosts Node.js web applications. It runs on 火山引擎
-(Volcengine) underneath, but that is not a separate step you perform — you
-deploy to Coze and Coze allocates the Volcengine resources. Volcengine Ark, the
-AI model API, is an unrelated product and is not used by this app.
-
-Everything Coze needs is already committed:
-
-| File | Purpose |
-|---|---|
-| `.coze` | Project manifest: runtime, build and run commands |
-| `.cozeproj/scripts/deploy_build.sh` | `npm ci`, build, assemble the standalone bundle |
-| `.cozeproj/scripts/deploy_run.sh` | Seed the database, start the server |
-| `scripts/coze-preview-*.sh` | The same for Coze's preview environment |
-
-**Step 1 — create the project.** In the Coze console create a web application
-project and connect this repository. Coze issues a project id; paste it into the
-`sub_id` field at the top of `.coze` and commit.
-
-**Step 2 — create the database.** Enable Coze's built-in PostgreSQL and copy its
-connection string. Nothing else is needed: the app creates its own schema on
-first boot and seeds its accounts, so an empty database is the correct starting
-point.
-
-**Step 3 — set the environment variables.** Use Coze's encrypted environment
-variable panel, never a file in the repository.
-
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | The connection string from step 2 |
-| `DATABASE_SSL` | Only if the connection fails on TLS — try `no-verify` |
-| `AUTH_MODE` | `password` |
-| `APP_URL` | The URL Coze assigns, e.g. `https://xxx.coze.site` |
-| `SESSION_SECRET` | `openssl rand -base64 32` |
-| `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32`, different from the above |
-| `MOOMOO_CLIENT_ID` | From `npm run moomoo:register` |
-| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Optional, for the AI notes |
-| `SEED_OWNER_PASSWORD` and the other `SEED_*` | The family's sign-in passwords |
-
-**Step 4 — allow the deployed origin.** Sign-in is a Server Action, and Next
-rejects one whose `Origin` does not match `Host`. Coze proxies from its own
-domain, so its hostname must be listed in `experimental.serverActions
-.allowedOrigins` in `next.config.ts`. The dev and sandbox hosts are already
-there; if sign-in fails on the deployed URL while working locally, add that
-exact hostname (or set `PUBLIC_ORIGIN` to it) and redeploy. **This is the most
-likely first failure and it produces no obvious error message.**
-
-**Step 5 — register the callback before you need it.** moomoo compares the
-redirect URI character for character, and re-registering issues a new
-`client_id` that invalidates the stored connection. One client can hold several
-URIs, so register every origin the app will ever be served from in one go:
-
-```bash
-npm run moomoo:register -- https://your-app.coze.site https://your-app.vercel.app
-```
-
-`APP_URL` and `http://localhost:3000` are always included. Set `APP_URL` on each
-deployment to its own origin — that is what the app builds its callback from.
-
-**Step 6 — carry your data across**, if you are moving from the SQLite version.
-Do this **before the first deploy**, while the database is still empty: the app
-seeds its own accounts on every boot, and once they exist the usernames collide
-and your original accounts — with their passwords — are skipped. The script
-warns when it sees this, but the clean order is:
-
-1. create the database, deploy nothing yet
-2. `DATABASE_URL=<coze postgres> npm run db:migrate-from-sqlite`
-3. deploy; the boot-time seed then leaves your migrated accounts alone
-
-Coze keeps development and production databases apart, so migrating into one
-does nothing to the other. Do it deliberately, for the one you are launching.
-
-#### Verifying the deployment
-
-1. `/login` renders **with styling** — unstyled means the standalone bundle is
-   missing `.next/static`, so check `deploy_build.sh` ran fully
-2. A wrong password is rejected; the right one signs in — if it hangs or fails
-   silently, revisit step 4
-3. `/dashboard` shows holdings, and `/settings` reports the broker connection
-4. Redeploy, then reload: you should stay signed in, because the session lives
-   in Postgres rather than on the container's disk
-
-#### Custom domain
-
-Coze can bind a domain, but a mainland-hosted one requires ICP 备案, which takes
-weeks. The Coze-provided URL needs no filing and is the fastest path to having
-the family actually using it.
-
 ### Docker (works on any VPS)
 
-The portable path, and the fallback if Coze is agent-only:
+A portable deployment option for a Node.js host:
 
 ```bash
 docker build -t family-portfolio .

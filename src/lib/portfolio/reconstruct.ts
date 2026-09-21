@@ -5,6 +5,13 @@ import type { BrokerTransaction } from "@/types/broker";
 export type CashFlow = { date: string; amount: number };
 export type PriceSeries = Map<string, Map<string, number>>;
 
+/** What the replay believes is held, for reconciling against the broker. */
+export type ReplayedHolding = {
+  symbol: string;
+  quantity: number;
+  cost: number;
+};
+
 export type ReconstructedDay = {
   date: string;
   marketValue: Decimal;
@@ -14,6 +21,8 @@ export type ReconstructedDay = {
   realized: Decimal;
   netDeposits: Decimal;
   totalReturn: Decimal;
+  /** Only on the final day, for reconciliation. Empty elsewhere. */
+  holdings: ReplayedHolding[];
 };
 
 type Lot = { quantity: Decimal; cost: Decimal };
@@ -156,6 +165,13 @@ export function reconstruct(
       realized,
       netDeposits,
       totalReturn: value.minus(netDeposits),
+      holdings: [...lots]
+        .filter(([, lot]) => !lot.quantity.isZero())
+        .map(([symbol, lot]) => ({
+          symbol,
+          quantity: lot.quantity.toNumber(),
+          cost: lot.cost.toNumber(),
+        })),
     });
   }
 

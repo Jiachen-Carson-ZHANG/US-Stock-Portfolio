@@ -74,16 +74,16 @@ describe("the leaderboard", () => {
     // A large account that grew 10%, and a small one that grew 50%.
     await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
     const small = await createPortfolio(db, {
-      slug: "mum-paper",
+      slug: "mother-mock",
       displayName: "Mum",
       ownerUserId: mum.id,
-      kind: "paper",
+      kind: "mock",
       openingCash: "10000",
     });
     await history(small.id, 10_000, 15_000);
 
     const board = await leaderboard(db, admin, "max", NOW);
-    expect(board.standings.map((s) => s.slug)).toEqual(["mum-paper", "carson"]);
+    expect(board.standings.map((s) => s.slug)).toEqual(["mother-mock", "carson"]);
     expect(board.standings[0].returnPercent).toBeGreaterThan(
       board.standings[1].returnPercent!,
     );
@@ -101,10 +101,10 @@ describe("the leaderboard", () => {
     });
     await history(hers.id, 5_000, 6_000);
     const mums = await createPortfolio(db, {
-      slug: "mum-paper",
+      slug: "mother-mock",
       displayName: "Mum",
       ownerUserId: mum.id,
-      kind: "paper",
+      kind: "mock",
       openingCash: "10000",
     });
     await history(mums.id, 10_000, 9_000);
@@ -115,7 +115,7 @@ describe("the leaderboard", () => {
 
     await grantAccess(db, mums.id, mile.id);
     const after = await leaderboard(db, mile, "max", NOW);
-    expect(after.standings.map((s) => s.slug).sort()).toEqual(["mirat", "mum-paper"]);
+    expect(after.standings.map((s) => s.slug).sort()).toEqual(["mirat", "mother-mock"]);
   });
 
   it("puts anyone without a figure below everyone who has one", async () => {
@@ -124,10 +124,10 @@ describe("the leaderboard", () => {
 
     await history(TEST_PORTFOLIO_ID, 20_000, 19_000); // a loss, but a figure
     await createPortfolio(db, {
-      slug: "mum-paper",
+      slug: "mother-mock",
       displayName: "Mum",
       ownerUserId: mum.id,
-      kind: "paper",
+      kind: "mock",
       openingCash: "10000",
     }); // no history at all
 

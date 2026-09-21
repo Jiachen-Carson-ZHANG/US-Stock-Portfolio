@@ -172,6 +172,43 @@ async function main() {
   );
   const actual = Number(live?.positions ?? 0) + Number(live?.cash ?? 0);
 
+  // Which symbol the replay and the account disagree about.
+  //
+  // A total that is out by a few hundred says nothing about where to look,
+  // and the two most common causes point in opposite directions: a sell the
+  // history is missing leaves the replay still holding something, while a
+  // share transferred in rather than bought leaves it holding too little.
+  // Both are obvious per symbol and invisible in the total.
+  const heldLive = await db.all<{ symbol: string; quantity: string; value: string }>(
+    `SELECT symbol,
+            SUM(quantity)::text AS quantity,
+            SUM(COALESCE(reported_market_value, 0))::text AS value
+       FROM positions
+      WHERE portfolio_id = ? AND instrument_type <> 'cash'
+      GROUP BY symbol`,
+    [portfolio.id],
+  );
+  const liveBySymbol = new Map(
+    heldLive.map((row) => [row.symbol, { quantity: Number(row.quantity), value: Number(row.value) }]),
+  );
+  const replayBySymbol = new Map(last.holdings.map((h) => [h.symbol, h]));
+
+  const disagreements: string[] = [];
+  for (const symbol of new Set([...liveBySymbol.keys(), ...replayBySymbol.keys()])) {
+    const mine = replayBySymbol.get(symbol)?.quantity ?? 0;
+    const theirs = liveBySymbol.get(symbol)?.quantity ?? 0;
+    if (Math.abs(mine - theirs) < 1e-6) continue;
+    const note =
+      theirs === 0
+        ? "replay still holds it — a sell is missing from the history"
+        : mine === 0
+          ? "the account holds it and the replay never bought it — transferred in?"
+          : "quantities differ";
+    disagreements.push(
+      `  ${symbol.padEnd(20)} replay ${String(mine).padStart(6)}  account ${String(theirs).padStart(6)}  ${note}`,
+    );
+  }
+
   console.log(`\n  ${dates.length} trading days reconstructed`);
   console.log(`  final replayed value   ${last.marketValue.toFixed(2).padStart(12)}`);
   console.log(`  live account value     ${actual.toFixed(2).padStart(12)}` +
@@ -186,9 +223,20 @@ async function main() {
     console.log(`\n  ! ${missing} symbol(s) have no price history: ${missingSymbols.join(", ")}`);
   }
 
+  if (disagreements.length > 0) {
+    console.log(`\n  Holdings the replay and the account disagree about:\n`);
+    for (const line of disagreements) console.log(line);
+  } else {
+    console.log(`\n  Every holding matches the account, symbol for symbol.`);
+  }
+
   // Refuse rather than record something that cannot be told apart from real
   // history once it is in the table.
-  const TOLERANCE = 250;
+  // Raised deliberately with --accept-drift when the remainder is understood
+  // — dividends, a gifted share, an expiry with no closing fill — rather than
+  // by editing this number, so the decision shows up in the command.
+  const accepted = process.argv.find((arg) => arg.startsWith("--accept-drift="));
+  const TOLERANCE = accepted ? Number(accepted.split("=")[1]) : 250;
   const drift = Math.abs(last.marketValue.toNumber() - actual);
   const refusals = [
     missing > 0 && `${missing} symbol(s) priced from nothing — re-run with --refresh`,
@@ -198,6 +246,12 @@ async function main() {
   if (write && refusals.length > 0) {
     console.error("\nRefusing to write:");
     for (const reason of refusals) console.error(`  - ${reason}`);
+    if (drift > TOLERANCE) {
+      console.error(
+        "\n  Check the holdings above first. If the remainder is understood,\n" +
+          `  re-run with --accept-drift=${Math.ceil(drift / 50) * 50}.`,
+      );
+    }
     console.error("");
     await closeDb();
     process.exit(1);

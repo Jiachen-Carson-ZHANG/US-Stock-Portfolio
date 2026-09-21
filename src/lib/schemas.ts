@@ -60,8 +60,8 @@ export const createPortfolioSchema = z.object({
     ),
   displayName: z.string().trim().min(1).max(60),
   ownerUserId: z.string().uuid(),
-  kind: z.enum(["broker", "paper"]),
-  // Only meaningful for a paper portfolio; a broker one takes its opening
+  kind: z.enum(["broker", "mock"]),
+  // Only meaningful for a mock portfolio; a broker one takes its opening
   // position from the cash-flow ledger.
   openingCash: z
     .string()
@@ -74,10 +74,20 @@ export const createPortfolioSchema = z.object({
  * Whole shares only, and a sane upper bound. Fractional paper shares would
  * not match how the real account trades, which is the thing being compared.
  */
-export const paperTradeSchema = z.object({
+export const mockTradeSchema = z.object({
   side: z.enum(["buy", "sell"]),
   symbol: symbolSchema,
   quantity: z.number().int().positive().max(1_000_000),
+});
+
+export const accessRequestSchema = z.object({
+  slug: z.string().trim().toLowerCase().min(1).max(32),
+  message: z.string().trim().max(280).default(""),
+});
+
+export const accessDecisionSchema = z.object({
+  requestId: z.string().uuid(),
+  approve: z.boolean(),
 });
 
 export const portfolioAccessSchema = z.object({
