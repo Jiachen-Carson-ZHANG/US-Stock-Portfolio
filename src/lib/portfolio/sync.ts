@@ -100,6 +100,10 @@ export async function syncPositions(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   await db.transaction(async (tx) => {
+    // Serialize replacements across server instances. DELETE alone cannot see
+    // another transaction's newly inserted rows, so concurrent refreshes can
+    // append multiple complete sets. Lock the parent even when holdings are empty.
+    await tx.get(`SELECT id FROM portfolios WHERE id = ? FOR UPDATE`, [portfolioId]);
     // Scoped: replacing "the" position set used to wipe every portfolio's.
     await tx.run(`DELETE FROM positions WHERE portfolio_id = ?`, [portfolioId]);
     for (const position of positions) {

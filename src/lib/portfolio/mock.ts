@@ -145,6 +145,12 @@ export async function syncMockPositions(
   ]);
 
   await db.transaction(async (tx) => {
+    // The same race as the broker sync, and the same fix: DELETE cannot see
+    // another transaction's uncommitted inserts, so two overlapping refreshes
+    // each delete what they can see and then append a full set. Locking the
+    // parent row serializes them, and works even when there is nothing to
+    // delete yet.
+    await tx.get(`SELECT id FROM portfolios WHERE id = ? FOR UPDATE`, [portfolio.id]);
     await tx.run(`DELETE FROM positions WHERE portfolio_id = ?`, [portfolio.id]);
     for (const row of rows) {
       await tx.run(
