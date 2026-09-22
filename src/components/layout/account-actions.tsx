@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
 
-const MIN_LENGTH = 10;
+import { MIN_PASSWORD_LENGTH } from "@/lib/schemas";
+
+const MIN_LENGTH = MIN_PASSWORD_LENGTH;
 
 type Result = { tone: "ok" | "bad"; message: string };
 

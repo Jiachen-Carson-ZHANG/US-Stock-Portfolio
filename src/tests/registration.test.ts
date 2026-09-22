@@ -212,31 +212,30 @@ describe("what they are asked at sign-up", () => {
     await register(db, {
       ...CREDENTIALS,
       referredBy: "Mile",
-      reasons: ["friend", "learning"],
-      intro: "I sit next to Mile at work.",
+      reason: "I sit next to Mile at work and want to learn.",
+      email: "sam@example.com",
     });
 
     const [waiting] = await pendingAccounts(db);
     expect(waiting.referredBy).toBe("Mile");
-    expect(waiting.reasons).toEqual(["friend", "learning"]);
-    expect(waiting.intro).toBe("I sit next to Mile at work.");
+    expect(waiting.reason).toBe("I sit next to Mile at work and want to learn.");
+    expect(waiting.email).toBe("sam@example.com");
   });
 
   it("puts the referral in the owner's notification, since it decides most of them", async () => {
     const owner = await addOwner();
-    await register(db, { ...CREDENTIALS, referredBy: "Mile", reasons: ["friend"] });
+    await register(db, { ...CREDENTIALS, referredBy: "Mile", reason: "Mile invited me." });
 
     const told = await notificationsFor(db, owner);
     expect(told[0].body).toContain("Mile");
   });
 
-  it("survives a malformed reasons column without losing the queue", async () => {
+  it("still lists somebody who gave no reason", async () => {
     await addOwner();
-    const { id } = await register(db, CREDENTIALS);
-    await db.run(`UPDATE users SET reasons = 'not json' WHERE id = ?`, [id]);
+    await register(db, CREDENTIALS);
 
     const [waiting] = await pendingAccounts(db);
-    expect(waiting.reasons).toEqual([]);
+    expect(waiting.reason).toBeNull();
     expect(waiting.username).toBe("jane");
   });
 });

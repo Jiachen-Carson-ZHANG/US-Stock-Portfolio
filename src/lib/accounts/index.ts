@@ -15,8 +15,9 @@ export type PendingAccount = {
   username: string;
   displayName: string;
   referredBy: string | null;
-  reasons: string[];
-  intro: string | null;
+  /** Written in their own words at sign-up. */
+  reason: string | null;
+  email: string | null;
   createdAt: string;
 };
 
@@ -41,8 +42,8 @@ export async function register(
     displayName: string;
     password: string;
     referredBy?: string;
-    reasons?: string[];
-    intro?: string;
+    reason?: string;
+    email?: string;
   },
   now: Date = new Date(),
 ): Promise<{ id: string }> {
@@ -67,7 +68,7 @@ export async function register(
   await db.run(
     `INSERT INTO users
        (id, username, display_name, password_hash, role, created_at, status,
-        referred_by, reasons, intro)
+        referred_by, intro, email)
      VALUES (?, ?, ?, ?, 'viewer', ?, 'pending', ?, ?, ?)`,
     [
       id,
@@ -76,8 +77,8 @@ export async function register(
       await hashPassword(input.password),
       now.toISOString(),
       input.referredBy?.trim() || null,
-      JSON.stringify(input.reasons ?? []),
-      input.intro?.trim() || null,
+      input.reason?.trim() || null,
+      input.email?.trim() || null,
     ],
   );
 
@@ -113,11 +114,11 @@ export async function pendingAccounts(db: DB): Promise<PendingAccount[]> {
     username: string;
     display_name: string;
     referred_by: string | null;
-    reasons: string | null;
     intro: string | null;
+    email: string | null;
     created_at: string;
   }>(
-    `SELECT id, username, display_name, referred_by, reasons, intro, created_at
+    `SELECT id, username, display_name, referred_by, intro, email, created_at
        FROM users WHERE status = 'pending' ORDER BY created_at`,
   );
   return rows.map((row) => ({
@@ -125,17 +126,8 @@ export async function pendingAccounts(db: DB): Promise<PendingAccount[]> {
     username: row.username,
     displayName: row.display_name,
     referredBy: row.referred_by,
-    // Stored as JSON. A malformed value is somebody else's bad write, and
-    // should cost the badge rather than the whole queue.
-    reasons: (() => {
-      try {
-        const parsed = JSON.parse(row.reasons ?? "[]");
-        return Array.isArray(parsed) ? parsed.map(String) : [];
-      } catch {
-        return [];
-      }
-    })(),
-    intro: row.intro,
+    reason: row.intro,
+    email: row.email,
     createdAt: row.created_at,
   }));
 }

@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { dedupe } from "@/lib/inflight";
 import { logger } from "@/lib/logger";
 import { MOOMOO_API_BASE, refreshAccessToken, assertReadOnlyScope } from "./oauth";
 import { markRefreshed, markStatus, readConnection } from "./tokens";
@@ -65,10 +66,15 @@ async function accessToken(portfolioId: string): Promise<string> {
 
   try {
     assertReadOnlyScope(connection.scope);
-    const tokens = await refreshAccessToken({
-      refreshToken: connection.refreshToken,
-      clientId: clientId(),
-    });
+    // Deduplicated: two requests arriving milliseconds apart were each doing
+    // their own round trip to moomoo for the same token, which is pure
+    // latency for whoever arrived second.
+    const tokens = await dedupe(`moomoo:token:${portfolioId}`, () =>
+      refreshAccessToken({
+        refreshToken: connection.refreshToken,
+        clientId: clientId(),
+      }),
+    );
 
     assertReadOnlyScope(tokens.scope);
     cachedAccessTokens.set(portfolioId, {

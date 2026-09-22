@@ -229,6 +229,8 @@ ALTER TABLE users ADD CONSTRAINT users_status_check
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reasons TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS intro TEXT;
+-- Optional, and only ever used to say "you are in". Nothing else reads it.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_at TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_pending ON users(status) WHERE status = 'pending';

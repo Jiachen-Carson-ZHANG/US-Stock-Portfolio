@@ -6,14 +6,17 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(512),
 });
 
-/**
- * A minimum length rather than a character-class rule: length is what actually
- * resists guessing, and forcing a symbol mostly produces "Password1!". The
- * confirmation is checked in the form, not here, so the API stays one object.
- */
+/** The only password rule: eight characters. Length resists guessing; a
+ * required symbol mostly produces "Password1!". The confirmation is checked
+ * in the form, not here, so the API stays one object. */
+export const MIN_PASSWORD_LENGTH = 8;
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(512),
-  newPassword: z.string().min(10, "Use at least 10 characters").max(512),
+  newPassword: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
+    .max(512),
 });
 
 export const activitySchema = z.object({
@@ -85,21 +88,6 @@ export const mockTradeSchema = z.object({
  * what survives a link from the moment it is chosen rather than being
  * rejected later.
  */
-/**
- * Why someone wants in. A fixed list rather than free text, because the
- * person approving is scanning a queue: "friend of the family" is answerable
- * at a glance in a way that a paragraph is not. The free-text box is still
- * there for anything the list does not cover.
- */
-export const JOIN_REASONS = [
-  "family",
-  "friend",
-  "learning",
-  "compare",
-  "curious",
-  "other",
-] as const;
-
 export const registerSchema = z.object({
   username: z
     .string()
@@ -110,10 +98,26 @@ export const registerSchema = z.object({
       "Use lowercase letters, digits and hyphens, starting with a letter",
     ),
   displayName: z.string().trim().min(1).max(60),
-  password: z.string().min(10, "Use at least 10 characters").max(512),
+  password: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
+    .max(512),
   referredBy: z.string().trim().max(60).default(""),
-  reasons: z.array(z.enum(JOIN_REASONS)).min(1, "Pick at least one").max(6),
-  intro: z.string().trim().max(500).default(""),
+  // Written rather than chosen, and required: a sentence in somebody's own
+  // words tells whoever approves far more than a tick-box, and a blank one
+  // tells them nothing at all.
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Say a little about why you would like to join")
+    .max(500),
+  email: z
+    .string()
+    .trim()
+    .email("That does not look like an email address")
+    .max(160)
+    .optional()
+    .or(z.literal("")),
 });
 
 export const accountDecisionSchema = z.object({

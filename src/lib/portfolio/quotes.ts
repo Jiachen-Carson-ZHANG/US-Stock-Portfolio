@@ -1,4 +1,5 @@
 import type { DB } from "@/lib/db";
+import { dedupe } from "@/lib/inflight";
 import type { Quote } from "@/types/market";
 import type { MarketDataProvider } from "@/providers/market-data/types";
 
@@ -83,9 +84,26 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
 }
 
 /**
+ * How far past its TTL a quote may be and still be served immediately while a
+ * refresh runs behind the caller.
+ *
+ * Blocking a page render on a broker round trip is what made the site feel
+ * slow: every five seconds one unlucky request paid for everybody's refresh.
+ * Inside this window the caller gets the cached price now and the next one
+ * gets the new price — which for a number that moves in cents over seconds is
+ * a better trade than a spinner.
+ *
+ * Past it the quote is too old to show without asking, so the caller waits.
+ */
+const STALE_WHILE_REVALIDATE_MS = 60_000;
+
+/**
  * Serves quotes from the shared server-side cache, only calling the provider
  * for symbols whose cache entry has aged out (§15). A provider failure falls
  * back to stale cache rather than blanking the dashboard (§28).
+ *
+ * Concurrent callers wanting the same symbols share one fetch, and a
+ * moderately stale entry is served at once while that fetch happens.
  */
 export async function getQuotes(
   db: DB,
@@ -102,11 +120,32 @@ export async function getQuotes(
     return now.getTime() - new Date(row.cached_at).getTime() > ttlMs;
   });
 
+  // Old enough to want refreshing, but new enough to show meanwhile.
+  const servableNow =
+    expired.length > 0 &&
+    expired.every((symbol) => {
+      const row = cached.get(symbol);
+      if (!row) return false;
+      return now.getTime() - new Date(row.cached_at).getTime() <= STALE_WHILE_REVALIDATE_MS;
+    });
+
   let isStale = false;
 
-  if (expired.length > 0) {
-    try {
+  if (expired.length > 0 && servableNow) {
+    // Fire and forget, deduplicated: the page renders from cache and the next
+    // request sees the new prices. A failure here is invisible by design —
+    // the following call will simply try again.
+    void dedupe(`quotes:${[...expired].sort().join(",")}`, async () => {
       const fresh = await provider.getQuotes(expired);
+      await writeCache(db, fresh, new Date());
+      return fresh;
+    }).catch(() => {});
+  } else if (expired.length > 0) {
+    try {
+      const fresh = await dedupe(
+        `quotes:${[...expired].sort().join(",")}`,
+        () => provider.getQuotes(expired),
+      );
       await writeCache(db, fresh, now);
       for (const quote of fresh) {
         cached.set(quote.symbol, {

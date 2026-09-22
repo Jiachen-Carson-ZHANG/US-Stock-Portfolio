@@ -5,23 +5,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
+import { MIN_PASSWORD_LENGTH } from "@/lib/schemas";
 
 /**
  * Open sign-up, but the account is inert until somebody approves it — so the
  * form says so before it is filled in rather than after it is submitted.
  */
-const REASON_KEYS = [
-  "family",
-  "friend",
-  "learning",
-  "compare",
-  "curious",
-  "other",
-] as const;
-
 export function RegisterForm() {
   const t = useT();
-  const [reasons, setReasons] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,11 +20,6 @@ export function RegisterForm() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-
-    if (reasons.length === 0) {
-      setError(t.pending.reasonsHint);
-      return;
-    }
 
     setPending(true);
     setError(null);
@@ -45,8 +31,8 @@ export function RegisterForm() {
         displayName: String(data.get("displayName") ?? ""),
         password: String(data.get("password") ?? ""),
         referredBy: String(data.get("referredBy") ?? ""),
-        reasons,
-        intro: String(data.get("intro") ?? ""),
+        reason: String(data.get("reason") ?? ""),
+        email: String(data.get("email") ?? ""),
       }),
     });
     const body = await response.json().catch(() => ({}));
@@ -109,7 +95,7 @@ export function RegisterForm() {
             name="password"
             type="password"
             autoComplete="new-password"
-            minLength={10}
+            minLength={MIN_PASSWORD_LENGTH}
             required
           />
           <p className="text-xs text-muted-foreground">{t.register.passwordHint}</p>
@@ -123,46 +109,27 @@ export function RegisterForm() {
           <p className="text-xs text-muted-foreground">{t.pending.referredByHint}</p>
         </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-xs text-muted-foreground">{t.pending.reasons}</legend>
-          <div className="space-y-1.5">
-            {REASON_KEYS.map((key) => {
-              const label = {
-                family: t.pending.reasonFamily,
-                friend: t.pending.reasonFriend,
-                learning: t.pending.reasonLearning,
-                compare: t.pending.reasonCompare,
-                curious: t.pending.reasonCurious,
-                other: t.pending.reasonOther,
-              }[key];
-              return (
-                <label key={key} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="size-4"
-                    checked={reasons.includes(key)}
-                    onChange={(event) =>
-                      setReasons((current) =>
-                        event.target.checked
-                          ? [...current, key]
-                          : current.filter((r) => r !== key),
-                      )
-                    }
-                  />
-                  {label}
-                </label>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground">{t.pending.reasonsHint}</p>
-        </fieldset>
+        <div className="space-y-2">
+          <Label htmlFor="reason" className="text-xs text-muted-foreground">
+            {t.pending.reason}
+          </Label>
+          <textarea
+            id="reason"
+            name="reason"
+            rows={3}
+            minLength={MIN_PASSWORD_LENGTH}
+            required
+            className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-base transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/70 hover:border-muted-foreground/40 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/10"
+          />
+          <p className="text-xs text-muted-foreground">{t.pending.reasonHint}</p>
+        </div>
 
         <div className="space-y-2">
-          <Label htmlFor="intro" className="text-xs text-muted-foreground">
-            {t.pending.intro}
+          <Label htmlFor="email" className="text-xs text-muted-foreground">
+            {t.pending.email}
           </Label>
-          <Input id="intro" name="intro" autoComplete="off" />
-          <p className="text-xs text-muted-foreground">{t.pending.introHint}</p>
+          <Input id="email" name="email" type="email" autoComplete="email" />
+          <p className="text-xs text-muted-foreground">{t.pending.emailHint}</p>
         </div>
 
         {error && (

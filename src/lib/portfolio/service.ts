@@ -1,5 +1,6 @@
 import "server-only";
 import { getDb, type DB } from "@/lib/db";
+import { dedupe } from "@/lib/inflight";
 import { DEFAULT_SLUG, findById, type Portfolio } from "@/lib/portfolios";
 import { mockState, syncMockPositions } from "./mock";
 import { getMarketDataProvider } from "@/providers";
@@ -152,6 +153,16 @@ export async function portfolioStart(
   return dates.length > 0 ? dates.sort()[0] : null;
 }
 
+/**
+ * How stale holdings may get before a page load waits for them.
+ *
+ * Between the cache TTL and this, the page renders from what is stored and
+ * the refresh runs behind it — three moomoo round trips (accounts, positions,
+ * funds) is a long time to hold a render for numbers that only move when
+ * somebody trades.
+ */
+const STALE_POSITIONS_MS = 5 * 60_000;
+
 function positionTtlSeconds(): number {
   return Number(process.env.POSITION_CACHE_SECONDS ?? 30);
 }
@@ -188,14 +199,22 @@ async function ensureFreshPositions(portfolioId: string, now: Date): Promise<voi
     if (age < positionTtlSeconds() * 1000) return;
   }
 
-  try {
+  // Holdings change on a trade, not on a tick, so a render does not wait for
+  // them. Past the window below the page would be showing something old
+  // enough to mislead, and then it does wait.
+  const age = synced ? now.getTime() - new Date(synced).getTime() : Infinity;
+  const blocking = age > STALE_POSITIONS_MS;
+
+  const work = dedupe(`positions:${portfolioId}`, async () => {
     await syncPositions(db, portfolioId, await getBrokerProvider(portfolioId), "moomoo", now);
-  } catch (error) {
+  }).catch((error: unknown) => {
     logger.error("broker.sync.failure", {
       provider: "moomoo",
       reason: error instanceof Error ? error.message : "unknown",
     });
-  }
+  });
+
+  if (blocking) await work;
 }
 
 async function pricedPositions(portfolioId: string, now: Date): Promise<{
