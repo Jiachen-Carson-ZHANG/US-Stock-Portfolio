@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth/guards";
+import { getSessionUser } from "@/lib/auth/guards";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { LoginForm } from "@/components/layout/login-form";
@@ -7,7 +7,10 @@ import { LanguageToggle } from "@/components/layout/nav";
 import { BrandMark } from "@/components/layout/brand-mark";
 
 export default async function LoginPage() {
-  if (await getCurrentUser()) redirect("/");
+  // A waiting account is signed in already; showing it the form again is how
+  // somebody ends up typing a correct password over and over.
+  const signedIn = await getSessionUser();
+  if (signedIn) redirect(signedIn.status === "active" ? "/" : "/pending");
   const { locale, t } = await serverDictionary();
 
   return (

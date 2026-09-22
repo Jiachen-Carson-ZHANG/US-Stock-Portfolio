@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, isOpenAccess } from "@/lib/auth/guards";
+import { getSessionUser, isOpenAccess } from "@/lib/auth/guards";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { RegisterForm } from "@/components/layout/register-form";
@@ -12,7 +12,8 @@ export default async function RegisterPage() {
   // Without sign-in there are no accounts to create, so the page would be a
   // form that cannot do anything.
   if (isOpenAccess()) redirect("/");
-  if (await getCurrentUser()) redirect("/");
+  const signedIn = await getSessionUser();
+  if (signedIn) redirect(signedIn.status === "active" ? "/" : "/pending");
 
   const { locale, t } = await serverDictionary();
 
