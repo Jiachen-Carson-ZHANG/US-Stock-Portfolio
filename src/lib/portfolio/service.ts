@@ -40,7 +40,7 @@ import { money, toDTO } from "@/lib/money";
 import { getQuotes } from "./quotes";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
-import { realizedBySymbol } from "./reconstruct";
+import { realizedFor } from "./realized-cache";
 import {
   lastTransactionSync,
   readTransactions,
@@ -255,11 +255,10 @@ export async function loadPortfolio(
   );
 
   // From the fills, which cover the whole account, rather than the broker's
-  // figure, which only covers positions still open. Needed in two places, so
-  // replayed once.
-  const realized = Object.fromEntries(
-    realizedBySymbol(await readTransactions(db, portfolioId, 5000)),
-  );
+  // figure, which only covers positions still open. Cached against a
+  // fingerprint of the fill list, so the replay runs when a trade changes
+  // rather than on every page view.
+  const realized = await realizedFor(db, portfolioId);
 
   const invested = totalInvested(positions, currency);
   const views = buildPositionViews(positions, currency).map((view) => ({

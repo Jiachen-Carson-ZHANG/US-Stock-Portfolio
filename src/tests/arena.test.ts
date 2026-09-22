@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
 import type { AuthUser } from "@/lib/auth/session";
-import { leaderboard, type Standing } from "@/lib/arena";
+import { clearArenaCache, leaderboard, type Standing } from "@/lib/arena";
 import { createPortfolio, grantAccess } from "@/lib/portfolios";
 import {
   awardCompletedPeriods,
@@ -66,6 +66,9 @@ async function history(
 
 beforeEach(async () => {
   db = await createTestDb();
+  // Each test gets a fresh schema, so a standing cached against another
+  // test's fingerprint must not survive into this one.
+  clearArenaCache();
 });
 
 afterEach(async () => {
@@ -247,4 +250,21 @@ describe("the trophy cabinet", () => {
     await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
     expect((await awardCompletedPeriods(db, NOW)).awarded).toBe(0);
   });
+});
+
+it("historical rankings cannot include later valuations", async () => {
+  const admin = await addUser("carson", "owner");
+  await history(TEST_PORTFOLIO_ID, 10000, 12000);
+  const asAt = new Date("2026-08-31T23:59:59Z");
+  const before = await leaderboard(db, admin, "month", asAt);
+  await db.run("UPDATE portfolio_snapshots SET total_market_value = '99999999' WHERE snapshot_date > '2026-08-31'");
+  const after = await leaderboard(db, admin, "month", asAt);
+  expect(after).toEqual(before);
+  expect(after.standings[0].curve.every((p) => p.date <= "2026-08-31")).toBe(true);
+});
+it("does not report an old all-time return as this week's result", async () => {
+  const admin = await addUser("carson", "owner");
+  await history(TEST_PORTFOLIO_ID, 10000, 12000);
+  const board = await leaderboard(db, admin, "week", new Date("2027-01-01T12:00:00Z"));
+  expect(board.standings[0].returnPercent).toBeNull();
 });

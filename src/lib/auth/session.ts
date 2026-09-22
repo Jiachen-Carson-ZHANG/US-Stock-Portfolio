@@ -19,6 +19,7 @@ type UserRow = {
   display_name: string;
   role: UserRole;
   disabled_at: string | null;
+  last_seen_at: string;
 };
 
 /**
@@ -71,7 +72,7 @@ export async function validateSession(
   if (!token) return null;
 
   const row = await db.get<UserRow>(
-    `SELECT u.id, u.username, u.display_name, u.role, u.disabled_at
+    `SELECT u.id, u.username, u.display_name, u.role, u.disabled_at, s.last_seen_at
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ?
@@ -82,10 +83,7 @@ export async function validateSession(
 
   if (!row || row.disabled_at) return null;
 
-  await db.run(`UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`, [
-    now.toISOString(),
-    hashToken(token),
-  ]);
+  await touchSession(db, row, token, now);
 
   return {
     id: row.id,
@@ -93,6 +91,33 @@ export async function validateSession(
     displayName: row.display_name,
     role: row.role,
   };
+}
+
+/**
+ * How stale `last_seen_at` may get before it is worth a write.
+ *
+ * It exists so an idle session can be spotted, which is a question measured
+ * in minutes. Writing it on every request meant a database write per quote
+ * poll — one every five seconds per open tab, recording something nobody
+ * reads at that resolution.
+ */
+const LAST_SEEN_RESOLUTION_MS = 5 * 60_000;
+
+async function touchSession(
+  db: DB,
+  row: UserRow,
+  token: string,
+  now: Date,
+): Promise<void> {
+  const seen = Date.parse(row.last_seen_at);
+  if (Number.isFinite(seen) && now.getTime() - seen < LAST_SEEN_RESOLUTION_MS) {
+    return;
+  }
+
+  await db.run(`UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`, [
+    now.toISOString(),
+    hashToken(token),
+  ]);
 }
 
 export async function revokeSession(

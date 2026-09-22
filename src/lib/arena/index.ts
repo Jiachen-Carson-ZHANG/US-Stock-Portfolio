@@ -77,6 +77,7 @@ async function standingFor(
   portfolio: Portfolio,
   period: Period,
   now: Date,
+  fromOverride?: string,
 ): Promise<Standing> {
   const base: Omit<Standing, "returnPercent" | "curve" | "unavailable"> = {
     slug: portfolio.slug,
@@ -89,7 +90,12 @@ async function standingFor(
     readAnalysis(db, portfolio.id),
   ]);
 
-  const series = adjustedSeries(snapshots, analysis.flows, analysis.coverage);
+  const through = now.toISOString().slice(0, 10);
+  const series = adjustedSeries(
+    snapshots.filter((point) => point.snapshotDate <= through),
+    analysis.flows.filter((flow) => flow.date <= through),
+    analysis.coverage,
+  );
   if (series.issue) {
     return {
       ...base,
@@ -99,14 +105,11 @@ async function standingFor(
     };
   }
 
-  const from = windowFrom(period, now);
+  const from = fromOverride ?? windowFrom(period, now);
   // One point before the window so the first interval is a real return
   // rather than a zero, which would flatter whoever joined most recently.
-  const startIndex = from
-    ? Math.max(0, series.points.findIndex((p) => p.date >= from) - 1)
-    : 0;
-  const slice =
-    startIndex < 0 ? series.points : series.points.slice(startIndex);
+  const firstInWindow = from ? series.points.findIndex((p) => p.date >= from) : 0;
+  const slice = firstInWindow < 0 ? [] : series.points.slice(Math.max(0, firstInWindow - 1));
 
   if (slice.length < 2) {
     return {
@@ -148,14 +151,66 @@ export async function leaderboard(
  * Separated from the viewer-scoped leaderboard because awarding a trophy has
  * to consider everybody, not only whoever happens to be looking.
  */
+/**
+ * Standings change when a day is recorded or a cash flow is edited, which is
+ * daily at most — not on every page view, which is what computing them here
+ * used to mean. Every portfolio's whole snapshot history was read and
+ * replayed five times over, once per period, for each person who opened the
+ * page.
+ *
+ * The key is a fingerprint of everything the calculation depends on, so a new
+ * snapshot or a corrected transfer invalidates it without anyone remembering
+ * to. Held per process; a cold instance recomputes once.
+ */
+const rankCache = new Map<string, { key: string; value: Standing[] }>();
+const MAX_RANK_ENTRIES = 32;
+
+async function rankFingerprint(db: DB, now: Date): Promise<string> {
+  const row = await db.get<{
+    snaps: number;
+    lastSnap: string | null;
+    flows: number;
+    lastFlow: string | null;
+    config: string | null;
+  }>(
+    `SELECT (SELECT COUNT(*)::int FROM portfolio_snapshots) AS snaps,
+            (SELECT MAX(snapshot_date) FROM portfolio_snapshots) AS "lastSnap",
+            (SELECT COUNT(*)::int FROM analysis_flows) AS flows,
+            (SELECT MAX(date) FROM analysis_flows) AS "lastFlow",
+            (SELECT MAX(value) FROM analysis_config WHERE key = 'review') AS config`,
+  );
+
+  // The calendar day matters because a period window is measured from today:
+  // yesterday's "week" is not this morning's.
+  return [
+    now.toISOString().slice(0, 10),
+    row?.snaps ?? 0,
+    row?.lastSnap ?? "",
+    row?.flows ?? 0,
+    row?.lastFlow ?? "",
+    row?.config ?? "",
+  ].join("|");
+}
+
 export async function rank(
   db: DB,
   portfolios: Portfolio[],
   period: Period,
   now: Date,
+  fromOverride?: string,
 ): Promise<Standing[]> {
+  // fromOverride changes the window, so it belongs in the key — otherwise a
+  // custom range would be served yesterday's answer for the default one.
+  const cacheKey = `${period}:${fromOverride ?? ""}:${portfolios
+    .map((p) => p.id)
+    .sort()
+    .join(",")}`;
+  const key = await rankFingerprint(db, now);
+  const hit = rankCache.get(cacheKey);
+  if (hit && hit.key === key) return hit.value;
+
   const standings = await Promise.all(
-    portfolios.map((portfolio) => standingFor(db, portfolio, period, now)),
+    portfolios.map((portfolio) => standingFor(db, portfolio, period, now, fromOverride)),
   );
 
   standings.sort((a, b) => {
@@ -169,7 +224,18 @@ export async function rank(
     return b.returnPercent - a.returnPercent;
   });
 
+  if (rankCache.size >= MAX_RANK_ENTRIES && !rankCache.has(cacheKey)) {
+    const oldest = rankCache.keys().next().value;
+    if (oldest !== undefined) rankCache.delete(oldest);
+  }
+  rankCache.set(cacheKey, { key, value: standings });
+
   return standings;
+}
+
+/** For tests, and after a job rewrites history behind the app's back. */
+export function clearArenaCache(): void {
+  rankCache.clear();
 }
 
 export async function allLeaderboards(
