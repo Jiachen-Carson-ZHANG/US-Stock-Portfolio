@@ -85,6 +85,21 @@ export const mockTradeSchema = z.object({
  * what survives a link from the moment it is chosen rather than being
  * rejected later.
  */
+/**
+ * Why someone wants in. A fixed list rather than free text, because the
+ * person approving is scanning a queue: "friend of the family" is answerable
+ * at a glance in a way that a paragraph is not. The free-text box is still
+ * there for anything the list does not cover.
+ */
+export const JOIN_REASONS = [
+  "family",
+  "friend",
+  "learning",
+  "compare",
+  "curious",
+  "other",
+] as const;
+
 export const registerSchema = z.object({
   username: z
     .string()
@@ -96,6 +111,9 @@ export const registerSchema = z.object({
     ),
   displayName: z.string().trim().min(1).max(60),
   password: z.string().min(10, "Use at least 10 characters").max(512),
+  referredBy: z.string().trim().max(60).default(""),
+  reasons: z.array(z.enum(JOIN_REASONS)).min(1, "Pick at least one").max(6),
+  intro: z.string().trim().max(500).default(""),
 });
 
 export const accountDecisionSchema = z.object({

@@ -21,7 +21,7 @@ async function addUser(username: string, role: "owner" | "viewer" = "viewer") {
      VALUES (?, ?, ?, 'hash', ?, ?)`,
     [id, username, username, role, NOW.toISOString()],
   );
-  return { id, username, displayName: username, role } satisfies AuthUser;
+  return { id, username, displayName: username, role, status: "active" } satisfies AuthUser;
 }
 
 /** A straight-line climb from `start` to `end` over `days` weekdays. */

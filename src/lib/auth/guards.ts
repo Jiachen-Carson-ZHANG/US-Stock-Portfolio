@@ -12,9 +12,17 @@ const OPEN_ACCESS_USER: AuthUser = {
   username: "family",
   displayName: "Family",
   role: "owner",
+  status: "active",
 };
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
+/**
+ * Whoever holds the cookie, whatever state their account is in.
+ *
+ * Only two things may use this: the page that explains why an account is
+ * waiting, and signing out. Everything else wants getCurrentUser, which
+ * refuses anything but an active account.
+ */
+export async function getSessionUser(): Promise<AuthUser | null> {
   if (isOpenAccess()) return OPEN_ACCESS_USER;
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
@@ -25,10 +33,30 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return validateSession(await getDb(), token);
 }
 
-/** Server Component guard. Redirects unauthenticated visitors to /login. */
+/**
+ * The caller, if their account has actually been let in.
+ *
+ * Refusing here rather than in each route is deliberate: every page and API
+ * route already funnels through this or requireUser, so a pending account is
+ * closed out of all of them without thirty separate checks to add, and
+ * without a new route being able to forget one.
+ */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const user = await getSessionUser();
+  return user && user.status === "active" ? user : null;
+}
+
+/**
+ * Server Component guard.
+ *
+ * Signed out goes to /login. Signed in but not yet approved goes to the page
+ * that says so, rather than to /login, which would look like the password
+ * was wrong.
+ */
 export async function requireUser(): Promise<AuthUser> {
-  const user = await getCurrentUser();
+  const user = await getSessionUser();
   if (!user) redirect("/login");
+  if (user.status !== "active") redirect("/pending");
   return user;
 }
 

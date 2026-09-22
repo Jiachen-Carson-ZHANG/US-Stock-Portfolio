@@ -20,7 +20,7 @@ beforeEach(async () => {
   db = await createTestDb(); resetDbForTests(db); mocks.sync.mockClear();
   for (const id of ["holder", "viewer"]) await db.run("INSERT INTO users (id,username,display_name,password_hash,role,created_at) VALUES (?,?,?,'hash','viewer',?)", [id,id,id,new Date().toISOString()]);
   await db.run("UPDATE portfolios SET owner_user_id = 'holder' WHERE id = ?", [TEST_PORTFOLIO_ID]);
-  mocks.user = { id: "viewer", username: "viewer", displayName: "Viewer", role: "viewer" };
+  mocks.user = { id: "viewer", username: "viewer", displayName: "Viewer", role: "viewer", status: "active" };
 });
 afterEach(async () => { resetDbForTests(null); await db.close(); });
 const request = (path: string, origin = "http://localhost") => new Request(`http://localhost/api/${path}?portfolio=carson`, { method: "POST", headers: { origin } });

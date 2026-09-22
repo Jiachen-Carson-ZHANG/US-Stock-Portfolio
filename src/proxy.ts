@@ -16,6 +16,13 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 /**
+ * Reachable with a session whatever state the account is in. The page itself
+ * decides what to say; the middleware only needs to not redirect it to
+ * /login, which would look like the password was wrong.
+ */
+const SESSION_PATHS = new Set(["/pending", "/api/auth/logout"]);
+
+/**
  * Defence in depth only. This checks for a cookie, not a valid session — every
  * page and API route independently authorizes server-side before returning any
  * portfolio data (§4), so a forged cookie gains nothing here.
@@ -25,6 +32,7 @@ export function proxy(request: NextRequest) {
 
   if (isOpenAccess()) return NextResponse.next();
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
+  if (SESSION_PATHS.has(pathname)) return NextResponse.next();
 
   if (!request.cookies.has(SESSION_COOKIE)) {
     if (pathname.startsWith("/api/")) {

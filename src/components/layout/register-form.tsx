@@ -10,8 +10,18 @@ import { useT } from "@/lib/i18n/context";
  * Open sign-up, but the account is inert until somebody approves it — so the
  * form says so before it is filled in rather than after it is submitted.
  */
+const REASON_KEYS = [
+  "family",
+  "friend",
+  "learning",
+  "compare",
+  "curious",
+  "other",
+] as const;
+
 export function RegisterForm() {
   const t = useT();
+  const [reasons, setReasons] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +29,11 @@ export function RegisterForm() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+
+    if (reasons.length === 0) {
+      setError(t.pending.reasonsHint);
+      return;
+    }
 
     setPending(true);
     setError(null);
@@ -29,6 +44,9 @@ export function RegisterForm() {
         username: String(data.get("username") ?? ""),
         displayName: String(data.get("displayName") ?? ""),
         password: String(data.get("password") ?? ""),
+        referredBy: String(data.get("referredBy") ?? ""),
+        reasons,
+        intro: String(data.get("intro") ?? ""),
       }),
     });
     const body = await response.json().catch(() => ({}));
@@ -95,6 +113,56 @@ export function RegisterForm() {
             required
           />
           <p className="text-xs text-muted-foreground">{t.register.passwordHint}</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="referredBy" className="text-xs text-muted-foreground">
+            {t.pending.referredBy}
+          </Label>
+          <Input id="referredBy" name="referredBy" autoComplete="off" />
+          <p className="text-xs text-muted-foreground">{t.pending.referredByHint}</p>
+        </div>
+
+        <fieldset className="space-y-2">
+          <legend className="text-xs text-muted-foreground">{t.pending.reasons}</legend>
+          <div className="space-y-1.5">
+            {REASON_KEYS.map((key) => {
+              const label = {
+                family: t.pending.reasonFamily,
+                friend: t.pending.reasonFriend,
+                learning: t.pending.reasonLearning,
+                compare: t.pending.reasonCompare,
+                curious: t.pending.reasonCurious,
+                other: t.pending.reasonOther,
+              }[key];
+              return (
+                <label key={key} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4"
+                    checked={reasons.includes(key)}
+                    onChange={(event) =>
+                      setReasons((current) =>
+                        event.target.checked
+                          ? [...current, key]
+                          : current.filter((r) => r !== key),
+                      )
+                    }
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">{t.pending.reasonsHint}</p>
+        </fieldset>
+
+        <div className="space-y-2">
+          <Label htmlFor="intro" className="text-xs text-muted-foreground">
+            {t.pending.intro}
+          </Label>
+          <Input id="intro" name="intro" autoComplete="off" />
+          <p className="text-xs text-muted-foreground">{t.pending.introHint}</p>
         </div>
 
         {error && (

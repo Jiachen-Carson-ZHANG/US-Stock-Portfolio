@@ -6,11 +6,21 @@ export const SESSION_TTL_DAYS = 30;
 
 export type UserRole = "owner" | "viewer";
 
+/**
+ * An account exists before anyone has agreed to it.
+ *
+ * `pending` can sign in and see one page explaining that it is waiting.
+ * `declined` can sign in and see the same page saying otherwise. Neither can
+ * reach anything else — enforced in the guards, not here.
+ */
+export type AccountStatus = "pending" | "active" | "declined";
+
 export type AuthUser = {
   id: string;
   username: string;
   displayName: string;
   role: UserRole;
+  status: AccountStatus;
 };
 
 type UserRow = {
@@ -82,10 +92,10 @@ export async function validateSession(
     [hashToken(token), now.toISOString()],
   );
 
-  // The single choke point for account state. A pending or declined account
-  // holding a cookie — issued before a decision, or crafted — resolves to
-  // nobody, so no page, route or loader needs its own check.
-  if (!row || row.disabled_at || row.status !== "active") return null;
+  // A disabled account is gone; a pending one is merely waiting, and needs a
+  // session so it can be shown why. Which pages that session may reach is the
+  // guards' job — see getCurrentUser, which refuses anything but active.
+  if (!row || row.disabled_at) return null;
 
   await touchSession(db, row, token, now);
 
@@ -94,6 +104,7 @@ export async function validateSession(
     username: row.username,
     displayName: row.display_name,
     role: row.role,
+    status: (row.status as AccountStatus) ?? "active",
   };
 }
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { recordActivity } from "@/lib/activity";
-import { authenticateRequest } from "@/lib/auth/guards";
+import { getSessionUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { SESSION_COOKIE, revokeSession } from "@/lib/auth/session";
@@ -11,7 +11,9 @@ export async function POST() {
 
   if (token) {
     // Identified before the session is revoked, or there is nobody to name.
-    const user = await authenticateRequest();
+    // The raw accessor: someone waiting for approval must still be able to
+    // sign out, and getCurrentUser would call them nobody.
+    const user = await getSessionUser();
     const db = await getDb();
     // Awaited: a floating promise in a serverless function is not guaranteed
     // to finish once the response has been returned, so the sign-out could be

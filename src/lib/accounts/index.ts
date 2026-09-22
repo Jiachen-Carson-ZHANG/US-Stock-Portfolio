@@ -14,6 +14,9 @@ export type PendingAccount = {
   id: string;
   username: string;
   displayName: string;
+  referredBy: string | null;
+  reasons: string[];
+  intro: string | null;
   createdAt: string;
 };
 
@@ -33,7 +36,14 @@ export class RegistrationError extends Error {}
  */
 export async function register(
   db: DB,
-  input: { username: string; displayName: string; password: string },
+  input: {
+    username: string;
+    displayName: string;
+    password: string;
+    referredBy?: string;
+    reasons?: string[];
+    intro?: string;
+  },
   now: Date = new Date(),
 ): Promise<{ id: string }> {
   const username = input.username.trim().toLowerCase();
@@ -55,14 +65,19 @@ export async function register(
 
   const id = randomUUID();
   await db.run(
-    `INSERT INTO users (id, username, display_name, password_hash, role, created_at, status)
-     VALUES (?, ?, ?, ?, 'viewer', ?, 'pending')`,
+    `INSERT INTO users
+       (id, username, display_name, password_hash, role, created_at, status,
+        referred_by, reasons, intro)
+     VALUES (?, ?, ?, ?, 'viewer', ?, 'pending', ?, ?, ?)`,
     [
       id,
       username,
       input.displayName.trim() || username,
       await hashPassword(input.password),
       now.toISOString(),
+      input.referredBy?.trim() || null,
+      JSON.stringify(input.reasons ?? []),
+      input.intro?.trim() || null,
     ],
   );
 
@@ -78,7 +93,11 @@ export async function register(
         userId: owner.id,
         kind: "account_request",
         title: `${input.displayName.trim() || username} would like an account`,
-        body: `@${username}`,
+        // The referral is the part that decides most of these, so it goes in
+        // the notification rather than only on the settings page.
+        body: input.referredBy?.trim()
+          ? `@${username} · referred by ${input.referredBy.trim()}`
+          : `@${username}`,
         link: "/settings",
       },
       now,
@@ -93,15 +112,30 @@ export async function pendingAccounts(db: DB): Promise<PendingAccount[]> {
     id: string;
     username: string;
     display_name: string;
+    referred_by: string | null;
+    reasons: string | null;
+    intro: string | null;
     created_at: string;
   }>(
-    `SELECT id, username, display_name, created_at
+    `SELECT id, username, display_name, referred_by, reasons, intro, created_at
        FROM users WHERE status = 'pending' ORDER BY created_at`,
   );
   return rows.map((row) => ({
     id: row.id,
     username: row.username,
     displayName: row.display_name,
+    referredBy: row.referred_by,
+    // Stored as JSON. A malformed value is somebody else's bad write, and
+    // should cost the badge rather than the whole queue.
+    reasons: (() => {
+      try {
+        const parsed = JSON.parse(row.reasons ?? "[]");
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch {
+        return [];
+      }
+    })(),
+    intro: row.intro,
     createdAt: row.created_at,
   }));
 }

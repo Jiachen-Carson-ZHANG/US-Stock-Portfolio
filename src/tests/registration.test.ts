@@ -42,10 +42,11 @@ describe("signing up", () => {
     const row = await db.get<{ status: string }>(`SELECT status FROM users WHERE id = ?`, [id]);
     expect(row?.status).toBe("pending");
 
-    // The decisive check: even holding a session, a pending account resolves
-    // to nobody, so no page or route needs its own guard.
+    // It gets a session — that is what lets the waiting page greet them by
+    // name and offer sign-out. What it does not get is `active`, which is
+    // what every page and API guard insists on.
     const { token } = await createSession(db, id);
-    expect(await validateSession(db, token)).toBeNull();
+    expect((await validateSession(db, token))?.status).toBe("pending");
   });
 
   it("tells every owner that somebody is waiting", async () => {
@@ -152,7 +153,7 @@ describe("approving an account", () => {
     await decideAccount(db, { userId: id, deciderId: owner, approve: false });
 
     const { token } = await createSession(db, id);
-    expect(await validateSession(db, token)).toBeNull();
+    expect((await validateSession(db, token))?.status).toBe("declined");
     expect(await findBySlug(db, "jane-mock")).toBeNull();
   });
 
@@ -163,5 +164,79 @@ describe("approving an account", () => {
 
     const again = await decideAccount(db, { userId: id, deciderId: owner, approve: true });
     expect(again.ok).toBe(false);
+  });
+});
+
+describe("what a waiting account can reach", () => {
+  it("holds a session, but is nobody as far as the app is concerned", async () => {
+    await addOwner();
+    const { id } = await register(db, CREDENTIALS);
+    const { token } = await createSession(db, id);
+
+    // It resolves — that is what lets the waiting page greet them by name.
+    const user = await validateSession(db, token);
+    expect(user?.status).toBe("pending");
+
+    // And it is refused everywhere else, because every page and route funnels
+    // through a guard that insists on an active account.
+    expect(user && user.status === "active").toBe(false);
+  });
+
+  it("keeps a declined account signed-in-able but empty-handed", async () => {
+    const owner = await addOwner();
+    const { id } = await register(db, CREDENTIALS);
+    await decideAccount(db, { userId: id, deciderId: owner, approve: false });
+
+    const { token } = await createSession(db, id);
+    const user = await validateSession(db, token);
+    expect(user?.status).toBe("declined");
+    expect(await findBySlug(db, "jane-mock")).toBeNull();
+  });
+
+  it("stops resolving once the account is disabled outright", async () => {
+    await addOwner();
+    const { id } = await register(db, CREDENTIALS);
+    await db.run(`UPDATE users SET disabled_at = ? WHERE id = ?`, [
+      new Date().toISOString(),
+      id,
+    ]);
+
+    const { token } = await createSession(db, id);
+    expect(await validateSession(db, token)).toBeNull();
+  });
+});
+
+describe("what they are asked at sign-up", () => {
+  it("keeps the referral and the reasons for whoever approves it", async () => {
+    await addOwner();
+    await register(db, {
+      ...CREDENTIALS,
+      referredBy: "Mile",
+      reasons: ["friend", "learning"],
+      intro: "I sit next to Mile at work.",
+    });
+
+    const [waiting] = await pendingAccounts(db);
+    expect(waiting.referredBy).toBe("Mile");
+    expect(waiting.reasons).toEqual(["friend", "learning"]);
+    expect(waiting.intro).toBe("I sit next to Mile at work.");
+  });
+
+  it("puts the referral in the owner's notification, since it decides most of them", async () => {
+    const owner = await addOwner();
+    await register(db, { ...CREDENTIALS, referredBy: "Mile", reasons: ["friend"] });
+
+    const told = await notificationsFor(db, owner);
+    expect(told[0].body).toContain("Mile");
+  });
+
+  it("survives a malformed reasons column without losing the queue", async () => {
+    await addOwner();
+    const { id } = await register(db, CREDENTIALS);
+    await db.run(`UPDATE users SET reasons = 'not json' WHERE id = ?`, [id]);
+
+    const [waiting] = await pendingAccounts(db);
+    expect(waiting.reasons).toEqual([]);
+    expect(waiting.username).toBe("jane");
   });
 });

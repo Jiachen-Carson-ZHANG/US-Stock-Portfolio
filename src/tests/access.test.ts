@@ -15,7 +15,7 @@ async function addUser(username: string, role: "owner" | "viewer" = "viewer") {
      VALUES (?, ?, ?, 'hash', ?, ?)`,
     [id, username, username, role, new Date().toISOString()],
   );
-  return { id, username, displayName: username, role } satisfies AuthUser;
+  return { id, username, displayName: username, role, status: "active" } satisfies AuthUser;
 }
 
 beforeEach(async () => {

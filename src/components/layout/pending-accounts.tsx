@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n/context";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { PendingAccount } from "@/lib/accounts";
 
 /**
@@ -12,6 +13,18 @@ import type { PendingAccount } from "@/lib/accounts";
  * The note spells out what approving actually does, because "approve" on its
  * own does not say whether it hands over the family's holdings.
  */
+function reasonLabel(t: Dictionary, reason: string): string {
+  const labels: Record<string, string> = {
+    family: t.pending.reasonFamily,
+    friend: t.pending.reasonFriend,
+    learning: t.pending.reasonLearning,
+    compare: t.pending.reasonCompare,
+    curious: t.pending.reasonCurious,
+    other: t.pending.reasonOther,
+  };
+  return labels[reason] ?? reason;
+}
+
 export function PendingAccounts({ pending }: { pending: PendingAccount[] }) {
   const t = useT();
   const router = useRouter();
@@ -49,7 +62,29 @@ export function PendingAccounts({ pending }: { pending: PendingAccount[] }) {
                     @{account.username}
                   </span>
                 </p>
-                <p className="text-xs text-muted-foreground">
+                {account.referredBy && (
+                  <p className="text-xs text-muted-foreground">
+                    {t.pending.referredByLabel}: {account.referredBy}
+                  </p>
+                )}
+                {account.reasons.length > 0 && (
+                  <p className="mt-0.5 flex flex-wrap gap-1.5">
+                    {account.reasons.map((reason) => (
+                      <span
+                        key={reason}
+                        className="rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        {reasonLabel(t, reason)}
+                      </span>
+                    ))}
+                  </p>
+                )}
+                {account.intro && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    &ldquo;{account.intro}&rdquo;
+                  </p>
+                )}
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {new Date(account.createdAt).toLocaleString()}
                 </p>
               </div>

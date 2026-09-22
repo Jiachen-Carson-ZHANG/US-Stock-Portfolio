@@ -89,6 +89,51 @@ export async function visibleTo(db: DB, user: AuthUser): Promise<Portfolio[]> {
   return rows.map(toPortfolio);
 }
 
+export type DirectoryEntry = Portfolio & {
+  readable: boolean;
+  ownerName: string | null;
+  /** True when this person has already asked and is waiting on an answer. */
+  requested: boolean;
+};
+
+/**
+ * Every portfolio, marked with whether this person may open it.
+ *
+ * Deliberately shows the ones they cannot: a locked row with a name is how
+ * somebody knows there is something to ask for. The rule that matters is
+ * still enforced in the loaders — this list carries a name and a flag, never
+ * a holding or a figure.
+ */
+export async function directoryFor(
+  db: DB,
+  user: AuthUser,
+): Promise<DirectoryEntry[]> {
+  const rows = await db.all<
+    Row & { owner_name: string | null; granted: boolean | null; requested: boolean | null }
+  >(
+    `SELECT p.id, p.slug, p.display_name, p.owner_user_id, p.kind,
+            p.base_currency, p.opening_cash, p.created_at,
+            u.display_name AS owner_name,
+            (a.user_id IS NOT NULL) AS granted,
+            (r.id IS NOT NULL) AS requested
+       FROM portfolios p
+       LEFT JOIN users u ON u.id = p.owner_user_id
+       LEFT JOIN portfolio_access a ON a.portfolio_id = p.id AND a.user_id = ?
+       LEFT JOIN access_requests r
+              ON r.portfolio_id = p.id AND r.user_id = ? AND r.status = 'pending'
+      ORDER BY p.created_at`,
+    [user.id, user.id],
+  );
+
+  return rows.map((row) => ({
+    ...toPortfolio(row),
+    ownerName: row.owner_name,
+    readable:
+      user.role === "owner" || row.owner_user_id === user.id || row.granted === true,
+    requested: row.requested === true,
+  }));
+}
+
 export async function canRead(
   db: DB,
   user: AuthUser,

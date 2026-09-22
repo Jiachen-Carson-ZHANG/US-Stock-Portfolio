@@ -223,6 +223,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
 ALTER TABLE users ADD CONSTRAINT users_status_check
   CHECK (status IN ('pending','active','declined'));
+-- Asked for at sign-up so the person approving has something to go on
+-- besides a username. Kept on the user rather than in a separate table:
+-- it is answered once, never edited, and only read beside the account.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reasons TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS intro TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_at TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_pending ON users(status) WHERE status = 'pending';

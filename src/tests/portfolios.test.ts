@@ -7,6 +7,7 @@ import {
   canWrite,
   createPortfolio,
   defaultFor,
+  directoryFor,
   ensureDefaultPortfolio,
   findBySlug,
   grantAccess,
@@ -14,6 +15,7 @@ import {
   visibleTo,
 } from "@/lib/portfolios";
 import { portfolioStart } from "@/lib/portfolio/service";
+import { requestAccess } from "@/lib/access";
 
 let db: TestDb;
 
@@ -27,7 +29,7 @@ async function addUser(
      VALUES (?, ?, ?, 'hash', ?, ?)`,
     [id, username, username, role, new Date().toISOString()],
   );
-  return { id, username, displayName: username, role };
+  return { id, username, displayName: username, role, status: "active" as const };
 }
 
 beforeEach(async () => {
@@ -257,5 +259,92 @@ describe("when a portfolio's history starts", () => {
 
   it("returns nothing for a portfolio with no history at all", async () => {
     expect(await portfolioStart(db, TEST_PORTFOLIO_ID)).toBeNull();
+  });
+});
+
+describe("the directory", () => {
+  it("lists everything, and marks what you may open", async () => {
+    const mile = await addUser("mile");
+    const jane = await addUser("jane");
+    const hers = await createPortfolio(db, {
+      slug: "mirat",
+      displayName: "Mile",
+      ownerUserId: mile.id,
+      kind: "broker",
+    });
+
+    const seen = await directoryFor(db, jane);
+    const bySlug = Object.fromEntries(seen.map((entry) => [entry.slug, entry]));
+
+    // The locked one is present, named, and marked shut.
+    expect(bySlug.mirat).toBeDefined();
+    expect(bySlug.mirat.readable).toBe(false);
+    expect(bySlug.mirat.ownerName).toBe("mile");
+    expect(bySlug.carson.readable).toBe(false);
+
+    await grantAccess(db, hers.id, jane.id);
+    const after = await directoryFor(db, jane);
+    expect(after.find((entry) => entry.slug === "mirat")?.readable).toBe(true);
+  });
+
+  // The whole point of showing a locked row is that nothing sensitive rides
+  // along with the name.
+  it("carries no holdings, values or returns", async () => {
+    const jane = await addUser("jane");
+    const seen = await directoryFor(db, jane);
+
+    for (const entry of seen) {
+      expect(Object.keys(entry).sort()).toEqual([
+        "baseCurrency",
+        "createdAt",
+        "displayName",
+        "id",
+        "kind",
+        "openingCash",
+        "ownerName",
+        "ownerUserId",
+        "readable",
+        "requested",
+        "slug",
+      ]);
+    }
+  });
+
+  it("remembers that you already asked", async () => {
+    const mile = await addUser("mile");
+    const jane = await addUser("jane");
+    const hers = await createPortfolio(db, {
+      slug: "mirat",
+      displayName: "Mile",
+      ownerUserId: mile.id,
+      kind: "broker",
+    });
+
+    expect((await directoryFor(db, jane)).find((e) => e.slug === "mirat")?.requested).toBe(
+      false,
+    );
+
+    await requestAccess(db, {
+      portfolioId: hers.id,
+      userId: jane.id,
+      userName: jane.displayName,
+    });
+
+    expect((await directoryFor(db, jane)).find((e) => e.slug === "mirat")?.requested).toBe(
+      true,
+    );
+  });
+
+  it("shows an administrator everything as readable", async () => {
+    const admin = await addUser("carson", "owner");
+    const mile = await addUser("mile");
+    await createPortfolio(db, {
+      slug: "mirat",
+      displayName: "Mile",
+      ownerUserId: mile.id,
+      kind: "broker",
+    });
+
+    expect((await directoryFor(db, admin)).every((entry) => entry.readable)).toBe(true);
   });
 });

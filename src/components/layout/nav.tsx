@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutGrid,
+  Library,
   Trophy,
   LineChart,
   UserRound,
@@ -28,6 +29,7 @@ const ITEMS = [
   { href: "/performance", key: "performance", icon: LineChart, ownerOnly: false, scoped: true },
   { href: "/transactions", key: "transactions", icon: Receipt, ownerOnly: false, scoped: true },
   { href: "/watchlist", key: "watchlist", icon: Star, ownerOnly: false, scoped: false },
+  { href: "/portfolios", key: "portfolios", icon: Library, ownerOnly: false, scoped: false },
   { href: "/arena", key: "arena", icon: Trophy, ownerOnly: false, scoped: false },
   { href: "/account", key: "account", icon: UserRound, ownerOnly: false, scoped: false },
   { href: "/settings", key: "settings", icon: Settings, ownerOnly: true, scoped: false },
