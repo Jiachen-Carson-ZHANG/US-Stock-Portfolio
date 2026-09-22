@@ -235,6 +235,42 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_at TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_pending ON users(status) WHERE status = 'pending';
 
+-- Orders, for mock portfolios.
+--
+-- Separate from the transactions table on purpose: a transaction is
+-- something that happened, an order is something somebody asked for. Most
+-- orders become a transaction; some are cancelled, expire, or never fill.
+-- Conflating them would mean either inventing fills that did not happen, or
+-- losing the record of what was asked.
+CREATE TABLE IF NOT EXISTS orders (
+  id              TEXT PRIMARY KEY,
+  portfolio_id    TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  symbol          TEXT NOT NULL,
+  side            TEXT NOT NULL CHECK (side IN ('buy','sell')),
+  kind            TEXT NOT NULL CHECK (kind IN ('market','limit','stop')),
+  quantity        DOUBLE PRECISION NOT NULL,
+  limit_price     DOUBLE PRECISION,
+  stop_price      DOUBLE PRECISION,
+  -- 'day' expires at the close it was placed for; 'gtc' rests until filled
+  -- or cancelled.
+  time_in_force   TEXT NOT NULL CHECK (time_in_force IN ('day','gtc')),
+  status          TEXT NOT NULL CHECK (status IN ('open','filled','cancelled','expired','rejected')),
+  fill_price      DOUBLE PRECISION,
+  filled_at       TEXT,
+  -- When the matcher last looked at this order. Shown in the UI rather than
+  -- implying continuous monitoring, which without a dedicated worker would
+  -- be a lie.
+  last_checked_at TEXT,
+  note            TEXT,
+  placed_by       TEXT REFERENCES users(id) ON DELETE SET NULL,
+  placed_at       TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_orders_open
+  ON orders(portfolio_id, status) WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS idx_orders_recent
+  ON orders(portfolio_id, placed_at DESC);
+
 -- Who won which period. Recorded once a period has ended, because a trophy
 -- for a week still running would change hands all week.
 CREATE TABLE IF NOT EXISTS trophies (

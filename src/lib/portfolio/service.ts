@@ -3,6 +3,8 @@ import { getDb, type DB } from "@/lib/db";
 import { dedupe } from "@/lib/inflight";
 import { DEFAULT_SLUG, findById, type Portfolio } from "@/lib/portfolios";
 import { mockState, syncMockPositions } from "./mock";
+import { matchOpenOrders, openOrders } from "@/lib/trading/orders";
+import type { Quote } from "@/types/market";
 import { getMarketDataProvider } from "@/providers";
 import {
   marketSession,
@@ -181,12 +183,26 @@ async function ensureFreshPositions(portfolioId: string, now: Date): Promise<voi
   const portfolio = await findById(db, portfolioId);
   if (portfolio?.kind === "mock") {
     const { holdings } = await mockState(db, portfolio);
-    const symbols = [...holdings]
-      .filter(([, lot]) => !lot.quantity.isZero())
-      .map(([symbol]) => symbol);
+    // Resting orders need a price too, and for symbols that are not held yet
+    // — that is the whole point of a limit order to open a position.
+    const resting = await openOrders(db, portfolio.id);
+    const symbols = [
+      ...new Set([
+        ...[...holdings].filter(([, lot]) => !lot.quantity.isZero()).map(([symbol]) => symbol),
+        ...resting.map((order) => order.symbol),
+      ]),
+    ];
+
     const { quotes } = symbols.length
       ? await getQuotes(db, symbols, await getMarketDataProvider(portfolioId), now)
-      : { quotes: new Map() };
+      : { quotes: new Map<string, Quote>() };
+
+    // There is no always-on worker, so this is when a resting order gets
+    // looked at: whenever somebody loads the portfolio, plus the daily job.
+    // Orders record when they were last checked rather than implying the
+    // market is being watched continuously.
+    if (resting.length > 0) await matchOpenOrders(db, portfolio, quotes, now);
+
     await syncMockPositions(db, portfolio, quotes, now);
     return;
   }

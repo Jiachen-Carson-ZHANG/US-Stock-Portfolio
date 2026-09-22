@@ -6,17 +6,6 @@ import type { Portfolio } from "@/lib/portfolios";
 import type { Quote } from "@/types/market";
 import { readTransactions } from "./transactions";
 
-/** A fill priced from a quote older than this is not a game, it is a cheat. */
-export const MAX_QUOTE_AGE_MS = 15 * 60_000;
-
-export type MockTrade = {
-  side: "buy" | "sell";
-  symbol: string;
-  quantity: number;
-};
-
-export class MockTradeError extends Error {}
-
 function multiplierFor(symbol: string): number {
   return parseSymbol(symbol).instrumentType === "option" ? 100 : 1;
 }
@@ -73,83 +62,6 @@ export async function mockState(
   return { cash, holdings };
 }
 
-/**
- * Validates and records one mock trade.
- *
- * Every rule here is server-side. A client that skips the form and posts
- * directly must hit exactly the same checks, or the leaderboard measures who
- * can use developer tools rather than who can invest.
- *
- * Short selling is not allowed: it is the one position whose loss is not
- * bounded by the opening balance, which makes the ranking meaningless.
- */
-export async function placeMockTrade(
-  db: DB,
-  portfolio: Portfolio,
-  trade: MockTrade,
-  quote: Quote | undefined,
-  now: Date = new Date(),
-): Promise<{ price: number; cash: string }> {
-  if (portfolio.kind !== "mock") {
-    throw new MockTradeError("This portfolio follows a real brokerage account.");
-  }
-  if (!Number.isInteger(trade.quantity) || trade.quantity <= 0) {
-    throw new MockTradeError("Enter a whole number of shares.");
-  }
-  if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
-    throw new MockTradeError(`No usable price for ${trade.symbol} right now.`);
-  }
-
-  const quotedAt = quote.dataTimestamp
-    ? new Date(quote.dataTimestamp).getTime()
-    : now.getTime();
-  if (now.getTime() - quotedAt > MAX_QUOTE_AGE_MS) {
-    throw new MockTradeError(
-      "That price is more than fifteen minutes old. Try again in a moment.",
-    );
-  }
-
-  const { cash, holdings } = await mockState(db, portfolio);
-  const multiplier = multiplierFor(trade.symbol);
-  const value = new Decimal(trade.quantity).times(quote.price).times(multiplier);
-
-  if (trade.side === "buy") {
-    if (value.greaterThan(cash)) {
-      throw new MockTradeError(
-        `Not enough cash: that costs ${value.toFixed(2)} and you have ${cash.toFixed(2)}.`,
-      );
-    }
-  } else {
-    const held = holdings.get(trade.symbol)?.quantity ?? new Decimal(0);
-    if (held.lessThan(trade.quantity)) {
-      throw new MockTradeError(
-        `You hold ${held.toFixed(0)} of ${trade.symbol}, so you cannot sell ${trade.quantity}.`,
-      );
-    }
-  }
-
-  const amount = trade.side === "buy" ? value.negated() : value;
-  await db.run(
-    `INSERT INTO transactions
-       (deal_id, order_id, side, symbol, name, quantity, price, amount, traded_at, synced_at, portfolio_id)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      `paper-${randomUUID()}`,
-      trade.side,
-      trade.symbol,
-      quote.name ?? null,
-      trade.quantity,
-      quote.price,
-      amount.toNumber(),
-      now.toISOString(),
-      now.toISOString(),
-      portfolio.id,
-    ],
-  );
-
-  const after = await mockState(db, portfolio);
-  return { price: quote.price, cash: after.cash.toFixed(2) };
-}
 
 /**
  * Writes a mock portfolio's holdings into `positions`.

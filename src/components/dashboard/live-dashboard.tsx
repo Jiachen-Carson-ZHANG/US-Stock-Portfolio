@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { AllocationDonut } from "@/components/charts/allocation-donut";
 import { ContributionBars, UnrealizedPnLBars } from "@/components/charts/pnl-bars";
 import { ShareBar } from "@/components/charts/share-bar";
@@ -7,7 +9,6 @@ import { ConcentrationTiles } from "@/components/dashboard/concentration";
 import { MarketStatus } from "@/components/dashboard/market-status";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { AddDeposit, ReconciliationBanner } from "@/components/dashboard/deposits";
-import { MockTrade } from "@/components/dashboard/mock-trade";
 import { usePortfolio, type LivePortfolio } from "@/components/dashboard/use-portfolio";
 import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { useT } from "@/lib/i18n/context";
@@ -48,7 +49,14 @@ export function LiveDashboard({
       <header className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold tracking-tight">{portfolioName}</h1>
-          {isMock && canWrite && <MockTrade portfolioSlug={portfolioSlug} />}
+          {isMock && canWrite && (
+            <Link
+              href={`/${portfolioSlug}/trade`}
+              className="inline-flex min-h-9 items-center rounded-lg bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+            >
+              {t.trade.title}
+            </Link>
+          )}
           {isMock && !canWrite && (
             // Without this the page simply has no button and the reader is
             // left wondering whether trading is broken or forbidden.

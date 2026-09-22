@@ -135,6 +135,31 @@ export const accessDecisionSchema = z.object({
   approve: z.boolean(),
 });
 
+/**
+ * An order ticket. Whole shares only, matching how the real account trades —
+ * fractional paper shares would not compare.
+ */
+export const placeOrderSchema = z
+  .object({
+    symbol: symbolSchema,
+    side: z.enum(["buy", "sell"]),
+    kind: z.enum(["market", "limit", "stop"]),
+    quantity: z.number().int().positive().max(1_000_000),
+    limitPrice: z.number().positive().max(1_000_000).optional(),
+    stopPrice: z.number().positive().max(1_000_000).optional(),
+    timeInForce: z.enum(["day", "gtc"]).default("day"),
+  })
+  .refine((order) => order.kind !== "limit" || order.limitPrice !== undefined, {
+    message: "A limit order needs a limit price",
+    path: ["limitPrice"],
+  })
+  .refine((order) => order.kind !== "stop" || order.stopPrice !== undefined, {
+    message: "A stop order needs a stop price",
+    path: ["stopPrice"],
+  });
+
+export const cancelOrderSchema = z.object({ orderId: z.string().uuid() });
+
 export const portfolioAccessSchema = z.object({
   portfolioId: z.string().uuid(),
   userId: z.string().uuid(),
