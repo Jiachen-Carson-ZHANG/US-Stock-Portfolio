@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,16 @@ export function LoginForm() {
 
         <SubmitButton />
       </form>
+
+      <p className="mt-5 text-center text-xs text-muted-foreground">
+        {t.register.noAccount}{" "}
+        <Link
+          href="/register"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          {t.register.createOne}
+        </Link>
+      </p>
     </div>
   );
 }

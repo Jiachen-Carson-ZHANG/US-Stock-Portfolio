@@ -19,6 +19,7 @@ type UserRow = {
   display_name: string;
   role: UserRole;
   disabled_at: string | null;
+  status: string;
   last_seen_at: string;
 };
 
@@ -72,7 +73,7 @@ export async function validateSession(
   if (!token) return null;
 
   const row = await db.get<UserRow>(
-    `SELECT u.id, u.username, u.display_name, u.role, u.disabled_at, s.last_seen_at
+    `SELECT u.id, u.username, u.display_name, u.role, u.disabled_at, u.status, s.last_seen_at
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ?
@@ -81,7 +82,10 @@ export async function validateSession(
     [hashToken(token), now.toISOString()],
   );
 
-  if (!row || row.disabled_at) return null;
+  // The single choke point for account state. A pending or declined account
+  // holding a cookie — issued before a decision, or crafted — resolves to
+  // nobody, so no page, route or loader needs its own check.
+  if (!row || row.disabled_at || row.status !== "active") return null;
 
   await touchSession(db, row, token, now);
 

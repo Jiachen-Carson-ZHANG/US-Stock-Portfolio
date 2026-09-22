@@ -28,6 +28,7 @@ type UserRow = {
   username: string;
   password_hash: string;
   disabled_at: string | null;
+  status: string;
 };
 
 /**
@@ -58,7 +59,7 @@ export async function loginAction(
   }
 
   const user = await db.get<UserRow>(
-    `SELECT id, username, password_hash, disabled_at FROM users WHERE username = ?`,
+    `SELECT id, username, password_hash, disabled_at, status FROM users WHERE username = ?`,
     [username],
   );
 
@@ -72,6 +73,22 @@ export async function loginAction(
     await recordFailedAttempt(db, username);
     logger.warn("auth.login.failure", { username, reason: "bad_password" });
     return { error: t.login.invalid };
+  }
+
+
+  // Only after the password checks out. Saying "waiting for approval" to
+  // anyone who types a name would turn the login form into a way to discover
+  // who has applied; saying it to someone holding the right password tells
+  // them nothing they do not already know, and is the difference between a
+  // useful message and a baffling one.
+  if (user.status !== "active") {
+    logger.info("auth.login.not_active", { username, status: user.status });
+    return {
+      error:
+        user.status === "pending"
+          ? "Your account is waiting to be approved."
+          : "This account is not active.",
+    };
   }
 
   await clearFailedAttempts(db, username);

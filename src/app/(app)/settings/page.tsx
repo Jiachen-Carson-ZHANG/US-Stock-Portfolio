@@ -11,7 +11,9 @@ import {
 } from "@/components/layout/settings-actions";
 import { Badge } from "@/components/ui/misc";
 import { FamilyActivity } from "@/components/layout/family-activity";
+import { PendingAccounts } from "@/components/layout/pending-accounts";
 import { PortfolioAdmin } from "@/components/layout/portfolio-admin";
+import { pendingAccounts } from "@/lib/accounts";
 import { listPortfolios, readersOf } from "@/lib/portfolios";
 import { activityByMember, mostViewedAssets } from "@/lib/activity";
 
@@ -77,6 +79,8 @@ export default async function SettingsPage({
   const mostViewed = await mostViewedAssets(db);
   const byMember = await activityByMember(db);
   const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];
+
+  const pending = await pendingAccounts(db);
 
   const portfolios = await Promise.all(
     (await listPortfolios(db)).map(async (item) => ({
@@ -188,6 +192,8 @@ export default async function SettingsPage({
           <SyncButton />
         </div>
       </section>
+
+      <PendingAccounts pending={pending} />
 
       <PortfolioAdmin
         portfolios={portfolios}

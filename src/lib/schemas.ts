@@ -80,6 +80,29 @@ export const mockTradeSchema = z.object({
   quantity: z.number().int().positive().max(1_000_000),
 });
 
+/**
+ * The username becomes a URL segment on approval, so it is constrained to
+ * what survives a link from the moment it is chosen rather than being
+ * rejected later.
+ */
+export const registerSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(
+      /^[a-z][a-z0-9-]{1,30}$/,
+      "Use lowercase letters, digits and hyphens, starting with a letter",
+    ),
+  displayName: z.string().trim().min(1).max(60),
+  password: z.string().min(10, "Use at least 10 characters").max(512),
+});
+
+export const accountDecisionSchema = z.object({
+  userId: z.string().uuid(),
+  approve: z.boolean(),
+});
+
 export const accessRequestSchema = z.object({
   slug: z.string().trim().toLowerCase().min(1).max(32),
   message: z.string().trim().max(280).default(""),

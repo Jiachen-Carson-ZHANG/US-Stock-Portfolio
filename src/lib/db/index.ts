@@ -217,6 +217,16 @@ CREATE TABLE IF NOT EXISTS portfolio_access (
 );
 CREATE INDEX IF NOT EXISTS idx_portfolio_access_user ON portfolio_access(user_id);
 
+-- Registration is open, but an account is inert until somebody approves it.
+-- Everything written before this existed belongs to the family and is active.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
+ALTER TABLE users ADD CONSTRAINT users_status_check
+  CHECK (status IN ('pending','active','declined'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_at TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS decided_by TEXT;
+CREATE INDEX IF NOT EXISTS idx_users_pending ON users(status) WHERE status = 'pending';
+
 -- Who won which period. Recorded once a period has ended, because a trophy
 -- for a week still running would change hands all week.
 CREATE TABLE IF NOT EXISTS trophies (
