@@ -58,27 +58,30 @@ export async function requestAccess(
   input: { portfolioId: string; userId: string; userName: string; message?: string },
   now: Date = new Date(),
 ): Promise<{ created: boolean }> {
-  const existing = await db.get<{ id: string }>(
+  return db.transaction(async (tx) => {
+  const existing = await tx.get<{ id: string }>(
     `SELECT id FROM access_requests
       WHERE portfolio_id = ? AND user_id = ? AND status = 'pending'`,
     [input.portfolioId, input.userId],
   );
   if (existing) return { created: false };
 
-  const portfolio = await findById(db, input.portfolioId);
+  const portfolio = await findById(tx, input.portfolioId);
   if (!portfolio) return { created: false };
 
-  await db.run(
+  const inserted = await tx.run(
     `INSERT INTO access_requests (id, portfolio_id, user_id, message, status, created_at)
-     VALUES (?, ?, ?, ?, 'pending', ?)`,
+     VALUES (?, ?, ?, ?, 'pending', ?) ON CONFLICT DO NOTHING`,
     [randomUUID(), input.portfolioId, input.userId, input.message ?? null, now.toISOString()],
   );
+
+  if (inserted.changes === 0) return { created: false };
 
   // The owner decides, so the owner is told. Administrators can also see the
   // queue in settings, but the notification goes to whose portfolio it is.
   if (portfolio.ownerUserId) {
     await notify(
-      db,
+      tx,
       {
         userId: portfolio.ownerUserId,
         kind: "access_request",
@@ -91,6 +94,7 @@ export async function requestAccess(
   }
 
   return { created: true };
+  });
 }
 
 export async function pendingRequests(db: DB): Promise<AccessRequest[]> {
@@ -123,7 +127,8 @@ export async function decideRequest(
   },
   now: Date = new Date(),
 ): Promise<{ ok: boolean; reason?: string }> {
-  const row = await db.get<{
+  return db.transaction(async (tx) => {
+  const row = await tx.get<{
     portfolio_id: string;
     portfolio_slug: string;
     portfolio_name: string;
@@ -135,7 +140,7 @@ export async function decideRequest(
             p.owner_user_id
        FROM access_requests r
        JOIN portfolios p ON p.id = r.portfolio_id
-      WHERE r.id = ? AND r.status = 'pending'`,
+      WHERE r.id = ? AND r.status = 'pending' FOR UPDATE OF r`,
     [input.requestId],
   );
 
@@ -146,15 +151,15 @@ export async function decideRequest(
     (input.isAdministrator && row.owner_user_id === null);
   if (!mayDecide) return { ok: false, reason: "Only the owner can answer this" };
 
-  await db.run(
+  await tx.run(
     `UPDATE access_requests SET status = ?, decided_at = ?, decided_by = ? WHERE id = ?`,
     [input.approve ? "approved" : "declined", now.toISOString(), input.deciderId, input.requestId],
   );
 
-  if (input.approve) await grantAccess(db, row.portfolio_id, row.user_id, now);
+  if (input.approve) await grantAccess(tx, row.portfolio_id, row.user_id, now);
 
   await notify(
-    db,
+    tx,
     {
       userId: row.user_id,
       kind: input.approve ? "access_granted" : "access_declined",
@@ -167,4 +172,5 @@ export async function decideRequest(
   );
 
   return { ok: true };
+  });
 }

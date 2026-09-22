@@ -40,7 +40,7 @@ function toEntry(row: Row, notes: WatchlistNote[] = []): WatchlistEntry {
     name: row.name,
     reason: row.reason,
     addedBy: row.added_by,
-    aiNote: row.ai_note,
+    aiNote: null,
     createdAt: row.created_at,
     notes,
   };
@@ -54,7 +54,7 @@ async function notesFor(db: DB, symbol: string): Promise<WatchlistNote[]> {
   );
 }
 
-export async function readWatchlist(db: DB): Promise<WatchlistEntry[]> {
+export async function readWatchlist(db: DB, portfolioId?: string): Promise<WatchlistEntry[]> {
   const rows = await db.all<Row>(`SELECT * FROM watchlist ORDER BY created_at DESC`);
   if (rows.length === 0) return [];
 
@@ -71,7 +71,11 @@ export async function readWatchlist(db: DB): Promise<WatchlistEntry[]> {
     else bySymbol.set(symbol, [note]);
   }
 
-  return rows.map((row) => toEntry(row, bySymbol.get(row.symbol) ?? []));
+  const privateNotes = portfolioId
+    ? await db.all<{ symbol: string; note: string }>("SELECT symbol, note FROM portfolio_ai_notes WHERE portfolio_id = ?", [portfolioId])
+    : [];
+  const aiBySymbol = new Map(privateNotes.map((item) => [item.symbol, item.note]));
+  return rows.map((row) => ({ ...toEntry(row, bySymbol.get(row.symbol) ?? []), aiNote: aiBySymbol.get(row.symbol) ?? null }));
 }
 
 /**
@@ -127,11 +131,13 @@ export async function removeFromWatchlist(db: DB, symbol: string): Promise<boole
 
 export async function saveAiNote(
   db: DB,
+  portfolioId: string,
   symbol: string,
   note: string,
 ): Promise<void> {
-  await db.run(`UPDATE watchlist SET ai_note = ? WHERE symbol = ?`, [
-    note,
+  await db.run(`INSERT INTO portfolio_ai_notes (portfolio_id, symbol, note) VALUES (?, ?, ?) ON CONFLICT (portfolio_id, symbol) DO UPDATE SET note = excluded.note`, [
+    portfolioId,
     symbol.toUpperCase(),
+    note,
   ]);
 }

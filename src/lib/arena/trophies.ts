@@ -73,25 +73,32 @@ export async function awardCompletedPeriods(
   for (const period of AWARDED) {
     const periodEnd = lastCompletedEnd(period, now);
 
-    const already = await db.get<{ n: number }>(
+    awarded += await db.transaction(async (tx) => {
+    let count = 0;
+    await tx.get("SELECT pg_advisory_xact_lock(hashtext(?))", [`arena-trophy:${period}:${periodEnd}`]);
+    const already = await tx.get<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM trophies WHERE period = ? AND period_end = ?`,
       [period, periodEnd],
     );
-    if ((already?.n ?? 0) > 0) continue;
+    if ((already?.n ?? 0) > 0) return 0;
 
     // Ranked as at the end of that period, not as at today, so a trophy
     // reflects the race as it was actually run.
     const asAt = new Date(`${periodEnd}T23:59:59Z`);
-    const standings = (await rank(db, portfolios, period as Period, asAt)).filter(
+    const start = new Date(`${periodEnd}T00:00:00Z`);
+    if (period === "week") start.setUTCDate(start.getUTCDate() - 6);
+    else if (period === "month") start.setUTCDate(1);
+    else start.setUTCMonth(0, 1);
+    const standings = (await rank(tx, portfolios, period as Period, asAt, iso(start))).filter(
       (standing) => standing.returnPercent !== null,
     );
-    if (standings.length < 2) continue;
+    if (standings.length < 2) return 0;
 
     for (const [index, standing] of standings.slice(0, PLACES).entries()) {
       const portfolio = portfolios.find((p) => p.slug === standing.slug);
       if (!portfolio) continue;
 
-      await db.run(
+      await tx.run(
         `INSERT INTO trophies (id, portfolio_id, period, period_end, rank, return_percent, awarded_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (period, period_end, portfolio_id) DO NOTHING`,
@@ -105,11 +112,11 @@ export async function awardCompletedPeriods(
           now.toISOString(),
         ],
       );
-      awarded += 1;
+      count += 1;
 
       if (index === 0 && portfolio.ownerUserId) {
         await notify(
-          db,
+          tx,
           {
             userId: portfolio.ownerUserId,
             kind: "trophy",
@@ -121,6 +128,8 @@ export async function awardCompletedPeriods(
         );
       }
     }
+    return count;
+    });
   }
 
   return { awarded };

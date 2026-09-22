@@ -40,6 +40,7 @@ export async function search(
         max_results: options.maxResults ?? 4,
       }),
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) return [];

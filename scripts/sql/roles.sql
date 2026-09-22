@@ -34,19 +34,11 @@ ALTER ROLE analyst PASSWORD :'analyst_password';
 GRANT CONNECT ON DATABASE neondb TO analyst;
 GRANT USAGE ON SCHEMA public TO analyst;
 
--- Read everything by default...
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO analyst;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO analyst;
-
--- ...then take back the two places a live secret actually lives.
-REVOKE ALL ON broker_connections FROM analyst;
-REVOKE SELECT (password_hash) ON users FROM analyst;
-
--- Session tokens are stored as SHA-256 digests and cannot be reversed into a
--- usable cookie, but there is no reason to read them either.
-REVOKE SELECT (token_hash) ON sessions FROM analyst;
-
--- Analyst is read-only. Anything that writes goes through the app.
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public FROM analyst;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM analyst;
+-- Explicitly opt in financial tables. Future tables receive no automatic access.
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM analyst;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM analyst;
+GRANT SELECT ON portfolios, portfolio_access, positions, transactions,
+  portfolio_snapshots, analysis_flows, analysis_config, analysis_observations,
+  quote_cache, watchlist, watchlist_notes, portfolio_ai_notes TO analyst;
+GRANT SELECT (id, username, display_name, role, created_at, disabled_at) ON users TO analyst;
+-- Sessions and broker_connections intentionally have no grants.

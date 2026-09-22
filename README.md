@@ -43,8 +43,7 @@ npm run db:dev:up      # docker; npm run db:dev:down to remove it
 | Variable | What it does |
 |---|---|
 | `APP_URL` | The site's own base URL. **Must exactly match** the moomoo redirect URI, e.g. `https://portfolio.example.com` |
-| `SESSION_SECRET` | Random 32 bytes. `openssl rand -base64 32` |
-| `TOKEN_ENCRYPTION_KEY` | Random 32 bytes, **different** from the above. Encrypts the broker refresh token at rest |
+| `TOKEN_ENCRYPTION_KEY` | Random 32 bytes encoded as base64. Encrypts broker refresh tokens at rest |
 | `DATABASE_URL` | Postgres connection string, e.g. `postgres://user:pass@host:5432/portfolio?sslmode=require` |
 | `AUTH_MODE` | `password` to require sign-in. See [Access mode](#5-access-mode) |
 
@@ -155,8 +154,7 @@ no developer portal step:
 APP_URL=https://your-deployed-url npm run moomoo:register
 ```
 
-Put the printed `MOOMOO_CLIENT_ID` in `.env.local` and restart. Then open
-**Settings → Connect moomoo** and sign in.
+Put the printed `MOOMOO_CLIENT_ID` in `.env.local` and restart. Then open your portfolio → **Broker connection and refresh** and sign in.
 
 On moomoo's consent screen tick **only**:
 
@@ -177,7 +175,7 @@ after the deployed URL is final.
 
 | Value | Behaviour |
 |---|---|
-| unset | **Open.** No sign-in, everyone is treated as owner |
+| unset / `open` | Open only in development; production refuses to start |
 | `password` | Sign-in required; viewers cannot reach Settings |
 
 Open mode is fine on a laptop. **Set `AUTH_MODE=password` before the app is
@@ -430,3 +428,63 @@ been entered, and will be removed.
 hand; keep the owner connection string in the deployment environments only.
 Read the comments at the top — it is a guard against accidents, not against a
 determined operator.
+
+## Read-only broker security (September 2026 audit)
+
+Broker tokens remain encrypted in PostgreSQL. The operator controls the server
+and encryption key and can decrypt them; this is not encryption against the
+operator. Passwords are stored as Argon2id hashes. Moomoo passwords are never
+collected by this app. A broker read grant cannot be upgraded merely by editing
+our database; permissions are granted by the user at Moomoo.
+
+Only `quote:read`, `trade:read` and documented `accid:` selectors are accepted.
+Both read permissions are required. Missing, write or unknown permissions are
+rejected at connection storage and refresh; old unsafe grants require
+reconnection. The broker client also permits only the specific read endpoints
+used by the dashboard (including POST quote snapshots). Tests use synthetic
+tokens and mocked responses and do not submit real orders.
+
+Production builds and startup require `AUTH_MODE=password`. Configure it on
+both the build and runtime environments. Scheduler endpoints separately check
+`SNAPSHOT_CRON_SECRET`; the monthly reconstruction endpoint no longer requires
+a browser session.
+
+Every signed-in member can see Carson's default portfolio by design. The
+administrator can read all portfolios. Other access is explicit and can be
+requested from the portfolio owner. Any permitted reader can request a broker
+sync without the owner being logged in; only the portfolio owner can connect,
+replace or disconnect their broker, edit transfers or place mock trades.
+Each broker portfolio now has a `/<portfolio>/connection` page, linked from
+its dashboard, including empty portfolios. New users can register and choose their own password. An administrator must
+approve the account before it becomes active and receives its starting portfolio.
+
+Watchlist discussions remain shared, but AI notes are stored by source portfolio
+and shown only through that portfolio's authorized context. Old unscoped AI
+notes are not displayed because their source cannot be established. AI providers
+receive the permitted financial context; optional Arena news search sends ticker
+queries to Tavily. Family Room remains a shared family space, not a private vault.
+
+Disconnect deletes the stored connection, not financial history or backups.
+Users should also revoke authorization at Moomoo to invalidate outstanding broker
+access. The revised `scripts/sql/roles.sql` grants only explicit permitted tables
+and user columns; it excludes broker connections, password hashes and sessions.
+Apply it deliberately with a new analyst password on each deployed database.
+It is not automatically applied by the schema migration.
+
+### Vercel deployment consistency
+
+A build uses committed files, not uncommitted local changes. Ship the OAuth
+scope validator together with its callers: `tokens.ts` and the callback import
+`assertReadOnlyScope` from `oauth.ts`. A missing-export build error means the
+source snapshot is incomplete; adding an environment variable cannot fix it.
+
+In Vercel's value fields, enter values only: `DATABASE_URL` starts with
+`postgresql://` or `postgres://`, not `DATABASE_URL=`. Set `APP_URL` to the real
+HTTPS application origin and, when used, `PUBLIC_ORIGIN` to that same origin.
+Register `<APP_URL>/api/broker/moomoo/callback` with Moomoo exactly. Environment
+changes require a new deployment and must apply to its Production/Preview scope.
+
+`TAVILY_API_KEY` is optional for Arena news search. `SESSION_SECRET` is unused:
+sessions use random opaque tokens with database-stored hashes. Seed passwords
+are used only when provisioning accounts through the seed script, not on every
+request. Cron secrets authenticate jobs but do not create a host scheduler.

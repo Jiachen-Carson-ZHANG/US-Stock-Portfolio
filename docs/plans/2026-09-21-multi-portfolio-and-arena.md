@@ -296,13 +296,11 @@ encrypted at rest with `TOKEN_ENCRYPTION_KEY`, which lives in the deployment's
 environment. Anyone who can read that environment can decrypt any token in the
 table. That is Carson, on both Vercel and EdgeOne.
 
-The only way to change that is to derive the encryption key from the user's own
-password, so the server holds ciphertext it cannot open unless that person is
-signed in. The cost is severe and structural: background sync, snapshots, the
-monthly reconstruction and any cron would stop working for anyone not currently
-logged in, because the server could no longer reach their broker. For a family
-dashboard whose entire premise is that the data is there when someone opens it,
-that trade is not worth making.
+Encrypting with a password entered into a server-controlled website does not
+hide credentials from a determined server operator: they could change the code
+that receives that password. This is not the selected architecture. The accepted
+model is encrypted server-side read-only tokens, operator access to portfolio
+data, and unattended synchronization.
 
 So the honest position is: **the server can act as any connected account, and
 the person who controls the server controls the token.** What limits it is
@@ -386,3 +384,23 @@ behaviour logging, credential redaction in log values, and a read-only
   is the reason the page says "private" rather than "not found".
 - **Only the owner answers an access request.** Administrators run the
   deployment; that is not the same as owning the money.
+
+### Audit follow-up and accepted security model
+
+The operator explicitly accepts server-side custody of encrypted read-only
+broker tokens. No desktop companion or independent token service is planned.
+Automatic access to Carson's default portfolio is intentional. Administrator
+read access to other portfolios is also intentional.
+
+Follow-up patches enforce strict scope checks at storage and refresh, restrict
+broker calls to known read operations, require production password mode, isolate
+portfolio-derived watchlist AI notes, repair analyst column grants, expose broker
+connection controls to the actual account owner, and let permitted readers sync.
+Cross-origin mutations are rejected. Access decisions are atomic. Historical
+Arena results exclude later valuations and empty recent windows do not fall back
+to all-time returns. The scheduler proxy permits both authenticated cron paths.
+
+Registration is now available, with administrator approval before activation.
+Disconnect is not data
+erasure or broker-side revocation. The SQL role script must be applied separately;
+no production database permissions were changed by this code review.

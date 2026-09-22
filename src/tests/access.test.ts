@@ -222,3 +222,16 @@ describe("notifications", () => {
     expect(await markRead(db, mile.id, dads[0].id)).toBe(0);
   });
 });
+
+it("only applies one of two concurrent access decisions", async () => {
+  const mile = await addUser("mile");
+  const dad = await addUser("father");
+  const pf = await createPortfolio(db, { slug: "mirat", displayName: "Mile", ownerUserId: mile.id, kind: "broker" });
+  await requestAccess(db, { portfolioId: pf.id, userId: dad.id, userName: dad.displayName });
+  const [request] = await pendingRequestsFor(db, mile.id);
+  const results = await Promise.all([true, false].map((approve) => decideRequest(db, { requestId: request.id, deciderId: mile.id, approve, isAdministrator: false })));
+  expect(results.filter((r) => r.ok)).toHaveLength(1);
+  const notices = (await notificationsFor(db, dad.id)).filter((n) => n.kind === "access_granted" || n.kind === "access_declined");
+  expect(notices).toHaveLength(1);
+  expect(await canRead(db, dad, pf.id)).toBe(notices[0].kind === "access_granted");
+});

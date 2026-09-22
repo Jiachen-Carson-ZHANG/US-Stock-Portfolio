@@ -40,6 +40,16 @@ export function writeScopesIn(scope: string): string[] {
   );
 }
 
+/** Accept only documented read permissions and optional broker account selectors. */
+export function assertReadOnlyScope(scope: unknown): asserts scope is string {
+  if (typeof scope !== "string") throw new Error("Missing broker permissions; reconnect read-only.");
+  const granted = scope.trim().split(/\s+/).filter(Boolean);
+  if (!granted.includes("trade:read") || !granted.includes("quote:read") ||
+      granted.some((item) => !["trade:read", "quote:read"].includes(item) && !/^accid:(?:[0-9]+|\*)$/.test(item))) {
+    throw new Error("Broker permissions must be read-only; reconnect with Market Data and Accounts & Orders only.");
+  }
+}
+
 export function authorizeUrl(params: {
   clientId: string;
   challenge: string;
@@ -67,7 +77,7 @@ async function postForm(body: Record<string, string>): Promise<TokenResponse> {
 
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`moomoo token endpoint returned ${response.status}: ${text}`);
+    throw new Error(`moomoo token endpoint returned ${response.status}`);
   }
 
   return JSON.parse(text) as TokenResponse;

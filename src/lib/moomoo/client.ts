@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { MOOMOO_API_BASE, refreshAccessToken } from "./oauth";
+import { MOOMOO_API_BASE, refreshAccessToken, assertReadOnlyScope } from "./oauth";
 import { markRefreshed, markStatus, readConnection } from "./tokens";
 
 /** Trading endpoints answer with {s,d}; quote endpoints with {ret_code,data}. */
@@ -64,11 +64,13 @@ async function accessToken(portfolioId: string): Promise<string> {
   if (!connection) throw new MoomooNotConnectedError();
 
   try {
+    assertReadOnlyScope(connection.scope);
     const tokens = await refreshAccessToken({
       refreshToken: connection.refreshToken,
       clientId: clientId(),
     });
 
+    assertReadOnlyScope(tokens.scope);
     cachedAccessTokens.set(portfolioId, {
       token: tokens.access_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
@@ -102,11 +104,22 @@ async function call(path: string, init: RequestInit, token: string) {
  * Calls a moomoo REST endpoint and unwraps its `{s, d}` envelope. Retries once
  * on 401 with a fresh token and once on 429 after the advertised delay.
  */
+export function assertReadOnlyRequest(path: string, method = "GET"): void {
+  const pathname = path.split("?")[0];
+  const allowed = method === "GET" && (
+    pathname === "/api/v1.0/accounts/authorized_trd_accs" ||
+    /^\/api\/v1\.0\/accounts\/[0-9]+\/(positions|funds|fills_history)$/.test(pathname) ||
+    /^\/api\/v1\.0\/quote\/[^/]+\/history-kline$/.test(pathname)
+  ) || method === "POST" && pathname === "/api/v1.0/quote/snapshot";
+  if (!allowed) throw new Error("Broker operation is not on the read-only allowlist.");
+}
+
 export async function moomooRequest<T>(
   portfolioId: string,
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  assertReadOnlyRequest(path, init.method ?? "GET");
   let response = await call(path, init, await accessToken(portfolioId));
 
   if (response.status === 401) {

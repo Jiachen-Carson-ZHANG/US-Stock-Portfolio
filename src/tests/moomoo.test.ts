@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, TEST_PORTFOLIO_ID, type TestDb } from "@/lib/db/testing";
 import { generateKey } from "@/lib/crypto";
 import {
+  assertReadOnlyScope,
   authorizeUrl,
   createPkcePair,
   createState,
@@ -40,6 +41,14 @@ describe("PKCE", () => {
 });
 
 describe("scope enforcement", () => {
+  it.each([undefined, null, "", "quote:read", "trade:read", "quote:read trade:read trade:write", "quote:read trade:read quote:write", "quote:read trade:read unknown:read", "quote:read trade:read accid:invalid"])("rejects incomplete or unsafe granted scopes: %s", (scope) => {
+    expect(() => assertReadOnlyScope(scope)).toThrow();
+  });
+  it("accepts the documented read scopes and account selectors", () => {
+    expect(() => assertReadOnlyScope("quote:read trade:read accid:123")).not.toThrow();
+    expect(() => assertReadOnlyScope("trade:read quote:read accid:*")).not.toThrow();
+  });
+
   // The user picks scopes on moomoo's own consent screen, so the only real
   // guarantee this app has is refusing a grant that carries write access.
   it("flags write scopes in a granted string", async () => {
@@ -223,7 +232,7 @@ describe("token storage", () => {
   it("stores the token as ciphertext, never plaintext", async () => {
     await saveConnection(db, PF, {
       refreshToken: "super-secret-refresh",
-      scope: "quote:read",
+      scope: "quote:read trade:read",
       accountId: null,
     });
 
@@ -238,7 +247,7 @@ describe("token storage", () => {
   it("never exposes the token through the status view", async () => {
     await saveConnection(db, PF, {
       refreshToken: "secret",
-      scope: "quote:read",
+      scope: "quote:read trade:read",
       accountId: null,
     });
 
@@ -249,8 +258,8 @@ describe("token storage", () => {
   });
 
   it("replaces the token on reconnect rather than duplicating the row", async () => {
-    await saveConnection(db, PF, { refreshToken: "first", scope: "quote:read", accountId: null });
-    await saveConnection(db, PF, { refreshToken: "second", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "first", scope: "quote:read trade:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "second", scope: "quote:read trade:read", accountId: null });
 
     const count = await db.get<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM broker_connections`,
@@ -260,26 +269,26 @@ describe("token storage", () => {
   });
 
   it("records an expired connection", async () => {
-    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read trade:read", accountId: null });
     await markStatus(db, PF, "expired");
     expect((await readConnectionStatus(db, PF))?.status).toBe("expired");
   });
 
   it("remembers the resolved account id", async () => {
-    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read trade:read", accountId: null });
     await setAccountId(db, PF, "987654");
     expect((await readConnection(db, PF))?.accountId).toBe("987654");
   });
 
   it("returns nothing once disconnected", async () => {
-    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read trade:read", accountId: null });
     await deleteConnection(db, PF);
     expect(await readConnection(db, PF)).toBeNull();
     expect(await readConnectionStatus(db, PF)).toBeNull();
   });
 
   it("cannot decrypt a token with a different key", async () => {
-    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read", accountId: null });
+    await saveConnection(db, PF, { refreshToken: "t", scope: "quote:read trade:read", accountId: null });
     process.env.TOKEN_ENCRYPTION_KEY = generateKey();
     // The failure now surfaces as a rejected promise rather than a throw.
     await expect(readConnection(db, PF)).rejects.toThrow();

@@ -1,4 +1,7 @@
+import { isOpenAccess } from "./src/lib/auth/mode";
 import type { NextConfig } from "next";
+
+isOpenAccess(); // Validate authentication before starting or building the app.
 
 const isDev = process.env.NODE_ENV !== "production";
 
