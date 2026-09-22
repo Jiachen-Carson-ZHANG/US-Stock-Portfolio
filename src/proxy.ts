@@ -1,7 +1,19 @@
+import { isOpenAccess } from "@/lib/auth/mode";
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 
-const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/cron/snapshot"]);
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/api/auth/login",
+  // Signing up necessarily happens before there is a session to check.
+  "/register",
+  "/api/auth/register",
+  // Scheduled jobs and the keep-warm ping carry their own credentials, or
+  // none because they reveal nothing.
+  "/api/cron/snapshot",
+  "/api/cron/reconstruct",
+  "/api/health",
+]);
 
 /**
  * Defence in depth only. This checks for a cookie, not a valid session — every
@@ -11,7 +23,7 @@ const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/cron/snapshot"]
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (process.env.AUTH_MODE !== "password") return NextResponse.next();
+  if (isOpenAccess()) return NextResponse.next();
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
 
   if (!request.cookies.has(SESSION_COOKIE)) {
