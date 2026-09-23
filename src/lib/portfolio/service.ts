@@ -170,8 +170,16 @@ export async function portfolioStart(
  * the refresh runs behind it — three moomoo round trips (accounts, positions,
  * funds) is a long time to hold a render for numbers that only move when
  * somebody trades.
+ *
+ * Raised from five minutes to half an hour. Five meant that coming back to
+ * the site after lunch made the first page you opened wait for the broker,
+ * which read as "this site is slow" rather than "these holdings are eleven
+ * minutes old". Holdings change on a trade, not on a tick: the prices beside
+ * them still refresh every five seconds, the header still says when the
+ * holdings were last pulled, and Sync holdings now is there for the moment
+ * after you trade in the moomoo app itself.
  */
-const STALE_POSITIONS_MS = 5 * 60_000;
+const STALE_POSITIONS_MS = 30 * 60_000;
 
 function positionTtlSeconds(): number {
   return Number(process.env.POSITION_CACHE_SECONDS ?? 30);
