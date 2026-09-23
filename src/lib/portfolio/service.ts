@@ -45,6 +45,7 @@ import { getQuotes } from "./quotes";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
 import { realizedFor } from "./realized-cache";
+import { underlyingCostPrices } from "./underlying-cost";
 import {
   lastTransactionSync,
   readTransactions,
@@ -181,6 +182,9 @@ export async function portfolioStart(
  */
 const STALE_POSITIONS_MS = 30 * 60_000;
 
+/** The longest a page may wait for holdings before rendering what it has. */
+const BLOCKING_SYNC_DEADLINE_MS = 6_000;
+
 function positionTtlSeconds(): number {
   return Number(process.env.POSITION_CACHE_SECONDS ?? 30);
 }
@@ -246,7 +250,18 @@ export async function ensureFreshPositions(portfolioId: string, now: Date): Prom
     });
   });
 
-  if (blocking) await work;
+  // Even when it blocks, it blocks for a stated length of time. Three broker
+  // round trips at eight seconds each is twenty-four seconds of a page doing
+  // nothing, which nobody waits through — past this the stored holdings are
+  // rendered, the sync finishes in the background, and the next load has it.
+  // Nothing on this site is allowed to wait indefinitely for somebody else's
+  // server.
+  if (blocking) {
+    await Promise.race([
+      work,
+      new Promise<void>((resolve) => setTimeout(resolve, BLOCKING_SYNC_DEADLINE_MS)),
+    ]);
+  }
 }
 
 async function pricedPositions(portfolioId: string, now: Date): Promise<{
@@ -342,6 +357,17 @@ async function loadPortfolioInner(
   );
 
   const invested = totalInvested(positions, currency);
+  const groups = groupOptions(positions).groups;
+
+  // Where each underlying was trading when its contracts were bought. Daily
+  // closes, cached for the day, so this is one broker call per underlying
+  // however many people open the page.
+  const underlyingCost = await underlyingCostPrices(
+    db,
+    portfolioId,
+    groups,
+    await getMarketDataProvider(portfolioId),
+  ).catch(() => ({}) as Record<string, number>);
   const views = buildPositionViews(positions, currency).map((view) => ({
     ...view,
     investedWeightPercent: invested.amount.isZero()
@@ -382,8 +408,13 @@ async function loadPortfolioInner(
       bySector: allocationBySectorAtCost(positions, currency),
     },
     totalInvested: toDTO(invested),
-    optionGroups: groupOptions(positions).groups.map((group) =>
-      toOptionGroupDTO(group, invested, quotes.get(group.underlying)?.price),
+    optionGroups: groups.map((group) =>
+      toOptionGroupDTO(
+        group,
+        invested,
+        quotes.get(group.underlying)?.price,
+        underlyingCost[group.underlying],
+      ),
     ),
     byAssetClass: performanceByAssetClass(positions, currency, realized),
     // From the fills, which cover the whole account, rather than the broker's

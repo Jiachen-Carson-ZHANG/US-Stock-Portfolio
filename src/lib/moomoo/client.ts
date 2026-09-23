@@ -96,6 +96,17 @@ async function accessToken(portfolioId: string): Promise<string> {
   }
 }
 
+/**
+ * Nothing may hang a page.
+ *
+ * A fetch with no deadline waits as long as the other end feels like, and a
+ * render waiting on it waits exactly as long. That is how a spinner ends up
+ * turning for minutes: not an error anywhere, just nobody ever answering.
+ * Past this the call fails, which the caller can handle — unlike never
+ * returning, which it cannot.
+ */
+const BROKER_TIMEOUT_MS = 8_000;
+
 async function call(path: string, init: RequestInit, token: string) {
   // Charged to the request's broker budget. This is the line that turns "the
   // page is slow" into "the page waited 4.2 seconds on moomoo", which is the
@@ -108,6 +119,7 @@ async function call(path: string, init: RequestInit, token: string) {
         Authorization: `Bearer ${token}`,
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(BROKER_TIMEOUT_MS),
     }),
   );
 }

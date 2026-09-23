@@ -117,18 +117,12 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
 }
 
 /**
- * How far past its TTL a quote may be and still be served immediately while a
- * refresh runs behind the caller.
+ * How old a served-from-cache price may be before the page says so.
  *
- * Blocking a page render on a broker round trip is what made the site feel
- * slow: every five seconds one unlucky request paid for everybody's refresh.
- * Inside this window the caller gets the cached price now and the next one
- * gets the new price — which for a number that moves in cents over seconds is
- * a better trade than a spinner.
- *
- * Past it the quote is too old to show without asking, so the caller waits.
+ * Not a rule about whether to serve it — a cached price is always served
+ * rather than making somebody wait — only about whether to admit it is old.
  */
-const STALE_WHILE_REVALIDATE_MS = 60_000;
+const CALL_IT_STALE_MS = 60_000;
 
 /**
  * Serves quotes from the shared server-side cache, only calling the provider
@@ -153,14 +147,16 @@ export async function getQuotes(
     return now.getTime() - new Date(row.cached_at).getTime() > ttlMs;
   });
 
-  // Old enough to want refreshing, but new enough to show meanwhile.
+  // Anything at all in the cache is worth showing while a refresh runs.
+  //
+  // This used to insist the cached rows were under a minute old, which meant
+  // that after a quiet hour the next person to open a page waited for the
+  // broker — and if the broker was rate-limiting or simply not answering,
+  // waited until it gave up. A price from an hour ago clearly labelled as
+  // such is better than a page that will not load, every time. The only case
+  // that still waits is having nothing whatsoever to show.
   const servableNow =
-    expired.length > 0 &&
-    expired.every((symbol) => {
-      const row = cached.get(symbol);
-      if (!row) return false;
-      return now.getTime() - new Date(row.cached_at).getTime() <= STALE_WHILE_REVALIDATE_MS;
-    });
+    expired.length > 0 && expired.every((symbol) => cached.has(symbol));
 
   let isStale = false;
 
@@ -201,13 +197,22 @@ export async function getQuotes(
 
   const quotes = new Map<string, Quote>();
   let fetchedAt: string | null = null;
+  let oldest: number | null = null;
 
   for (const symbol of symbols) {
     const row = cached.get(symbol);
     if (!row) continue;
     quotes.set(symbol, toQuote(row));
     if (!fetchedAt || row.cached_at > fetchedAt) fetchedAt = row.cached_at;
+    const age = now.getTime() - new Date(row.cached_at).getTime();
+    if (Number.isFinite(age) && (oldest === null || age > oldest)) oldest = age;
   }
 
-  return { quotes, isStale, dataTimestamp: fetchedAt };
+  // Stale means "what you are looking at is older than it should be", whether
+  // that is because a fetch failed or because one is still on its way back.
+  return {
+    quotes,
+    isStale: isStale || (oldest !== null && oldest > CALL_IT_STALE_MS),
+    dataTimestamp: fetchedAt,
+  };
 }

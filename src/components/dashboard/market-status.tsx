@@ -32,10 +32,13 @@ const DOT_COLOR: Record<PortfolioSummary["marketStatus"], string> = {
 export function MarketStatus({
   summary,
   refreshing,
+  failures = 0,
   onRefresh,
 }: {
   summary: PortfolioSummary;
   refreshing?: boolean;
+  /** Consecutive failed refreshes, so the banner can say what is happening. */
+  failures?: number;
   onRefresh?: () => void;
 }) {
   const t = useT();
@@ -80,8 +83,20 @@ export function MarketStatus({
         </button>
       )}
 
-      {summary.isStale && (
-        <span className="w-full text-negative sm:w-auto">{t.market.stale}</span>
+      {/* Two different situations that used to read the same. Failing to
+          reach the feed is worth saying plainly, along with the fact that we
+          are trying less often now rather than hammering something that is
+          already struggling. Merely being a bit behind is not an alarm. */}
+      {failures > 0 ? (
+        <span className="w-full text-negative sm:w-auto">
+          {failures === 1 ? t.market.retrying : t.market.backingOff}
+        </span>
+      ) : (
+        summary.isStale && (
+          <span className="w-full text-muted-foreground sm:w-auto">
+            {t.market.stale}
+          </span>
+        )
       )}
     </div>
   );
