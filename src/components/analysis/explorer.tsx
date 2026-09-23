@@ -19,6 +19,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
   BarChart,
   Bar,
   Cell,
@@ -26,10 +27,18 @@ import {
 import {
   adjustedSeries,
   analysisStats,
+  missingWeekdays,
   benchmarkComparison,
   fxDecomposition,
   monthlyReturns,
 } from "@/lib/analysis/math";
+import { compareAll, type BenchmarkSeries } from "@/lib/analysis/benchmarks";
+import {
+  CURRENCY_LABEL,
+  VIEW_CURRENCIES,
+  rateOn,
+  type RateSeries,
+} from "@/lib/analysis/fx";
 import type { AnalysisData } from "@/lib/analysis/store";
 import type { PortfolioSnapshot } from "@/types/portfolio";
 
@@ -38,11 +47,29 @@ export function PerformanceExplorer({
   initial,
   owner,
   currency,
+  benchmarks = [],
+  rates = { USD: [], CNY: [], SGD: [], EUR: [] },
+  mode = "analysis",
 }: {
   snapshots: PortfolioSnapshot[];
   initial: AnalysisData;
   owner: boolean;
   currency: string;
+  /**
+   * Live daily closes for the funds the account is measured against. Fetched
+   * on the server; compared here, so changing the date range re-bases every
+   * line to the new starting day instead of keeping a stale 100.
+   */
+  benchmarks?: BenchmarkSeries[];
+  /** Daily exchange rates, so the account can be read in more than dollars. */
+  rates?: RateSeries;
+  /**
+   * "analysis" is the reading screen; "manage" is the data-entry one. They
+   * were the same page, which put a form for typing in bank transfers
+   * underneath a performance chart — two different jobs, and the wrong one
+   * kept getting in the way of the other.
+   */
+  mode?: "analysis" | "manage";
 }) {
   const zh = useLocale() === "zh";
   const say = (en: string, cn: string) => (zh ? cn : en);
@@ -65,11 +92,17 @@ export function PerformanceExplorer({
   }, [snapshots, period, latest]);
   const result = adjustedSeries(selected, data.flows, data.coverage);
   const stats = analysisStats(result);
+  // How patchy the history is. This is the honest answer to "is the chart
+  // wrong": usually it is not, but it is drawn from fewer days than it looks.
+  const gaps = missingWeekdays(result.points.map((point) => point.date));
   const months = monthlyReturns(result, data.flows);
   const comparison =
     currency === "USD"
       ? benchmarkComparison(result.points, data.benchmark)
       : [];
+  // The live comparison: VOO, QQQ, ONEQ and the equal mix of the three, all
+  // re-based to 100 on the first day the account and every fund share.
+  const live = compareAll(result.points, benchmarks);
   const first = selected[0],
     last = selected.at(-1);
   const fmt = (n: number, unit = currency) =>
@@ -100,12 +133,50 @@ export function PerformanceExplorer({
           },
           { name: say("End", "期末"), range: [0, end], amount: end },
         ];
-  const fxStart = data.fx.find((r) => r.date === first?.snapshotDate)?.value;
-  const fxEnd = data.fx.find((r) => r.date === last?.snapshotDate)?.value;
-  const fx =
-    currency === "USD" && fxStart && fxEnd
-      ? fxDecomposition(start, end, fxStart, fxEnd)
-      : null;
+  // The manually imported USD/CNY series is still accepted, and still shown
+  // when the live rate service cannot be reached, so an import somebody has
+  // already done is not thrown away.
+  const importedStart = data.fx.find((r) => r.date === first?.snapshotDate)?.value;
+  const importedEnd = data.fx.find((r) => r.date === last?.snapshotDate)?.value;
+
+  /**
+   * The same account, seen from each currency somebody actually spends.
+   *
+   * The split is exact rather than approximate: what the investments did is
+   * valued at the starting rate, and everything else — including the
+   * interaction between a bigger balance and a moved rate — is the exchange
+   * rate's doing. The two always add to the total, which is the property that
+   * makes the table trustworthy.
+   */
+  const currencyViews = useMemo(() => {
+    if (currency !== "USD" || !first || !last) return [];
+
+    return VIEW_CURRENCIES.flatMap((code) => {
+      const series = rates[code] ?? [];
+      const live = {
+        start: code === "USD" ? 1 : rateOn(series, first.snapshotDate),
+        end: code === "USD" ? 1 : rateOn(series, last.snapshotDate),
+      };
+      // The imported series is the fallback for yuan, which is the one
+      // somebody may already have filled in by hand.
+      const startRate = live.start ?? (code === "CNY" ? (importedStart ?? null) : null);
+      const endRate = live.end ?? (code === "CNY" ? (importedEnd ?? null) : null);
+      if (!startRate || !endRate) return [];
+
+      const parts = fxDecomposition(start, end, startRate, endRate);
+      return [
+        {
+          code,
+          startValue: start * startRate,
+          endValue: end * endRate,
+          investment: parts.investment,
+          currency: parts.currency,
+          total: parts.total,
+        },
+      ];
+    });
+  }, [currency, first, last, rates, start, end, importedStart, importedEnd]);
+
   async function save(body: unknown) {
     if (pending.current) return false;
     pending.current = true;
@@ -156,321 +227,10 @@ export function PerformanceExplorer({
         ),
       }[result.issue]
     : null;
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {first?.snapshotDate ?? "—"} → {last?.snapshotDate ?? "—"} ·{" "}
-          {selected.length} {say("observations", "次记录")}
-        </p>
-        <div className="flex gap-1" aria-label={say("Period", "期间")}>
-          {[
-            ["7", say("Week", "周")],
-            ["30", say("Month", "月")],
-            ["90", say("Quarter", "季")],
-            ["all", say("All", "全部")],
-          ].map(([value, label]) => (
-            <Button
-              key={value}
-              size="sm"
-              variant={period === value ? "primary" : "outline"}
-              aria-pressed={period === value}
-              onClick={() => setPeriod(value)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      </div>
-      {issue && (
-        <p
-          className="rounded-xl border border-border bg-muted/40 p-4 text-sm"
-          role="status"
-        >
-          {issue}
-        </p>
-      )}
-      {!issue && (
-        <>
-          <p className="text-xs text-muted-foreground">
-            {say(
-              "Cash-flow-adjusted returns; deposits and withdrawals assumed at end of day. Drawdown uses observed valuations.",
-              "已调整现金流的收益率；假设转入和转出发生在每日结束时。回撤基于已记录的估值。",
-            )}
-            {!result.daily &&
-              " " +
-                say(
-                  "Missing weekdays: daily statistics are withheld.",
-                  "缺少工作日数据：不显示每日统计。",
-                )}
-          </p>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              [
-                say("Period return", "期间收益率"),
-                pct(stats.periodReturnPercent),
-              ],
-              [
-                say("Observed drawdown", "已观察回撤"),
-                stats.maxDrawdownPercent === null
-                  ? "—"
-                  : `−${stats.maxDrawdownPercent.toFixed(2)}%`,
-              ],
-              [
-                say("Annualised volatility", "年化波动率"),
-                pct(stats.annualisedVolatilityPercent),
-              ],
-              [
-                say("Best / worst day", "最佳 / 最差日"),
-                `${pct(stats.bestDayPercent)} / ${pct(stats.worstDayPercent)}`,
-              ],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="rounded-xl border border-border bg-surface p-5"
-              >
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="tabular mt-2 text-xl font-semibold">{value}</p>
-              </div>
-            ))}
-          </div>
-          <ChartFrame
-            title={say("What changed?", "价值变化来自哪里？")}
-            note={say(
-              "Account value = starting value + net external flows + investment gain/loss.",
-              "账户价值 = 期初价值 + 外部净转入 + 投资损益。",
-            )}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={waterfall}>
-                <CartesianGrid vertical={false} stroke={GRID} />
-                <XAxis dataKey="name" tick={AXIS_TICK} />
-                <YAxis
-                  tick={AXIS_TICK}
-                  width={72}
-                  tickFormatter={(n) =>
-                    Intl.NumberFormat("en", { notation: "compact" }).format(n)
-                  }
-                />
-                <Tooltip
-                  content={({ active, payload }) =>
-                    active && payload?.length ? (
-                      <div className="rounded-lg border border-border bg-surface p-3 text-sm">
-                        {payload[0].payload.name}:{" "}
-                        {fmt(payload[0].payload.amount)}
-                      </div>
-                    ) : null
-                  }
-                />
-                <Bar dataKey="range" radius={4} isAnimationActive={false}>
-                  {waterfall.map((row, i) => (
-                    <Cell
-                      key={row.name}
-                      fill={
-                        i === 1 || i === 2
-                          ? row.amount < 0
-                            ? "var(--negative)"
-                            : "var(--positive)"
-                          : seriesColor(0)
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartFrame>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-            {waterfall.map((row) => (
-              <span key={row.name}>
-                {row.name}: <strong>{fmt(row.amount)}</strong>
-              </span>
-            ))}
-          </div>
-          <ChartFrame
-            title={say("Growth of 100", "100 的增长轨迹")}
-            note={say(
-              "Cash-flow-adjusted portfolio index.",
-              "调整现金流后的投资组合指数。",
-            )}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={result.points}>
-                <CartesianGrid stroke={GRID} vertical={false} />
-                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={50} />
-                <YAxis domain={["auto", "auto"]} tick={AXIS_TICK} />
-                <Tooltip formatter={(v) => Number(v).toFixed(2)} />
-                <Line
-                  dataKey="index"
-                  name={say("Portfolio", "组合")}
-                  stroke={seriesColor(0)}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartFrame>
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="font-medium">
-              {say("Monthly return calendar", "月度收益日历")}
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {say(
-                "Observed portions only; select a month to see its exact coverage. Missing months are not zero returns.",
-                "仅显示已观察期间；选择月份查看具体覆盖日期。缺失月份不代表零收益。",
-              )}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-              {months.map((m) => (
-                <button
-                  key={m.month}
-                  onClick={() => setSelectedMonth(m.month)}
-                  aria-pressed={selectedMonth === m.month}
-                  className={`rounded-lg border p-3 text-left focus-visible:ring-2 focus-visible:ring-accent ${selectedMonth === m.month ? "border-accent" : "border-border"}`}
-                >
-                  <span className="block text-xs text-muted-foreground">
-                    {m.month}
-                  </span>
-                  <strong
-                    className={
-                      m.percent < 0 ? "text-negative" : "text-positive"
-                    }
-                  >
-                    {pct(m.percent)}
-                  </strong>
-                  {/* The percentage is time-weighted and comparable between
-                      months; the amount is what actually landed in the
-                      account. People ask for both. */}
-                  <span
-                    className={`block text-xs tabular ${
-                      m.amount < 0 ? "text-negative" : "text-positive"
-                    }`}
-                  >
-                    {m.amount >= 0 ? "+" : "−"}
-                    {fmt(Math.abs(m.amount))}
-                  </span>
-                  <span className="block text-[10px] text-muted-foreground">
-                    {m.from.slice(5)} → {m.to.slice(5)}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {months
-              .filter((m) => m.month === selectedMonth)
-              .map((m) => (
-                <p key={m.month} className="mt-3 text-sm">
-                  {m.from} → {m.to} · {m.observations}{" "}
-                  {say("intervals", "个区间")} · {pct(m.percent)} ·{" "}
-                  {m.amount >= 0 ? "+" : "−"}
-                  {fmt(Math.abs(m.amount))}
-                  {m.flows !== 0 && (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      ({say("excludes", "不含")} {fmt(m.flows)}{" "}
-                      {say("paid in", "转入")})
-                    </span>
-                  )}
-                </p>
-              ))}
-          </section>
-        </>
-      )}
-      <ValueLine
-        currency={currency}
-        title={say(
-          "Portfolio value (includes cash flows)",
-          "组合价值（含现金流）",
-        )}
-        data={selected.map((s) => ({
-          date: s.snapshotDate,
-          value: Number(s.totalMarketValue),
-        }))}
-      />
-      <section className="space-y-3">
-        <h2 className="font-medium">
-          {say("Portfolio versus benchmark", "投资组合与基准")}
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          {say(
-            "Imported total-return index, including reinvested dividends; matching dates only. Both series start at 100 on their first shared date.",
-            "导入含股息再投资的总回报指数，仅使用日期匹配的数据。两条曲线在首个共同日期从 100 起步。",
-          )}{" "}
-          {data.sources.benchmark}
-        </p>
-        {comparison.length >= 2 ? (
-          <>
-            <p className="text-xs text-muted-foreground">
-              {comparison[0].date} → {comparison.at(-1)?.date}
-            </p>
-            <ChartFrame title={say("Comparable growth", "同期增长")}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={comparison}>
-                  <CartesianGrid vertical={false} stroke={GRID} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={50} />
-                  <YAxis domain={["auto", "auto"]} tick={AXIS_TICK} />
-                  <Tooltip formatter={(v) => Number(v).toFixed(2)} />
-                  <Line
-                    dataKey="portfolio"
-                    name={say("Portfolio", "组合")}
-                    stroke={seriesColor(0)}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    dataKey="benchmark"
-                    name={say("Benchmark", "基准")}
-                    stroke={seriesColor(1)}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartFrame>
-          </>
-        ) : (
-          <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
-            {say(
-              "Requires a USD portfolio, reviewed cash flows and a total-return benchmark with at least two matching dates.",
-              "需要美元投资组合、已审核现金流，以及至少两个匹配日期的总回报基准。",
-            )}
-          </p>
-        )}
-      </section>
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="font-medium">
-          {say("The RMB perspective", "人民币视角")}
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {say(
-            "Account-value change, including deposits and withdrawals; not investment return. USD changes use the starting exchange rate; FX effect includes the interaction.",
-            "账户价值变化包含转入和转出，并非投资收益率。美元价值变化按期初汇率折算；汇率影响包含交叉项。",
-          )}{" "}
-          {data.sources.fx}
-        </p>
-        {fx ? (
-          <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-            {[
-              [say("USD value change", "美元价值变化"), fx.investment],
-              [say("Exchange-rate effect", "汇率影响"), fx.currency],
-              [say("Total RMB change", "人民币总变化"), fx.total],
-            ].map(([label, value]) => (
-              <div key={String(label)}>
-                <dt className="text-xs text-muted-foreground">{label}</dt>
-                <dd className="mt-1 text-lg font-semibold">
-                  {fmt(Number(value), "CNY")}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="mt-4 text-sm text-muted-foreground">
-            {say(
-              "Requires a USD portfolio and USD/CNY observations on both selected endpoint dates.",
-              "需要美元投资组合以及所选期初和期末日期的美元兑人民币汇率。",
-            )}
-          </p>
-        )}
-      </section>
-      {owner && (
+  // Owner-only data entry. Lifted out of the middle of the page so the
+  // records screen can show it on its own: recording a transfer is a
+  // bookkeeping job, not something to trip over while reading a chart.
+  const manage = owner ? (
         <details className="rounded-xl border border-border bg-surface p-5">
           <summary className="cursor-pointer font-medium">
             {say("Manage analysis data", "管理分析数据")}
@@ -622,7 +382,7 @@ export function PerformanceExplorer({
             }}
           >
             <p className="text-sm font-medium">
-              {say("Import dated observations", "导入日期数据")}
+              {say("Import a dated series", "导入带日期的数据")}
             </p>
             <label className="block text-sm">
               {say("Series", "数据系列")}
@@ -672,7 +432,7 @@ export function PerformanceExplorer({
               )}
             </p>
             <Button disabled={busy}>
-              {say("Import observations", "导入数据")}
+              {say("Import", "导入")}
             </Button>
           </form>
           {status && (
@@ -684,7 +444,413 @@ export function PerformanceExplorer({
             </p>
           )}
         </details>
+  ) : null;
+
+  if (mode === "manage") return <div className="space-y-4">{manage}</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {first?.snapshotDate ?? "—"} → {last?.snapshotDate ?? "—"} ·{" "}
+          {selected.length} {say("days with a recorded value", "天有记录的估值")}
+        </p>
+        <div className="flex gap-1" aria-label={say("Period", "期间")}>
+          {[
+            ["7", say("Week", "周")],
+            ["30", say("Month", "月")],
+            ["90", say("Quarter", "季")],
+            ["all", say("All", "全部")],
+          ].map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={period === value ? "primary" : "outline"}
+              aria-pressed={period === value}
+              onClick={() => setPeriod(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {issue && (
+        <p
+          className="rounded-xl border border-border bg-muted/40 p-4 text-sm"
+          role="status"
+        >
+          {issue}
+        </p>
       )}
+      {!issue && (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {say(
+              "Money paid in or taken out is taken out of the sum, so these figures show how the investments did rather than how much was added. Transfers are treated as arriving at the end of the day. The worst fall is measured between days that were actually recorded.",
+              "转入和转出的钱已经被剔除，所以这些数字反映的是投资做得怎么样，而不是往里放了多少钱。转账按当天收盘时到账计算。最大回撤只在有记录的日子之间衡量。",
+            )}
+            {gaps > 0 &&
+              " " +
+                say(
+                  `${gaps} weekday${gaps === 1 ? "" : "s"} in this window has no recorded value, so the line joins straight across them. The daily figures are held back for that reason, and a fall that spans a gap will look sharper than it was.`,
+                  `这段时间里有 ${gaps} 个工作日没有记录估值，曲线在那里是直接连过去的。因此不显示每日统计；跨越缺口的下跌，看起来会比实际更陡。`,
+                )}
+          </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              [
+                say("Period return", "期间收益率"),
+                pct(stats.periodReturnPercent),
+              ],
+              [
+                say("Observed drawdown", "已观察回撤"),
+                stats.maxDrawdownPercent === null
+                  ? "—"
+                  : `−${stats.maxDrawdownPercent.toFixed(2)}%`,
+              ],
+              [
+                say("Annualised volatility", "年化波动率"),
+                pct(stats.annualisedVolatilityPercent),
+              ],
+              [
+                say("Best / worst day", "最佳 / 最差日"),
+                `${pct(stats.bestDayPercent)} / ${pct(stats.worstDayPercent)}`,
+              ],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-xl border border-border bg-surface p-5"
+              >
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="tabular mt-2 text-xl font-semibold">{value}</p>
+              </div>
+            ))}
+          </div>
+          <ChartFrame
+            title={say("What changed?", "价值变化来自哪里？")}
+            note={say(
+              "Account value = starting value + net external flows + investment gain/loss.",
+              "账户价值 = 期初价值 + 外部净转入 + 投资损益。",
+            )}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={waterfall}>
+                <CartesianGrid vertical={false} stroke={GRID} />
+                <XAxis dataKey="name" tick={AXIS_TICK} />
+                <YAxis
+                  tick={AXIS_TICK}
+                  width={72}
+                  tickFormatter={(n) =>
+                    Intl.NumberFormat("en", { notation: "compact" }).format(n)
+                  }
+                />
+                <Tooltip
+                  content={({ active, payload }) =>
+                    active && payload?.length ? (
+                      <div className="rounded-lg border border-border bg-surface p-3 text-sm">
+                        {payload[0].payload.name}:{" "}
+                        {fmt(payload[0].payload.amount)}
+                      </div>
+                    ) : null
+                  }
+                />
+                <Bar dataKey="range" radius={4} isAnimationActive={false}>
+                  {waterfall.map((row, i) => (
+                    <Cell
+                      key={row.name}
+                      fill={
+                        i === 1 || i === 2
+                          ? row.amount < 0
+                            ? "var(--negative)"
+                            : "var(--positive)"
+                          : seriesColor(0)
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartFrame>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+            {waterfall.map((row) => (
+              <span key={row.name}>
+                {row.name}: <strong>{fmt(row.amount)}</strong>
+              </span>
+            ))}
+          </div>
+          <ChartFrame
+            title={say("Growth of 100", "100 的增长轨迹")}
+            note={say(
+              "Where 100 put in on the first day would stand now, ignoring anything added or withdrawn since.",
+              "第一天投入 100 元，到今天变成多少；期间的转入转出不计。",
+            )}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={result.points}>
+                <CartesianGrid stroke={GRID} vertical={false} />
+                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={50} />
+                <YAxis domain={["auto", "auto"]} tick={AXIS_TICK} />
+                <Tooltip formatter={(v) => Number(v).toFixed(2)} />
+                <Line
+                  dataKey="index"
+                  name={say("Portfolio", "组合")}
+                  stroke={seriesColor(0)}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartFrame>
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="font-medium">
+              {say("Monthly return calendar", "月度收益日历")}
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {say(
+                "Observed portions only; select a month to see its exact coverage. Missing months are not zero returns.",
+                "仅显示已观察期间；选择月份查看具体覆盖日期。缺失月份不代表零收益。",
+              )}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              {months.map((m) => (
+                <button
+                  key={m.month}
+                  onClick={() => setSelectedMonth(m.month)}
+                  aria-pressed={selectedMonth === m.month}
+                  className={`rounded-lg border p-3 text-left focus-visible:ring-2 focus-visible:ring-accent ${selectedMonth === m.month ? "border-accent" : "border-border"}`}
+                >
+                  <span className="block text-xs text-muted-foreground">
+                    {m.month}
+                  </span>
+                  <strong
+                    className={
+                      m.percent < 0 ? "text-negative" : "text-positive"
+                    }
+                  >
+                    {pct(m.percent)}
+                  </strong>
+                  {/* The percentage is time-weighted and comparable between
+                      months; the amount is what actually landed in the
+                      account. People ask for both. */}
+                  <span
+                    className={`block text-xs tabular ${
+                      m.amount < 0 ? "text-negative" : "text-positive"
+                    }`}
+                  >
+                    {m.amount >= 0 ? "+" : "−"}
+                    {fmt(Math.abs(m.amount))}
+                  </span>
+                  <span className="block text-[10px] text-muted-foreground">
+                    {m.from.slice(5)} → {m.to.slice(5)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {months
+              .filter((m) => m.month === selectedMonth)
+              .map((m) => (
+                <p key={m.month} className="mt-3 text-sm">
+                  {m.from} → {m.to} · {m.observations}{" "}
+                  {say("days counted", "天计入")} · {pct(m.percent)} ·{" "}
+                  {m.amount >= 0 ? "+" : "−"}
+                  {fmt(Math.abs(m.amount))}
+                  {m.flows !== 0 && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({say("excludes", "不含")} {fmt(m.flows)}{" "}
+                      {say("paid in", "转入")})
+                    </span>
+                  )}
+                </p>
+              ))}
+          </section>
+        </>
+      )}
+      <ValueLine
+        currency={currency}
+        title={say(
+          "Portfolio value (includes cash flows)",
+          "组合价值（含现金流）",
+        )}
+        data={selected.map((s) => ({
+          date: s.snapshotDate,
+          value: Number(s.totalMarketValue),
+        }))}
+      />
+      <section className="space-y-3">
+        <h2 className="font-medium">
+          {say("Portfolio versus benchmark", "投资组合与基准")}
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          {say(
+            "Put the same money into each on the first day and watch what happens. Every line starts at 100 on that day, so the gap between them is the difference in result, not the difference in size. The mix is a third in each fund.",
+            "在同一天把同样一笔钱分别投进去，看看后来各自变成多少。所有曲线都从那天的 100 起步，因此曲线之间的差距就是成绩的差距，而不是本金的差距。「等额组合」是三只各买三分之一。",
+          )}{" "}
+          {live.rows.length >= 2 ? "" : data.sources.benchmark}
+        </p>
+        {live.rows.length >= 2 ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              {live.rows[0].date} → {live.rows.at(-1)?.date}
+            </p>
+            <ChartFrame title={say("Growth of the same money", "同一笔钱的增长")}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={live.rows}>
+                  <CartesianGrid vertical={false} stroke={GRID} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={50} />
+                  <YAxis domain={["auto", "auto"]} tick={AXIS_TICK} />
+                  <Tooltip formatter={(v) => Number(v).toFixed(2)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line
+                    dataKey="portfolio"
+                    name={say("This account", "本账户")}
+                    stroke={seriesColor(0)}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  {live.used.map((series, index) => (
+                    <Line
+                      key={series.key}
+                      dataKey={series.key}
+                      name={series.label}
+                      stroke={seriesColor(index + 1)}
+                      strokeDasharray={series.key === "BLEND" ? undefined : "4 3"}
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+            <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {[
+                { key: "portfolio", label: say("This account", "本账户") },
+                ...live.used.map((s) => ({ key: s.key, label: s.label })),
+              ].map((entry) => {
+                const last = live.rows.at(-1)! as Record<string, number | string>;
+                const value = Number(last[entry.key]) - 100;
+                return (
+                  <div key={entry.key}>
+                    <dt className="text-xs text-muted-foreground">{entry.label}</dt>
+                    <dd className={`mt-0.5 text-sm font-semibold ${value >= 0 ? "text-positive" : "text-negative"}`}>
+                      {pct(value)}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </>
+        ) : comparison.length >= 2 ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              {comparison[0].date} → {comparison.at(-1)?.date}
+            </p>
+            <ChartFrame title={say("Comparable growth", "同期增长")}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={comparison}>
+                  <CartesianGrid vertical={false} stroke={GRID} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={50} />
+                  <YAxis domain={["auto", "auto"]} tick={AXIS_TICK} />
+                  <Tooltip formatter={(v) => Number(v).toFixed(2)} />
+                  <Line
+                    dataKey="portfolio"
+                    name={say("Portfolio", "组合")}
+                    stroke={seriesColor(0)}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    dataKey="benchmark"
+                    name={say("Benchmark", "基准")}
+                    stroke={seriesColor(1)}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+          </>
+        ) : (
+          <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+            {say(
+              "Requires a USD portfolio, reviewed cash flows and a total-return benchmark with at least two matching dates.",
+              "需要美元投资组合、已审核现金流，以及至少两个匹配日期的总回报基准。",
+            )}
+          </p>
+        )}
+      </section>
+      <section className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="font-medium">
+          {say("What it is worth in your currency", "换成你的货币是多少")}
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {say(
+            "The account holds US dollars, but not everybody spends them. Each row is the same account seen from a different currency, and splits the change into two parts: what the investments did, and what the exchange rate did. Note this counts money paid in and taken out as well, so it is the change in what the account is worth, not a return.",
+            "账户里是美元，但不是每个人都花美元。每一行都是同一个账户换成另一种货币来看，并把变化拆成两部分：投资本身赚了多少，汇率又让它变了多少。注意这里也包含转入转出，所以这是账户价值的变化，不是收益率。",
+          )}{" "}
+          {say("Rates: European Central Bank daily reference rates.", "汇率来源：欧洲央行每日参考汇率。")}
+        </p>
+        {currencyViews.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
+                  <th scope="col" className="py-2 text-left font-medium">
+                    {say("Currency", "货币")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("Start", "期初")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("End", "期末")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("From the investments", "投资带来的")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("From the exchange rate", "汇率带来的")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("Total change", "合计变化")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {currencyViews.map((view) => (
+                  <tr key={view.code} className="border-b border-border last:border-0">
+                    <th scope="row" className="py-2 text-left font-medium">
+                      {zh ? CURRENCY_LABEL[view.code].zh : CURRENCY_LABEL[view.code].en}
+                    </th>
+                    <td className="tabular py-2 text-right text-muted-foreground">
+                      {fmt(view.startValue, view.code)}
+                    </td>
+                    <td className="tabular py-2 text-right">{fmt(view.endValue, view.code)}</td>
+                    <td className="tabular py-2 text-right">
+                      {fmt(view.investment, view.code)}
+                    </td>
+                    <td className="tabular py-2 text-right">
+                      {view.code === "USD" ? "—" : fmt(view.currency, view.code)}
+                    </td>
+                    <td
+                      className={`tabular py-2 text-right font-medium ${view.total >= 0 ? "text-positive" : "text-negative"}`}
+                    >
+                      {fmt(view.total, view.code)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+            {say(
+              "Needs a US dollar account and a published exchange rate on both the first and last day of the period.",
+              "需要美元账户，并且期初和期末两天都有公布的汇率。",
+            )}
+          </p>
+        )}
+      </section>
     </div>
   );
 }
