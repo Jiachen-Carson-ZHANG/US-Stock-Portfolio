@@ -1,7 +1,7 @@
 import "server-only";
 import { getDb, type DB } from "@/lib/db";
 import { dedupe } from "@/lib/inflight";
-import { DEFAULT_SLUG, findById, type Portfolio } from "@/lib/portfolios";
+import { DEFAULT_SLUG, findById, listPortfolios, type Portfolio } from "@/lib/portfolios";
 import { mockState, syncMockPositions } from "./mock";
 import { matchOpenOrders, openOrders } from "@/lib/trading/orders";
 import type { Quote } from "@/types/market";
@@ -174,7 +174,7 @@ function positionTtlSeconds(): number {
  * so several family members opening the dashboard together trigger one sync
  * rather than one each. A failure leaves the previous holdings in place.
  */
-async function ensureFreshPositions(portfolioId: string, now: Date): Promise<void> {
+export async function ensureFreshPositions(portfolioId: string, now: Date): Promise<void> {
   const db = await getDb();
 
   // A mock portfolio has no broker to ask. Its holdings are the replay of
@@ -197,10 +197,10 @@ async function ensureFreshPositions(portfolioId: string, now: Date): Promise<voi
       ? await getQuotes(db, symbols, await getMarketDataProvider(portfolioId), now)
       : { quotes: new Map<string, Quote>() };
 
-    // There is no always-on worker, so this is when a resting order gets
-    // looked at: whenever somebody loads the portfolio, plus the daily job.
-    // Orders record when they were last checked rather than implying the
-    // market is being watched continuously.
+    // One of the moments a resting order gets looked at. The scheduler calling
+    // matchAllRestingOrders is the other, and the one that matters when nobody
+    // is watching. Orders record when they were last checked either way, so
+    // the screen can say when rather than imply it is continuous.
     if (resting.length > 0) await matchOpenOrders(db, portfolio, quotes, now);
 
     await syncMockPositions(db, portfolio, quotes, now);
@@ -235,6 +235,7 @@ async function ensureFreshPositions(portfolioId: string, now: Date): Promise<voi
 
 async function pricedPositions(portfolioId: string, now: Date): Promise<{
   positions: Position[];
+  quotes: Map<string, Quote>;
   dataTimestamp: string | null;
   isStale: boolean;
 }> {
@@ -242,12 +243,25 @@ async function pricedPositions(portfolioId: string, now: Date): Promise<{
   await ensureFreshPositions(portfolioId, now);
   const stored = await readPositions(db, portfolioId);
   if (stored.length === 0) {
-    return { positions: [], dataTimestamp: null, isStale: false };
+    return { positions: [], quotes: new Map(), dataTimestamp: null, isStale: false };
   }
+
+  // The underlying share price is asked for alongside the contracts. An
+  // option's break-even is a share price, so it only means something next to
+  // where the share actually trades — and the underlying is usually not held
+  // itself, so nothing else would have fetched it.
+  const symbols = [
+    ...new Set([
+      ...stored.map((p) => p.symbol),
+      ...stored.flatMap((p) =>
+        p.instrumentType === "option" && p.underlyingSymbol ? [p.underlyingSymbol] : [],
+      ),
+    ]),
+  ];
 
   const { quotes, isStale, dataTimestamp } = await getQuotes(
     db,
-    [...new Set(stored.map((p) => p.symbol))],
+    symbols,
     await getMarketDataProvider(portfolioId),
     now,
   );
@@ -263,12 +277,15 @@ async function pricedPositions(portfolioId: string, now: Date): Promise<{
     };
   });
 
-  const synced = await lastSyncedAt(db, portfolioId);
+  const [synced, provider] = await Promise.all([
+    lastSyncedAt(db, portfolioId),
+    activeProvider(portfolioId),
+  ]);
   const brokerStale =
-    (await activeProvider(portfolioId)) === "moomoo" &&
+    provider === "moomoo" &&
     (!synced ||
       now.getTime() - new Date(synced).getTime() > positionTtlSeconds() * 1000);
-  return { positions, dataTimestamp, isStale: isStale || brokerStale };
+  return { positions, quotes, dataTimestamp, isStale: isStale || brokerStale };
 }
 
 export async function loadPortfolio(
@@ -280,20 +297,26 @@ export async function loadPortfolio(
   const portfolio = await findById(db, portfolioId);
   if (!portfolio) throw new Error(`No portfolio ${portfolioId}`);
 
-  const { positions, dataTimestamp, isStale } = await pricedPositions(portfolioId, now);
+  // Three independent reads: holdings, money paid in, and realized gains.
+  // None needs another's answer, so they go to the database at the same time
+  // rather than one after another. Sitting beside the database that saves
+  // milliseconds; across an ocean it saves two full round trips per page.
+  const [{ positions, quotes, dataTimestamp, isStale }, deposits, realized] = await Promise.all([
+    pricedPositions(portfolioId, now),
+    netDeposits(db, portfolio, currency),
+    // From the fills, which cover the whole account, rather than the broker's
+    // figure, which only covers positions still open. Cached against a
+    // fingerprint of the fill list, so the replay runs when a trade changes
+    // rather than on every page view.
+    realizedFor(db, portfolioId),
+  ]);
 
   const summary = summarize(
     positions,
     currency,
     { status: marketSession(now), dataTimestamp, isStale },
-    await netDeposits(db, portfolio, currency),
+    deposits,
   );
-
-  // From the fills, which cover the whole account, rather than the broker's
-  // figure, which only covers positions still open. Cached against a
-  // fingerprint of the fill list, so the replay runs when a trade changes
-  // rather than on every page view.
-  const realized = await realizedFor(db, portfolioId);
 
   const invested = totalInvested(positions, currency);
   const views = buildPositionViews(positions, currency).map((view) => ({
@@ -337,13 +360,56 @@ export async function loadPortfolio(
     },
     totalInvested: toDTO(invested),
     optionGroups: groupOptions(positions).groups.map((group) =>
-      toOptionGroupDTO(group, invested),
+      toOptionGroupDTO(group, invested, quotes.get(group.underlying)?.price),
     ),
     byAssetClass: performanceByAssetClass(positions, currency, realized),
     // From the fills, which cover the whole account, rather than the broker's
     // figure, which only covers positions still open.
     realizedBySymbol: realized,
   };
+}
+
+/**
+ * Fills resting orders for every simulated account, with nobody signed in.
+ *
+ * Until now an order was only looked at when somebody happened to load the
+ * page it was resting on. Leave a limit order overnight and it would sit
+ * there untouched while the price traded straight through it, then fill the
+ * next morning at whatever the price had become — which is not a limit order,
+ * it is a lottery. A scheduler calls this every minute so the market being
+ * reached is what fills an order, not somebody opening a browser tab.
+ *
+ * Only accounts that actually have something resting are touched, so a
+ * hundred idle accounts cost one query rather than a hundred quote requests.
+ */
+export async function matchAllRestingOrders(
+  now: Date = new Date(),
+): Promise<{ accounts: number; orders: number }> {
+  const db = await getDb();
+  let accounts = 0;
+  let orders = 0;
+
+  for (const portfolio of await listPortfolios(db)) {
+    if (portfolio.kind !== "mock") continue;
+    const resting = await openOrders(db, portfolio.id);
+    if (resting.length === 0) continue;
+
+    accounts += 1;
+    orders += resting.length;
+    try {
+      // The whole refresh rather than matching alone: a fill changes the
+      // holdings, and the holdings have to be rewritten with prices for every
+      // symbol held, not only the ones an order named.
+      await loadPortfolio(portfolio.id, now);
+    } catch (error) {
+      // One account with a broken quote feed must not stop the rest.
+      logger.error("orders.match.failure", {
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+
+  return { accounts, orders };
 }
 
 export async function loadPosition(

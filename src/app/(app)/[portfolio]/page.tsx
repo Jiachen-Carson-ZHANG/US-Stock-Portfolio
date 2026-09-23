@@ -15,7 +15,23 @@ export default async function DashboardPage({
   params: Promise<{ portfolio: string }>;
 }) {
   const { user, portfolio } = await requirePortfolio((await params).portfolio);
-  const { t } = await serverDictionary();
+  const db = await getDb();
+
+  // Four independent lookups. Asking for them one after another meant four
+  // separate waits on the database; asked for together it is one.
+  // `since` is what "total" is measured from: the first money in, or failing
+  // that the first day on record.
+  const [{ t }, data, since, owner] = await Promise.all([
+    serverDictionary(),
+    loadPortfolio(portfolio.id),
+    portfolioStart(db, portfolio.id),
+    portfolio.ownerUserId
+      ? db.get<{ display_name: string }>(`SELECT display_name FROM users WHERE id = ?`, [
+          portfolio.ownerUserId,
+        ])
+      : null,
+  ]);
+
   const {
     summary,
     positions,
@@ -24,20 +40,8 @@ export default async function DashboardPage({
     totalInvested,
     optionGroups,
     realizedBySymbol,
-} = await loadPortfolio(portfolio.id);
-
-  // What "total" is measured from: the first money in, or failing that the
-  // first day on record.
-  const db = await getDb();
-  const since = await portfolioStart(db, portfolio.id);
-  const ownerName = portfolio.ownerUserId
-    ? ((
-        await db.get<{ display_name: string }>(
-          `SELECT display_name FROM users WHERE id = ?`,
-          [portfolio.ownerUserId],
-        )
-      )?.display_name ?? null)
-    : null;
+  } = data;
+  const ownerName = owner?.display_name ?? null;
 
   if (positions.length === 0) {
     return (
