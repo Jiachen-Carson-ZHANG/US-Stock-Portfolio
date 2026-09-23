@@ -21,7 +21,8 @@
     "db:e2e:reset": "tsx scripts/reset-e2e-db.ts",
     "db:import-fills": "tsx scripts/import-fills.ts",
     "db:import-deposits": "tsx scripts/import-deposits.ts",
-    "db:reconstruct": "tsx scripts/reconstruct-history.ts"
+    "db:reconstruct": "tsx scripts/reconstruct-history.ts",
+    "accounts": "tsx scripts/accounts-admin.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

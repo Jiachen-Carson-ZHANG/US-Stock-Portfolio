@@ -60,9 +60,13 @@ async function quoteConnectionFor(portfolioId: string): Promise<string | null> {
   try {
     const db = await getDb();
     const row = await db.get<{ portfolio_id: string | null }>(
+      // A connection in any state, healthiest first. An "expired" one is not
+      // a dead one — refreshing it is the normal path — and skipping it would
+      // drop the whole site onto the demo feed, which knows the price of
+      // almost nothing.
       `SELECT portfolio_id FROM broker_connections
-        WHERE provider = 'moomoo' AND status = 'connected' AND portfolio_id IS NOT NULL
-        ORDER BY connected_at DESC
+        WHERE provider = 'moomoo' AND portfolio_id IS NOT NULL
+        ORDER BY (status = 'connected') DESC, connected_at DESC
         LIMIT 1`,
     );
     return row?.portfolio_id ?? null;

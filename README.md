@@ -406,10 +406,32 @@ balance. That is enforced by the data type, not by the template.
 |---|---|---|
 | `POST /api/cron/snapshot` | daily, after the close | records the day for every portfolio |
 | `POST /api/cron/reconstruct` | monthly | rebuilds all history from fills; the backstop for days nobody was there to capture |
+| `GET /api/cron/orders` | every minute while the market is open | fills resting orders on the practice accounts |
 
-Both take `Authorization: Bearer $SNAPSHOT_CRON_SECRET`. Neither is required
-for correctness — history can always be re-derived — but without the monthly
-one nothing re-derives it if nobody opens the app.
+All three take `Authorization: Bearer $SNAPSHOT_CRON_SECRET`. The first two
+are not required for correctness — history can always be re-derived — but
+without the monthly one nothing re-derives it if nobody opens the app.
+
+The order matcher is different: without it a limit order only gets looked at
+when somebody loads the page it is resting on, so one left overnight sits
+untouched while the price trades straight through it. It is a `GET` because
+that is all a simple uptime pinger sends, it does nothing when the market is
+shut, and it touches only the accounts that actually have an order open.
+
+Vercel's own cron runs once a day on the free plan, which is no use here, so
+use any external scheduler that can send a header — cron-job.org is free and
+does. Point it at `https://<your-site>/api/cron/orders` every minute with
+`Authorization: Bearer <SNAPSHOT_CRON_SECRET>`.
+
+### Where the functions run
+
+`vercel.json` pins them to `sin1` (Singapore) because the Neon database is in
+`ap-southeast-1`. The default region is `iad1` (Washington), and from there
+every query crossed the Pacific: 233 ms a round trip against 7-10 ms beside
+the database, which on a page making twenty to forty queries is most of the
+wait. On the Hobby plan the dashboard setting (Project → Settings →
+Functions → Function Region) wins over this file, so set both. If the
+database ever moves, move this with it.
 
 ### Recording transfers
 
