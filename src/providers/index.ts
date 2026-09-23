@@ -35,10 +35,47 @@ export async function getBrokerProvider(
     : new MockBrokerProvider();
 }
 
+/**
+ * Whose connection pays for a quote.
+ *
+ * A price is not private — NVDA costs the same for everybody — but asking
+ * moomoo for one still spends somebody's token. A mock account has no
+ * connection of its own, and its entire promise is practice money against
+ * real prices, so it borrows a connection that exists rather than falling
+ * back to invented numbers.
+ *
+ * This is where placing an order on a simulated account used to fail. With
+ * DATA_PROVIDER set to moomoo, every portfolio was handed a moomoo quote
+ * client pointed at its own id; a mock portfolio has no token under that id,
+ * so the request threw and the screen said only "Could not place the order."
+ * The displayed price still looked fine because that came from the shared
+ * quote cache, which made it look like the feed was working.
+ *
+ * Only the public price feed is borrowed. Holdings, cash and orders are never
+ * read through somebody else's connection.
+ */
+async function quoteConnectionFor(portfolioId: string): Promise<string | null> {
+  if (portfolioId && (await hasBrokerConnection(portfolioId))) return portfolioId;
+
+  try {
+    const db = await getDb();
+    const row = await db.get<{ portfolio_id: string | null }>(
+      `SELECT portfolio_id FROM broker_connections
+        WHERE provider = 'moomoo' AND status = 'connected' AND portfolio_id IS NOT NULL
+        ORDER BY connected_at DESC
+        LIMIT 1`,
+    );
+    return row?.portfolio_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getMarketDataProvider(
   portfolioId: string,
 ): Promise<MarketDataProvider> {
-  return (await activeProvider(portfolioId)) === "moomoo"
-    ? new MoomooMarketDataProvider(portfolioId)
+  const connection = await quoteConnectionFor(portfolioId);
+  return connection
+    ? new MoomooMarketDataProvider(connection)
     : new MockMarketDataProvider();
 }

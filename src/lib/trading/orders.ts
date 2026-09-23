@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Decimal from "decimal.js";
 import type { DB } from "@/lib/db";
 import { parseSymbol } from "@/lib/moomoo/symbols";
+import { marketDateString } from "@/lib/market-hours";
 import { mockState } from "@/lib/portfolio/mock";
 import type { Portfolio } from "@/lib/portfolios";
 import type { Quote } from "@/types/market";
@@ -386,10 +387,14 @@ export async function matchOpenOrders(
   let filled = 0;
   let expired = 0;
 
+  const today = marketDateString(now);
+
   for (const order of resting) {
     // A day order dies at the end of the day it was placed, whether or not
-    // anybody was watching.
-    if (order.timeInForce === "day" && order.placedAt.slice(0, 10) < now.toISOString().slice(0, 10)) {
+    // anybody was watching. Measured in the market's own day, not UTC: an
+    // order placed at 9am New York is placed on the same trading day as the
+    // 8pm after-hours session, though UTC has already turned over.
+    if (order.timeInForce === "day" && marketDateString(new Date(order.placedAt)) < today) {
       await db.run(
         `UPDATE orders SET status = 'expired', last_checked_at = ?, updated_at = ?
           WHERE id = ? AND status = 'open'`,
@@ -400,7 +405,24 @@ export async function matchOpenOrders(
     }
 
     const quote = quotes.get(order.symbol);
-    if (!quote || !Number.isFinite(quote.price)) continue;
+    if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) continue;
+
+    // Two fairness rules, both about *which* price is allowed to fill an order.
+    //
+    // A price has to be recent. Left out, a limit order resting over a long
+    // weekend fills on Friday's last print as if it were live.
+    //
+    // And a price has to have printed after the order existed. Quotes are
+    // cached for a few seconds, so without this an order placed at 10:00:04
+    // could fill on the 10:00:00 tick — buying at a price it already knew it
+    // had missed. Anyone watching the number before clicking would win every
+    // time, which is the opposite of a fair fill.
+    const quotedAt = quote.dataTimestamp ? Date.parse(quote.dataTimestamp) : NaN;
+    if (Number.isFinite(quotedAt)) {
+      if (now.getTime() - quotedAt > MAX_QUOTE_AGE_MS) continue;
+      const placedAt = Date.parse(order.placedAt);
+      if (Number.isFinite(placedAt) && quotedAt < placedAt) continue;
+    }
 
     await db.run(`UPDATE orders SET last_checked_at = ? WHERE id = ?`, [
       now.toISOString(),

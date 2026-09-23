@@ -12,12 +12,21 @@ import {
 import { requirePortfolioApi, requireWritable } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { cancelOrderSchema, placeOrderSchema } from "@/lib/schemas";
+import { ensureFreshPositions } from "@/lib/portfolio/service";
+import { getQuotes } from "@/lib/portfolio/quotes";
 import { getMarketDataProvider } from "@/providers";
 
 /** The ticket: what is resting, what has happened, and what can be spent. */
 export async function GET(request: Request) {
   const context = await requirePortfolioApi(portfolioSlugFrom(request));
   if ("response" in context) return context.response;
+
+  // The trade screen polls this every few seconds while something is resting,
+  // so this is also where those orders get priced and filled for whoever is
+  // watching. The scheduler does the same for everyone who is not.
+  if (context.portfolio.kind === "mock") {
+    await ensureFreshPositions(context.portfolio.id, new Date()).catch(() => {});
+  }
 
   const db = await getDb();
   const [orders, power] = await Promise.all([
@@ -59,11 +68,16 @@ export async function POST(request: Request) {
 
   const symbol = parsed.data.symbol.toUpperCase();
 
-  try {
-    const provider = await getMarketDataProvider(context.portfolio.id);
-    const quote = (await provider.getQuotes([symbol])).find((q) => q.symbol === symbol);
+  const db = await getDb();
 
-    const db = await getDb();
+  try {
+    // Through the shared cache, like every other price on the site. Asking the
+    // provider directly meant an order was priced from a different request
+    // than the one the screen had just shown, and a feed that was failing
+    // showed a healthy price from cache while every order died.
+    const provider = await getMarketDataProvider(context.portfolio.id);
+    const { quotes } = await getQuotes(db, [symbol], provider, new Date());
+    const quote = quotes.get(symbol);
     const result = await placeOrder(
       db,
       context.portfolio,
@@ -91,10 +105,24 @@ export async function POST(request: Request) {
     if (error instanceof OrderError) {
       return Response.json({ error: error.message }, { status: 409 });
     }
-    logger.error("order.place.failure", {
-      reason: error instanceof Error ? error.message : "unknown",
-    });
-    return Response.json({ error: "Could not place the order." }, { status: 502 });
+    const reason = error instanceof Error ? error.message : "unknown";
+    logger.error("order.place.failure", { reason });
+    return Response.json(
+      {
+        error: "Could not place the order.",
+        // The category, not the stack trace. "Could not place the order" on
+        // its own left nobody anything to act on — the price feed being down
+        // and the account being wrong are different problems with different
+        // answers, and the person looking at the screen deserves to know
+        // which one they have.
+        reason: /quote|price|snapshot/i.test(reason)
+          ? "The price feed did not answer. Try again in a moment."
+          : /token|auth|connect/i.test(reason)
+            ? "The broker connection needs renewing before prices can be fetched."
+            : "Something went wrong on our side. It has been logged.",
+      },
+      { status: 502 },
+    );
   }
 }
 

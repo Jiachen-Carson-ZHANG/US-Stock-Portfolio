@@ -380,3 +380,88 @@ describe("when an order should fill", () => {
     expect(fillsAt(breakout, 109)).toBe(false);
   });
 });
+
+describe("which price is allowed to fill an order", () => {
+  async function rest(limitPrice: number, at = NOW) {
+    const { order } = await placeOrder(
+      db,
+      portfolio,
+      { symbol: "NVDA", side: "buy", kind: "limit", quantity: 1, limitPrice },
+      quote("NVDA", 200),
+      null,
+      at,
+    );
+    return order;
+  }
+
+  it("will not fill on a price that printed before the order existed", async () => {
+    await rest(180);
+
+    // A tick from four seconds ago. Quotes are cached for five, so without
+    // this rule an order placed a moment ago fills on a price it had already
+    // watched go by — free money for anybody who waits for the number to dip
+    // before clicking.
+    const stalePrint = quote("NVDA", 175, 4_000);
+    const after = new Date(NOW.getTime() + 1_000);
+    await matchOpenOrders(db, portfolio, new Map([["NVDA", stalePrint]]), after);
+
+    expect((await openOrders(db, portfolio.id)).length).toBe(1);
+  });
+
+  it("fills on the next price that prints after it", async () => {
+    await rest(180);
+
+    const later = new Date(NOW.getTime() + 10_000);
+    const fresh = {
+      ...quote("NVDA", 175),
+      dataTimestamp: new Date(NOW.getTime() + 8_000).toISOString(),
+    };
+    await matchOpenOrders(db, portfolio, new Map([["NVDA", fresh]]), later);
+
+    expect(await openOrders(db, portfolio.id)).toEqual([]);
+  });
+
+  it("will not fill on a price from hours ago", async () => {
+    await rest(180);
+
+    const later = new Date(NOW.getTime() + 3 * 3_600_000);
+    const old = {
+      ...quote("NVDA", 175),
+      dataTimestamp: new Date(NOW.getTime() + 60_000).toISOString(),
+    };
+    await matchOpenOrders(db, portfolio, new Map([["NVDA", old]]), later);
+
+    expect((await openOrders(db, portfolio.id)).length).toBe(1);
+  });
+
+  it("keeps a day order alive through the evening of the day it was placed", async () => {
+    // 9am in New York is 13:00 UTC; 8pm the same trading day is 00:00 UTC the
+    // next calendar day. Measured in UTC the order looks a day old and used
+    // to expire while the market it was placed for was still open.
+    const morning = new Date("2026-09-22T13:00:00.000Z");
+    await rest(180, morning);
+
+    const evening = new Date("2026-09-23T00:00:00.000Z");
+    const fresh = {
+      ...quote("NVDA", 190),
+      dataTimestamp: new Date(evening.getTime() - 1_000).toISOString(),
+    };
+    await matchOpenOrders(db, portfolio, new Map([["NVDA", fresh]]), evening);
+
+    expect((await openOrders(db, portfolio.id)).length).toBe(1);
+  });
+
+  it("expires a day order once the trading day has actually turned over", async () => {
+    const morning = new Date("2026-09-22T13:00:00.000Z");
+    await rest(180, morning);
+
+    const nextDay = new Date("2026-09-23T13:30:00.000Z");
+    await matchOpenOrders(db, portfolio, new Map(), nextDay);
+
+    const order = (await db.get<{ status: string }>(
+      `SELECT status FROM orders WHERE portfolio_id = ?`,
+      [portfolio.id],
+    ))!;
+    expect(order.status).toBe("expired");
+  });
+});

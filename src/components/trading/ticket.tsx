@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
+import { Help } from "@/components/ui/help";
+import { marketSession, quotePollIntervalMs } from "@/lib/market-hours";
 import { formatMoney } from "@/lib/money";
 import { cn, signClass } from "@/lib/utils";
 import type { Order } from "@/lib/trading/orders";
@@ -126,7 +128,12 @@ export function Ticket({
     setBusy(false);
 
     if (!response.ok) {
-      setMessage({ tone: "bad", text: body.error ?? t.trade.failed });
+      // The server sends a category alongside the headline when it has one.
+      // "Could not place the order" by itself tells nobody what to do next.
+      setMessage({
+        tone: "bad",
+        text: [body.error ?? t.trade.failed, body.reason].filter(Boolean).join(" "),
+      });
       setReviewing(false);
       return;
     }
@@ -151,9 +158,12 @@ export function Ticket({
     <section className="rounded-xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-medium">{t.trade.title}</h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
           {t.trade.buyingPower}{" "}
           <span className="tabular text-foreground">{money(Number(power))}</span>
+          <Help title={t.help.buyingPower} align="right">
+            {t.help.buyingPowerBody}
+          </Help>
         </p>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{t.trade.subtitle}</p>
@@ -280,8 +290,12 @@ export function Ticket({
           ) : null}
 
           <div className="space-y-1.5">
-            <Label htmlFor="ticket-kind" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="ticket-kind"
+              className="flex items-center gap-1 text-xs text-muted-foreground"
+            >
               {t.trade.orderType}
+              <Help title={t.help.orderKinds}>{t.help.orderKindsBody}</Help>
             </Label>
             <select
               id="ticket-kind"
@@ -373,7 +387,7 @@ const STATUS_TONE: Record<Order["status"], string> = {
 /** What is resting, and what has happened. */
 export function OrderList({
   portfolioSlug,
-  orders,
+  orders: initialOrders,
   canCancel,
   currency,
 }: {
@@ -385,6 +399,69 @@ export function OrderList({
   const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [orders, setOrders] = useState(initialOrders);
+
+  // When the server sends a newer list — after a cancel, a new order, or a
+  // refresh triggered below — that answer wins over anything polled. Adjusted
+  // during render rather than in an effect, which is the pattern React
+  // documents for resetting state when a prop changes: an effect would render
+  // the stale list once before correcting it.
+  const [fromServer, setFromServer] = useState(initialOrders);
+  if (fromServer !== initialOrders) {
+    setFromServer(initialOrders);
+    setOrders(initialOrders);
+  }
+
+  // A server render is a photograph. The page arrives with what was resting
+  // at that instant and then goes quiet, so an order could fill and nothing
+  // on screen would say so until somebody pressed reload.
+  //
+  // While anything is open, this asks again on the market's own cadence —
+  // five seconds in the regular session, thirty in extended hours, never when
+  // the market is shut, because a closed market cannot reach a price. The
+  // request also prices and fills those orders server-side, so watching the
+  // screen is what a broker feels like rather than a polite lie.
+  const anyOpen = orders.some((order) => order.status === "open");
+
+  useEffect(() => {
+    if (!anyOpen) return;
+    const every = quotePollIntervalMs(marketSession());
+    if (every === null) return;
+
+    let stopped = false;
+
+    async function poll() {
+      try {
+        const response = await fetch(
+          `/api/orders?portfolio=${encodeURIComponent(portfolioSlug)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok || stopped) return;
+        const body: { orders?: Order[] } = await response.json();
+        if (!body.orders || stopped) return;
+
+        setOrders((current) => {
+          // Only when something actually happened. A fill changes cash and
+          // holdings, which live on other parts of the page, so the server
+          // components are asked for again — but doing that every five
+          // seconds regardless would re-render the whole screen for nothing.
+          const before = current.map((o) => `${o.id}:${o.status}`).join();
+          const after = body.orders!.map((o) => `${o.id}:${o.status}`).join();
+          if (before !== after) router.refresh();
+          return body.orders!;
+        });
+      } catch {
+        // A dropped poll is not worth showing anybody. The next one is five
+        // seconds away.
+      }
+    }
+
+    const timer = setInterval(() => void poll(), every);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [anyOpen, portfolioSlug, router]);
 
   const open = orders.filter((order) => order.status === "open");
   const past = orders.filter((order) => order.status !== "open");
