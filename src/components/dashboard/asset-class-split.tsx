@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { signClass } from "@/lib/utils";
 import { useT } from "@/lib/i18n/context";
+import { Help } from "@/components/ui/help";
 import type { AssetClassPerformance } from "@/lib/portfolio/options";
 
 /**
@@ -64,8 +65,14 @@ export function AssetClassSplit({ data }: { data: AssetClassPerformance[] }) {
               key={row.key}
               className="rounded-xl border border-border bg-surface p-5"
             >
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {label(row.key)}
+                {/* These two cards and the chart below them answer different
+                    questions, and reading one as the other is how a green
+                    card sits above a red index. This says which is which. */}
+                <Help title={t.performance.sinceStart}>
+                  {t.performance.sinceStartBody}
+                </Help>
               </p>
               <p className={cn("mt-2 text-xl font-semibold tracking-tight", signClass(pnl))}>
                 {formatMoney(row.totalPnL, { signed: true })}

@@ -66,8 +66,11 @@ export default async function PerformancePage({
           {t.performance.title}
           <Help title={t.help.timeWeighted}>{t.help.timeWeightedBody}</Help>
         </h1>
+        {/* The range and the count belong to the section that uses them, and
+            they are stated there. Repeating them here, in a second phrasing,
+            was two answers to one question. */}
         <p className="mt-1 text-sm text-muted-foreground">
-          {t.performance.basedOn} {snapshots.length} {t.performance.snapshots}
+          {t.performance.subtitle}
         </p>
       </header>
       <AssetClassSplit data={portfolio.byAssetClass} />

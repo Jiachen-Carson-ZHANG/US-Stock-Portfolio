@@ -33,6 +33,7 @@ import {
   monthlyReturns,
 } from "@/lib/analysis/math";
 import { compareAll, type BenchmarkSeries } from "@/lib/analysis/benchmarks";
+import { Help } from "@/components/ui/help";
 import {
   CURRENCY_LABEL,
   VIEW_CURRENCIES,
@@ -120,18 +121,36 @@ export function PerformanceExplorer({
     result.gain === null
       ? []
       : [
-          { name: say("Start", "期初"), range: [0, start], amount: start },
+          // Named by what they are, not by where they sit. "Start" read as
+          // "money you have put in", which it is not: it is what the account
+          // was already worth on the first day that has a price, and anything
+          // paid in before that day is inside it.
           {
-            name: say("Net flows", "净转入"),
+            name: say(
+              `Worth on ${first?.snapshotDate ?? ""}`,
+              `${first?.snapshotDate ?? ""} 的价值`,
+            ),
+            range: [0, start],
+            amount: start,
+          },
+          {
+            name: say("Paid in since", "期间转入"),
             range: [Math.min(start, flowEnd), Math.max(start, flowEnd)],
             amount: result.netFlows,
           },
           {
-            name: say("Gain / loss", "投资损益"),
+            name: say("Made or lost", "投资损益"),
             range: [Math.min(flowEnd, end), Math.max(flowEnd, end)],
             amount: result.gain,
           },
-          { name: say("End", "期末"), range: [0, end], amount: end },
+          {
+            name: say(
+              `Worth on ${last?.snapshotDate ?? ""}`,
+              `${last?.snapshotDate ?? ""} 的价值`,
+            ),
+            range: [0, end],
+            amount: end,
+          },
         ];
   /**
    * The same account, seen from each currency somebody actually spends.
@@ -447,10 +466,33 @@ export function PerformanceExplorer({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {first?.snapshotDate ?? "—"} → {last?.snapshotDate ?? "—"} ·{" "}
-          {selected.length} {say("days with a recorded value", "天有记录的估值")}
+      {/* One header line for the section, with the range, the count and the
+          filter together. It used to repeat above and below the cards, in two
+          different phrasings, saying the same thing twice. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <span className="font-medium">{say("Over this period", "所选区间")}</span>
+          <span className="tabular text-muted-foreground">
+            {first?.snapshotDate ?? "—"} → {last?.snapshotDate ?? "—"}
+          </span>
+          <span className="text-muted-foreground">
+            · {selected.length} {say("days priced", "天有估值")}
+          </span>
+          <Help title={say("What these figures cover", "这些数字算的是什么")}>
+            {say(
+              "Money paid in or taken out is removed before the sum, so these show how the investments did rather than how much was added — put in ten thousand and the account gets bigger, not better. Transfers count as arriving at the end of their day. The worst fall is measured between days that were actually priced",
+              "计算前会先把转入转出的钱剔除，所以这些数字反映的是投资做得怎么样，而不是往里放了多少钱——转进一万块，账户变大了，但没有变好。转账按当天收盘时到账。最大回撤只在有估值记录的日子之间衡量",
+            )}
+            {gaps > 0 && (
+              <>
+                {" · "}
+                {say(
+                  `${gaps} weekday${gaps === 1 ? "" : "s"} here has no recorded value, so the line joins straight across, and a fall spanning a gap looks sharper than it was`,
+                  `这段时间有 ${gaps} 个工作日没有记录估值，曲线直接连过去，跨越缺口的下跌看起来会比实际更陡`,
+                )}
+              </>
+            )}
+          </Help>
         </p>
         <div className="flex gap-1" aria-label={say("Period", "期间")}>
           {[
@@ -481,18 +523,6 @@ export function PerformanceExplorer({
       )}
       {!issue && (
         <>
-          <p className="text-xs text-muted-foreground">
-            {say(
-              "Money paid in or taken out is taken out of the sum, so these figures show how the investments did rather than how much was added. Transfers are treated as arriving at the end of the day. The worst fall is measured between days that were actually recorded.",
-              "转入和转出的钱已经被剔除，所以这些数字反映的是投资做得怎么样，而不是往里放了多少钱。转账按当天收盘时到账计算。最大回撤只在有记录的日子之间衡量。",
-            )}
-            {gaps > 0 &&
-              " " +
-                say(
-                  `${gaps} weekday${gaps === 1 ? "" : "s"} in this window has no recorded value, so the line joins straight across them. The daily figures are held back for that reason, and a fall that spans a gap will look sharper than it was.`,
-                  `这段时间里有 ${gaps} 个工作日没有记录估值，曲线在那里是直接连过去的。因此不显示每日统计；跨越缺口的下跌，看起来会比实际更陡。`,
-                )}
-          </p>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               [
