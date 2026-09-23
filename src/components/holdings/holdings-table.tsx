@@ -136,7 +136,7 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
 
   return (
     <div className="space-y-4 px-4 py-3">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
         <div>
           <p className="text-xs text-muted-foreground">
             {Number(group.netCost.amount) >= 0
@@ -170,11 +170,22 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
           <p className="tabular mt-0.5 text-sm font-medium">
             {group.breakEven === null ? "—" : group.breakEven.toFixed(2)}
           </p>
-          {/* Break-even is a share price. On its own it is a number with
-              nothing to compare to, so the share's actual price sits directly
-              under it — above means the spread is in the money. */}
-          <p className="tabular mt-0.5 text-xs text-muted-foreground">
-            {t.position.stockPrice}{" "}
+        </div>
+
+        {/* A field of its own rather than a footnote under break-even. It is
+            the share's own price, not a property of the break-even, and
+            tucking it underneath read as though it were one. Comparing the
+            two is still the point — they sit side by side. */}
+        <div>
+          <p className="text-xs text-muted-foreground">{t.position.stockPrice}</p>
+          <p
+            className={cn(
+              "tabular mt-0.5 text-sm font-medium",
+              group.breakEven !== null &&
+                group.underlyingPrice !== undefined &&
+                signClass(group.underlyingPrice - group.breakEven),
+            )}
+          >
             {group.underlyingPrice === undefined
               ? "—"
               : money(group.underlyingPrice, group.netCost.currency)}
