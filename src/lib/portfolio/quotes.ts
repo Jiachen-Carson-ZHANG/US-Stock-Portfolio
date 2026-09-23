@@ -19,6 +19,19 @@ export type QuoteResult = {
   quotes: Map<string, Quote>;
   /** True when at least one quote came from cache older than its TTL. */
   isStale: boolean;
+  /**
+   * When these prices were last fetched — not when the instruments last
+   * traded.
+   *
+   * This used to be the oldest `data_timestamp` across every symbol held, and
+   * an option that had not traded for days dragged it back with it. The
+   * dashboard then announced "session of 18 Sep" while the market was open on
+   * the 22nd, and, worse, the daily snapshot refused to record because the
+   * timestamp it was handed was not from today — so the performance history
+   * quietly stopped growing. A price that is old because nobody traded it is
+   * not the same thing as data we failed to refresh; `isStale` says the
+   * second, and this says the first.
+   */
   dataTimestamp: string | null;
 };
 
@@ -166,14 +179,14 @@ export async function getQuotes(
   }
 
   const quotes = new Map<string, Quote>();
-  let oldest: string | null = null;
+  let fetchedAt: string | null = null;
 
   for (const symbol of symbols) {
     const row = cached.get(symbol);
     if (!row) continue;
     quotes.set(symbol, toQuote(row));
-    if (!oldest || row.data_timestamp < oldest) oldest = row.data_timestamp;
+    if (!fetchedAt || row.cached_at > fetchedAt) fetchedAt = row.cached_at;
   }
 
-  return { quotes, isStale, dataTimestamp: oldest };
+  return { quotes, isStale, dataTimestamp: fetchedAt };
 }

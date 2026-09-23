@@ -95,6 +95,32 @@ export function marketDateString(now: Date = new Date()): string {
   }).format(now);
 }
 
+/**
+ * The trading day the prices on screen belong to.
+ *
+ * "Today's profit" is measured against a session, and on a Sunday afternoon
+ * the session that produced those numbers was Friday's. Walks back until it
+ * lands on a weekday whose session has at least begun. Market holidays are
+ * not modelled, in keeping with the rest of this file, so a holiday reads as
+ * its own session.
+ */
+export function currentSessionDate(now: Date = new Date()): string {
+  const cursor = new Date(now);
+
+  for (let back = 0; back < 7; back += 1) {
+    const { minutesOfDay, weekday } = marketClock(cursor);
+    if (weekday !== 0 && weekday !== 6 && minutesOfDay >= PRE_MARKET_OPEN) {
+      return marketDateString(cursor);
+    }
+    // Back to the evening of the previous day, which is inside after-hours in
+    // New York whatever the offset, so the check above sees a live session.
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    cursor.setUTCHours(23, 0, 0, 0);
+  }
+
+  return marketDateString(now);
+}
+
 /** True once the regular session has ended for the day (§21 snapshot trigger). */
 export function isAfterMarketClose(now: Date = new Date()): boolean {
   const { minutesOfDay, weekday } = marketClock(now);

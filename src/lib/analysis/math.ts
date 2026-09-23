@@ -40,6 +40,35 @@ function consecutiveWeekdays(from: string, to: string): boolean {
   );
 }
 
+/**
+ * Weekdays inside the window that have no recorded value.
+ *
+ * A time-weighted index chains the moves between the days it has. Miss a run
+ * of days and the chain still joins up, but each remaining link carries more
+ * than one day's movement — so a chart drawn from a patchy history looks
+ * jumpier than the account ever was, and a single missing week around a fall
+ * can make the dip look far deeper than it was.
+ *
+ * Holidays are not modelled, so a market holiday counts as missing. That
+ * over-reports slightly, which is the right direction for a warning.
+ */
+export function missingWeekdays(dates: string[]): number {
+  if (dates.length < 2) return 0;
+
+  const have = new Set(dates);
+  const cursor = new Date(`${dates[0]}T12:00:00Z`);
+  const end = new Date(`${dates[dates.length - 1]}T12:00:00Z`);
+
+  let missing = 0;
+  while (cursor < end) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const day = cursor.getUTCDay();
+    if (day === 0 || day === 6) continue;
+    if (!have.has(cursor.toISOString().slice(0, 10))) missing += 1;
+  }
+  return missing;
+}
+
 /** End-of-day flow convention; never assumes an unreviewed ledger is complete. */
 export function adjustedSeries(
   snapshots: PortfolioSnapshot[],
