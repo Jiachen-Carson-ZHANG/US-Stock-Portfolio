@@ -12,6 +12,7 @@ import {
   Settings,
   Star,
   Table2,
+  MessagesSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -31,6 +32,7 @@ const ITEMS = [
   { href: "/watchlist", key: "watchlist", icon: Star, ownerOnly: false, scoped: false },
   { href: "/portfolios", key: "portfolios", icon: Library, ownerOnly: false, scoped: false },
   { href: "/arena", key: "arena", icon: Trophy, ownerOnly: false, scoped: false },
+  { href: "/playground", key: "playground", icon: MessagesSquare, ownerOnly: false, scoped: false },
   { href: "/account", key: "account", icon: UserRound, ownerOnly: false, scoped: false },
   { href: "/settings", key: "settings", icon: Settings, ownerOnly: true, scoped: false },
 ] as const;
@@ -181,7 +183,10 @@ export function Sidebar({
   const slug = useCurrentSlug(portfolios, defaultSlug);
 
   return (
-    <aside className="hidden w-56 shrink-0 border-r border-border bg-surface md:flex md:flex-col">
+    // Sticky and full height. It used to scroll away with the page, so on a
+    // long holdings table the navigation was somewhere above the top of the
+    // window and getting anywhere meant scrolling back up first.
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-border bg-surface md:flex">
       <div className="flex items-center gap-3 px-5 py-5">
         <BrandMark className="size-9 shrink-0" />
         <div className="min-w-0">
@@ -200,7 +205,7 @@ export function Sidebar({
         </div>
       )}
 
-      <nav className="flex-1 px-3">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3">
         <ul className="space-y-0.5">
           {items.map((item) => (
             <li key={item.key}>
@@ -225,8 +230,10 @@ export function Sidebar({
       </nav>
 
       {/* Language moved to the toolbar at the top of the page; keeping a
-          second copy here would just mean two places to look. */}
-      <div className="space-y-0.5 px-3 pb-4">
+          second copy here would just mean two places to look. Sign out stays
+          here, pinned to the bottom, which is where every other application
+          puts it. */}
+      <div className="mt-auto border-t border-border px-3 py-3">
         {canSignOut && <SignOutButton />}
       </div>
     </aside>
