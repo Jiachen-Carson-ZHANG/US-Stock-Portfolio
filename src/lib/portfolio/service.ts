@@ -319,11 +319,46 @@ async function pricedPositions(portfolioId: string, now: Date): Promise<{
   return { positions, quotes, dataTimestamp, isStale: isStale || brokerStale };
 }
 
+/**
+ * The same answer for everybody looking at the same account.
+ *
+ * Thirty people with the dashboard open is thirty requests every five
+ * seconds, and every one of them was recomputing the identical portfolio
+ * from scratch — the same rows, the same prices, the same arithmetic. They
+ * are all looking at the same account, so there is no reason for more than
+ * one of them to do the work.
+ *
+ * Two seconds, deliberately shorter than the five-second poll, so nobody
+ * ever sees a figure older than they would have seen anyway. What this
+ * removes is duplicated effort, not freshness.
+ */
+const RECOMPUTE_WINDOW_MS = 2_000;
+
+const recent = new Map<string, { at: number; data: Promise<PortfolioData> }>();
+
 export async function loadPortfolio(
   portfolioId: string,
   now: Date = new Date(),
 ): Promise<PortfolioData> {
-  return observe("portfolio.load", null, () => loadPortfolioInner(portfolioId, now));
+  const cached = recent.get(portfolioId);
+  if (cached && Date.now() - cached.at < RECOMPUTE_WINDOW_MS) return cached.data;
+
+  const data = observe("portfolio.load", null, () => loadPortfolioInner(portfolioId, now));
+  recent.set(portfolioId, { at: Date.now(), data });
+
+  // A failure must not be remembered, or one bad moment becomes two seconds
+  // of everybody being handed the same error.
+  data.catch(() => recent.delete(portfolioId));
+
+  // Keyed by portfolio, and there are only ever a handful — but a long-lived
+  // instance should not hold results forever.
+  if (recent.size > 50) {
+    for (const [key, value] of recent) {
+      if (Date.now() - value.at > RECOMPUTE_WINDOW_MS) recent.delete(key);
+    }
+  }
+
+  return data;
 }
 
 async function loadPortfolioInner(

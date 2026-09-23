@@ -4,7 +4,8 @@ import { logger } from "@/lib/logger";
 import { rebuildEveryPortfolio } from "@/app/api/cron/reconstruct/route";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+// The hosting plan caps this at 60 seconds whatever is asked for.
+export const maxDuration = 60;
 
 /**
  * Rebuilding the daily history from the trades, on request.

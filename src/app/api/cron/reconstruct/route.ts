@@ -16,7 +16,9 @@ import { getMarketDataProvider } from "@/providers";
  * Unlike the daily capture it has no deadline: if it fails, the next run
  * rebuilds exactly the same days.
  */
-export const maxDuration = 300;
+// The hosting plan caps a function at 60 seconds and clamps anything
+// higher, so asking for 300 only hid where the real ceiling was.
+export const maxDuration = 60;
 
 function loaderFor(portfolioId: string): PriceLoader {
   return async (symbols, range) => {

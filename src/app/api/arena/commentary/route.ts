@@ -8,7 +8,8 @@ import { ARENA_RULES, buildArenaContext } from "@/lib/arena/context";
 import { writeCommentary } from "@/lib/arena/commentary";
 import { PERIODS, type Period } from "@/lib/arena";
 
-export const maxDuration = 120;
+// The hosting plan caps this at 60 seconds whatever is asked for.
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
