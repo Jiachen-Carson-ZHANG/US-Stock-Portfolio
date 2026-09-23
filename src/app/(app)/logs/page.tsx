@@ -61,8 +61,10 @@ export default async function LogsPage() {
         <p className="mt-1 text-xs text-muted-foreground">
           Median rather than average: one cold start of nine seconds drags an
           average somewhere no request actually was. &ldquo;Database&rdquo; and
-          &ldquo;broker&rdquo; are how much of that time was spent waiting on
-          each; whatever is left over was our own work.
+          &ldquo;broker&rdquo; are the time spent inside calls of each kind —
+          added up across calls, so where several ran at once they can total
+          more than the operation itself took, and that is the point: it says
+          the waiting was overlapped rather than serial.
         </p>
 
         {paths.length === 0 ? (
