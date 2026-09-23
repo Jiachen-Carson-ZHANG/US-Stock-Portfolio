@@ -61,6 +61,20 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  return Response.json({ results: await rebuildEveryPortfolio() });
+}
+
+/**
+ * The rebuild itself, with no opinion about who asked for it.
+ *
+ * Two callers: the monthly scheduler above, which carries a shared secret,
+ * and an owner pressing a button in settings, which carries a session. The
+ * work is identical and lives here rather than being duplicated or, worse,
+ * having the button hold a copy of the secret.
+ */
+export async function rebuildEveryPortfolio(): Promise<
+  { slug: string; written: number; days: number; refusals: string[] }[]
+> {
   const db = await getDb();
   const results: {
     slug: string;
@@ -111,5 +125,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return Response.json({ results });
+  return results;
 }

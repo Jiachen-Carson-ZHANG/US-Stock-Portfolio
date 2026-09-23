@@ -190,3 +190,49 @@ export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
     </ul>
   );
 }
+
+/**
+ * Rebuilding the daily history from the trades.
+ *
+ * A day is only recorded if something captured it that evening, so a
+ * deployment that was down, or a bug in the capture, leaves a hole. Nothing
+ * is lost when that happens — every day can be re-derived from the fills —
+ * but "later" has to actually happen, and this is later.
+ */
+export function RebuildHistory() {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function rebuild() {
+    setPending(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/rebuild", { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage(data.error ?? "The rebuild could not finish.");
+        return;
+      }
+      setMessage(
+        data.written === 0
+          ? "Nothing to add — every day was already recorded."
+          : `Rebuilt ${data.written} ${data.written === 1 ? "day" : "days"}.`,
+      );
+      router.refresh();
+    } catch {
+      setMessage("The rebuild could not be reached.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="outline" onClick={rebuild} disabled={pending}>
+        {pending ? "Rebuilding…" : "Rebuild history from trades"}
+      </Button>
+      {message && <p className="text-sm text-muted-foreground">{message}</p>}
+    </div>
+  );
+}
