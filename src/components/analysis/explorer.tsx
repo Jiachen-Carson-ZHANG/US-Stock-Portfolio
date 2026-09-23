@@ -159,11 +159,16 @@ export function PerformanceExplorer({
       return [
         {
           code,
+          startRate,
+          endRate,
+          ratePercent: startRate === 0 ? 0 : ((endRate - startRate) / startRate) * 100,
           startValue: start * startRate,
           endValue: end * endRate,
-          investment: parts.investment,
-          currency: parts.currency,
-          total: parts.total,
+          // What the rate move alone did to the money. The other half of the
+          // old table — the dollar change converted — was labelled "from the
+          // investments" and was not: it included every deposit. One column
+          // that means one thing beats two that need a paragraph.
+          fromRate: parts.currency,
         },
       ];
     });
@@ -778,8 +783,12 @@ export function PerformanceExplorer({
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
           {say(
-            "The account holds US dollars, but not everybody spends them. Each row is the same account seen from a different currency, and splits the change into two parts: what the investments did, and what the exchange rate did. Note this counts money paid in and taken out as well, so it is the change in what the account is worth, not a return.",
-            "账户里是美元，但不是每个人都花美元。每一行都是同一个账户换成另一种货币来看，并把变化拆成两部分：投资本身赚了多少，汇率又让它变了多少。注意这里也包含转入转出，所以这是账户价值的变化，不是收益率。",
+            "The account holds US dollars, but not everybody spends them. Each row is one dollar in that currency at the start and at the end, with what the whole account was worth at that rate underneath.",
+            "账户里是美元，但不是每个人都花美元。每一行是一美元在期初和期末分别值多少，下面灰色的是按该汇率折算的整个账户价值。",
+          )}{" "}
+          {say(
+            "The last column is the exchange rate on its own: how far it moved, and what that alone did to the money — nothing to do with how the investments went. A rate that weakens can take money away from a yuan holder in a year the account did well, and that is the thing worth seeing.",
+            "最后一列只讲汇率本身：它变动了多少，以及仅仅因为这个变动，这笔钱多了或少了多少——与投资做得好不好无关。即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截，这正是值得看清楚的地方。",
           )}{" "}
           {say("Rates: European Central Bank daily reference rates.", "汇率来源：欧洲央行每日参考汇率。")}
         </p>
@@ -792,42 +801,59 @@ export function PerformanceExplorer({
                     {say("Currency", "货币")}
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
-                    {say("Start", "期初")}
+                    {say("Rate at the start", "期初汇率")}
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
-                    {say("End", "期末")}
+                    {say("Rate at the end", "期末汇率")}
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
-                    {say("From the investments", "投资带来的")}
-                  </th>
-                  <th scope="col" className="py-2 text-right font-medium">
-                    {say("From the exchange rate", "汇率带来的")}
-                  </th>
-                  <th scope="col" className="py-2 text-right font-medium">
-                    {say("Total change", "合计变化")}
+                    {say("What the rate move did", "汇率变动的影响")}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {currencyViews.map((view) => (
                   <tr key={view.code} className="border-b border-border last:border-0">
-                    <th scope="row" className="py-2 text-left font-medium">
+                    <th scope="row" className="py-2.5 text-left font-medium">
                       {zh ? CURRENCY_LABEL[view.code].zh : CURRENCY_LABEL[view.code].en}
                     </th>
-                    <td className="tabular py-2 text-right text-muted-foreground">
-                      {fmt(view.startValue, view.code)}
+
+                    {/* The rate is the figure that belongs to the currency, so
+                        it leads. The amount underneath is what the account was
+                        worth at that rate. */}
+                    <td className="py-2.5 text-right">
+                      <span className="tabular block font-medium">
+                        {view.code === "USD" ? "—" : view.startRate.toFixed(4)}
+                      </span>
+                      <span className="tabular block text-xs text-muted-foreground">
+                        {fmt(view.startValue, view.code)}
+                      </span>
                     </td>
-                    <td className="tabular py-2 text-right">{fmt(view.endValue, view.code)}</td>
-                    <td className="tabular py-2 text-right">
-                      {fmt(view.investment, view.code)}
+
+                    <td className="py-2.5 text-right">
+                      <span className="tabular block font-medium">
+                        {view.code === "USD" ? "—" : view.endRate.toFixed(4)}
+                      </span>
+                      <span className="tabular block text-xs text-muted-foreground">
+                        {fmt(view.endValue, view.code)}
+                      </span>
                     </td>
-                    <td className="tabular py-2 text-right">
-                      {view.code === "USD" ? "—" : fmt(view.currency, view.code)}
-                    </td>
-                    <td
-                      className={`tabular py-2 text-right font-medium ${view.total >= 0 ? "text-positive" : "text-negative"}`}
-                    >
-                      {fmt(view.total, view.code)}
+
+                    <td className="py-2.5 text-right">
+                      {view.code === "USD" ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <>
+                          <span
+                            className={`tabular block font-medium ${view.fromRate >= 0 ? "text-positive" : "text-negative"}`}
+                          >
+                            {pct(view.ratePercent)}
+                          </span>
+                          <span className="tabular block text-xs text-muted-foreground">
+                            {fmt(view.fromRate, view.code)}
+                          </span>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
