@@ -1,5 +1,7 @@
 import type { DB } from "@/lib/db";
 import { dedupe } from "@/lib/inflight";
+import { logger } from "@/lib/logger";
+import { recordFailure } from "@/lib/observe";
 import type { Quote } from "@/types/market";
 import type { MarketDataProvider } from "@/providers/market-data/types";
 
@@ -190,8 +192,14 @@ export async function getQuotes(
           cached_at: now.toISOString(),
         });
       }
-    } catch {
+    } catch (error) {
       isStale = cached.size > 0;
+      // Handled, so nothing upstream throws and nothing upstream would record
+      // it — which is how "live data temporarily unavailable" appeared on
+      // screen with no trace anywhere of why. It leaves a trace now.
+      const reason = error instanceof Error ? error.message : "unknown";
+      logger.warn("quotes.fetch_failed", { symbols: expired.length, reason });
+      void recordFailure("quotes.fetch", reason).catch(() => {});
     }
   }
 

@@ -407,6 +407,7 @@ balance. That is enforced by the data type, not by the template.
 | `POST /api/cron/snapshot` | daily, after the close | records the day for every portfolio |
 | `POST /api/cron/reconstruct` | monthly | rebuilds all history from fills; the backstop for days nobody was there to capture |
 | `GET /api/cron/orders` | every minute while the market is open | fills resting orders on the practice accounts |
+| `GET /api/cron/quotes` | every minute | refreshes the shared price cache so no page load has to |
 
 All three take `Authorization: Bearer $SNAPSHOT_CRON_SECRET`. The first two
 are not required for correctness — history can always be re-derived — but
@@ -434,7 +435,19 @@ does; the whole setup is five fields:
    header is wrong; `503` means `SNAPSHOT_CRON_SECRET` is not set on the
    deployment.
 
-The same scheduler can drive the other two jobs on their own schedules.
+Add a second job the same way for `/api/cron/quotes`, also every minute. It
+decides for itself whether there is anything to do: at most once a minute
+during the regular session, at most once every half hour in pre-market and
+after hours, and nothing at all when the market is shut. Guarding the cadence
+in the endpoint rather than trusting the scheduler means a misconfigured
+pinger costs one cheap query rather than a rate-limit ban.
+
+It fetches one price per name across every account, not one per portfolio:
+ten people holding NVDA cost one NVDA quote. Holdings are deliberately not
+refreshed on a timer — what somebody owns changes when they trade, is private
+to them, and is picked up when they open their own page.
+
+The same scheduler can drive the other jobs on their own schedules.
 
 ### Where the functions run
 

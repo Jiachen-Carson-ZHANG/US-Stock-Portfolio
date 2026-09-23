@@ -127,6 +127,18 @@ async function record(
   }
 }
 
+/**
+ * Records something that went wrong without wrapping a call around it.
+ *
+ * For failures that are handled rather than thrown — a price feed that did
+ * not answer, where the page carries on with the last known prices. Nothing
+ * upstream sees an error, so nothing upstream would record one, and the
+ * symptom people report ("it says unavailable") would have no trace at all.
+ */
+export async function recordFailure(path: string, detail: string): Promise<void> {
+  await record(path, null, 0, { db: 0, broker: 0 }, "error", detail.slice(0, 300));
+}
+
 /** Below this, a request is simply fine and not worth a row. */
 export const SLOW_ENOUGH_MS = 400;
 

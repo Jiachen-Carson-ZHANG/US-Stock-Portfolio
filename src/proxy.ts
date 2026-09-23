@@ -13,6 +13,7 @@ const PUBLIC_PATHS = new Set([
   "/api/cron/snapshot",
   "/api/cron/reconstruct",
   "/api/cron/orders",
+  "/api/cron/quotes",
   "/api/health",
 ]);
 
