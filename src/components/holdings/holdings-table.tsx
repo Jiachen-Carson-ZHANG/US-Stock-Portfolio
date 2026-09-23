@@ -190,6 +190,19 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
               ? "—"
               : money(group.underlyingPrice, group.netCost.currency)}
           </p>
+          {/* Where the share was when these contracts were bought. The price
+              now means little on its own: "236 today" and "198 when you
+              bought a 200 strike" together say that the move being bet on has
+              already happened. */}
+          {group.underlyingCostPrice !== undefined && (
+            <p
+              className="tabular mt-0.5 text-xs text-muted-foreground"
+              title={t.position.stockPriceWhenBought}
+            >
+              {money(group.underlyingCostPrice, group.netCost.currency)}{" "}
+              {t.position.whenBought}
+            </p>
+          )}
         </div>
       </div>
 

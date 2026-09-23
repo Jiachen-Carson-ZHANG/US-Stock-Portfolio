@@ -246,6 +246,12 @@ export type OptionGroupDTO = {
    */
   underlyingPrice?: number;
   /**
+   * Where the share was when these contracts were bought, weighted by how
+   * many were bought each day. Together with the price now it says whether
+   * the move being bet on has already happened.
+   */
+  underlyingCostPrice?: number;
+  /**
    * What each leg cost per contract, keyed by its symbol. Derived here rather
    * than in the table because the broker's own average cost nets realized
    * proceeds into itself and can come back negative; `costBasis` already
@@ -259,9 +265,11 @@ export function toOptionGroupDTO(
   group: OptionGroup,
   investedTotal: Money,
   underlyingPrice?: number,
+  underlyingCostPrice?: number,
 ): OptionGroupDTO {
   return {
     underlyingPrice,
+    underlyingCostPrice,
     legCost: Object.fromEntries(
       group.legs.map((leg) => {
         const units = contractMultiplier(leg).times(Math.abs(leg.quantity));
