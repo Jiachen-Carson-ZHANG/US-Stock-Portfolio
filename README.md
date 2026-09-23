@@ -419,9 +419,22 @@ that is all a simple uptime pinger sends, it does nothing when the market is
 shut, and it touches only the accounts that actually have an order open.
 
 Vercel's own cron runs once a day on the free plan, which is no use here, so
-use any external scheduler that can send a header — cron-job.org is free and
-does. Point it at `https://<your-site>/api/cron/orders` every minute with
-`Authorization: Bearer <SNAPSHOT_CRON_SECRET>`.
+use any external scheduler that can send a header. cron-job.org is free and
+does; the whole setup is five fields:
+
+1. Sign up at cron-job.org and choose **Create cronjob**.
+2. **URL**: `https://<your-site>/api/cron/orders`
+3. **Schedule**: every 1 minute. (Every 5 is fine too — it only changes how
+   quickly a touched limit turns into a fill.)
+4. **Advanced → Headers**, add one:
+   `Authorization: Bearer <the value of SNAPSHOT_CRON_SECRET>`
+5. Save, then press **Test run**. A working setup answers
+   `{"matched":true,...}` during market hours and
+   `{"matched":false,"reason":"Market closed"}` outside them. `401` means the
+   header is wrong; `503` means `SNAPSHOT_CRON_SECRET` is not set on the
+   deployment.
+
+The same scheduler can drive the other two jobs on their own schedules.
 
 ### Where the functions run
 
