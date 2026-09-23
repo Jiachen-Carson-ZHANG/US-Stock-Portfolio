@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireOwner } from "@/lib/auth/guards";
 import { requirePortfolio } from "@/lib/portfolios/context";
 import { getDb } from "@/lib/db";
@@ -98,6 +99,12 @@ export default async function SettingsPage({
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner only.</p>
+        <Link
+          href="/logs"
+          className="mt-2 inline-block text-sm underline underline-offset-4"
+        >
+          Speed and activity logs
+        </Link>
       </header>
 
       {outcome && (

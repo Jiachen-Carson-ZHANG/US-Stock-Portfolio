@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { timed } from "@/lib/observe/span";
 import { ensureDefaultPortfolio } from "@/lib/portfolios";
 import { toPositionalParams } from "./sql";
 
@@ -400,6 +401,45 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_pair
 CREATE INDEX IF NOT EXISTS idx_subscription_subject
   ON subscriptions(subject_id);
 
+-- How long things took, and what went wrong.
+--
+-- Written for every server render and every API call. "The site feels slow"
+-- is not something that can be argued with or fixed; "the performance page
+-- spends 4.2 seconds of its 4.8 in the broker" is both. Kept small on
+-- purpose: a path, a duration, a rough breakdown, and an outcome. No request
+-- bodies, no query strings, no headers — nothing that could carry somebody's
+-- data into a log an administrator reads.
+CREATE TABLE IF NOT EXISTS request_timings (
+  id          TEXT PRIMARY KEY,
+  path        TEXT NOT NULL,
+  user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  username    TEXT,
+  ms          INTEGER NOT NULL,
+  -- Where the time went, as far as the code can tell: database, broker and
+  -- any other outbound call.
+  db_ms       INTEGER,
+  broker_ms   INTEGER,
+  outcome     TEXT NOT NULL,
+  detail      TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_timings_recent ON request_timings(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_timings_path ON request_timings(path, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_timings_slow ON request_timings(ms DESC);
+
+-- Daily series that change once a day and cost a network call each.
+--
+-- The benchmark closes and the exchange rates are published once per day, so
+-- fetching them on every page load spent four outbound calls to learn nothing
+-- new — and made the performance page fail outright when one of them was
+-- slow. Stored whole, under a key that already describes the window asked
+-- for, so a changed date range simply misses and fetches.
+CREATE TABLE IF NOT EXISTS series_cache (
+  key        TEXT PRIMARY KEY,
+  payload    TEXT NOT NULL,
+  fetched_at TEXT NOT NULL
+);
+
 
 -- The playground: one table for the whole room.
 --
@@ -475,21 +515,25 @@ function sslOption(url: string) {
 function wrap(runner: {
   query: (text: string, values?: unknown[]) => Promise<{ rows: unknown[]; rowCount: number | null }>;
 }): Omit<DB, "transaction"> {
+  // Every statement is timed into the current request's budget, so a slow
+  // page can say how much of itself was the database rather than leaving
+  // somebody to guess. Outside a request the timer is absent and this costs
+  // one null check.
   return {
     async get<T>(sql: string, params: unknown[] = []): Promise<T | undefined> {
-      const result = await runner.query(toPositionalParams(sql), params);
+      const result = await timed("db", () => runner.query(toPositionalParams(sql), params));
       return result.rows[0] as T | undefined;
     },
     async all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-      const result = await runner.query(toPositionalParams(sql), params);
+      const result = await timed("db", () => runner.query(toPositionalParams(sql), params));
       return result.rows as T[];
     },
     async run(sql: string, params: unknown[] = []): Promise<RunResult> {
-      const result = await runner.query(toPositionalParams(sql), params);
+      const result = await timed("db", () => runner.query(toPositionalParams(sql), params));
       return { changes: result.rowCount ?? 0 };
     },
     async exec(sql: string): Promise<void> {
-      await runner.query(sql);
+      await timed("db", () => runner.query(sql));
     },
   };
 }

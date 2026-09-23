@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { timed } from "@/lib/observe/span";
 import { dedupe } from "@/lib/inflight";
 import { logger } from "@/lib/logger";
 import { MOOMOO_API_BASE, refreshAccessToken, assertReadOnlyScope } from "./oauth";
@@ -96,14 +97,19 @@ async function accessToken(portfolioId: string): Promise<string> {
 }
 
 async function call(path: string, init: RequestInit, token: string) {
-  return fetch(`${MOOMOO_API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
+  // Charged to the request's broker budget. This is the line that turns "the
+  // page is slow" into "the page waited 4.2 seconds on moomoo", which is the
+  // difference between a complaint and a fix.
+  return timed("broker", () =>
+    fetch(`${MOOMOO_API_BASE}${path}`, {
+      ...init,
+      headers: {
+        ...(init.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    }),
+  );
 }
 
 /**

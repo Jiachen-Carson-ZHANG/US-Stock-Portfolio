@@ -1,4 +1,5 @@
 import "server-only";
+import { observe } from "@/lib/observe";
 import { getDb, type DB } from "@/lib/db";
 import { dedupe } from "@/lib/inflight";
 import { DEFAULT_SLUG, findById, listPortfolios, type Portfolio } from "@/lib/portfolios";
@@ -299,6 +300,13 @@ export async function loadPortfolio(
   portfolioId: string,
   now: Date = new Date(),
 ): Promise<PortfolioData> {
+  return observe("portfolio.load", null, () => loadPortfolioInner(portfolioId, now));
+}
+
+async function loadPortfolioInner(
+  portfolioId: string,
+  now: Date,
+): Promise<PortfolioData> {
   const currency = baseCurrency();
   const db = await getDb();
   const portfolio = await findById(db, portfolioId);
@@ -445,6 +453,18 @@ const TRANSACTION_TTL_MS = 15 * 60_000;
 export async function loadTransactions(
   portfolioId: string,
   now: Date = new Date(),
+): Promise<{
+  transactions: StoredTransaction[];
+  totals: TransactionTotals;
+}> {
+  return observe("portfolio.transactions", null, () =>
+    loadTransactionsInner(portfolioId, now),
+  );
+}
+
+async function loadTransactionsInner(
+  portfolioId: string,
+  now: Date,
 ): Promise<{
   transactions: StoredTransaction[];
   totals: TransactionTotals;
