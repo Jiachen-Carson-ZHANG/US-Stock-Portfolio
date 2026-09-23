@@ -95,9 +95,40 @@ export function MoomooConnection({ connected, portfolioSlug }: { connected: bool
   );
 }
 
-export function UserRows({ users }: { users: AdminUser[] }) {
+export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, string>>({});
+
+  /**
+   * Removing an account made while setting things up.
+   *
+   * Confirmed here and refused again on the server for an owner, for yourself,
+   * and for anyone holding a portfolio that follows a real brokerage account.
+   */
+  async function remove(user: AdminUser) {
+    if (
+      !window.confirm(
+        `Remove @${user.username}? Their practice portfolio, posts and history go with them, and this cannot be undone.`,
+      )
+    )
+      return;
+
+    setBusy(user.id);
+    const response = await fetch("/api/admin/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setBusy(null);
+
+    if (!response.ok) {
+      setDone((current) => ({ ...current, [user.id]: data.error ?? "Could not remove." }));
+      return;
+    }
+    router.refresh();
+  }
 
   async function revoke(user: AdminUser) {
     setBusy(user.id);
@@ -143,6 +174,17 @@ export function UserRows({ users }: { users: AdminUser[] }) {
           >
             {busy === user.id ? "Revoking…" : "Revoke sessions"}
           </Button>
+
+          {user.role !== "owner" && user.id !== me && (
+            <button
+              type="button"
+              onClick={() => void remove(user)}
+              disabled={busy === user.id}
+              className="text-xs text-muted-foreground hover:text-negative disabled:opacity-50"
+            >
+              Remove
+            </button>
+          )}
         </li>
       ))}
     </ul>

@@ -20,6 +20,7 @@ export type ActivityKind =
   | "mock_trade"
   | "account_approve"
   | "account_decline"
+  | "account_remove"
   | "playground_post"
   | "playground_reply";
 

@@ -68,7 +68,7 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<{ moomoo?: string }>;
 }) {
-  await requireOwner();
+  const me = await requireOwner();
   const { portfolio } = await requirePortfolio();
 
   const provider = await activeProvider(portfolio.id);
@@ -212,6 +212,7 @@ export default async function SettingsPage({
           Revoking sessions signs that person out on every device.
         </p>
         <UserRows
+          me={me.id}
           users={users.map((user) => ({
             id: user.id,
             username: user.username,
