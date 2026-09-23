@@ -1,5 +1,6 @@
 import { recordActivity } from "@/lib/activity";
 import { getDb } from "@/lib/db";
+import { notifyFollowers } from "@/lib/feed";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logger } from "@/lib/logger";
 import {
@@ -95,6 +96,26 @@ export async function POST(request: Request) {
         result.filled ? ` filled at ${result.order.fillPrice}` : " resting"
       }`,
     });
+
+    // Only reaches followers who could already open this portfolio. Following
+    // somebody is not a way past the access rule, and it is checked when the
+    // message is sent rather than when it is read.
+    await notifyFollowers(db, {
+      subjectId: context.user.id,
+      kind: "feed_trade",
+      title: `${context.user.displayName} ${
+        result.filled
+          ? parsed.data.side === "buy"
+            ? "bought"
+            : "sold"
+          : "placed an order for"
+      } ${symbol}`,
+      body: `${parsed.data.side} ${parsed.data.quantity}${
+        result.filled ? ` · filled at ${result.order.fillPrice}` : " · resting"
+      }`,
+      link: `/${context.portfolio.slug}`,
+      portfolioId: context.portfolio.id,
+    }).catch(() => {});
 
     return Response.json({
       order: result.order,

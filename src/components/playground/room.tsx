@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
 import { cn, signClass } from "@/lib/utils";
+import { FollowButton } from "@/components/feed/follow";
 import type { Horizon, Post } from "@/lib/playground";
 
 type Prices = Record<string, { price: number; changePercent: number }>;
@@ -37,10 +38,13 @@ export function Playground({
   threads,
   prices,
   me,
+  following = [],
 }: {
   threads: Post[];
   prices: Prices;
   me: { id: string; isAdministrator: boolean };
+  /** Ids of the people this reader already follows. */
+  following?: string[];
 }) {
   const t = useT();
   const router = useRouter();
@@ -104,6 +108,7 @@ export function Playground({
     router.refresh();
   }
 
+  const follows = new Set(following);
   const shown = filter ? threads.filter((thread) => thread.horizon === filter) : threads;
 
   function Ticker({ value }: { value: string }) {
@@ -251,6 +256,16 @@ export function Playground({
                     <Trash2 className="size-3.5" aria-hidden="true" />
                     {t.playground.remove}
                   </button>
+                )}
+                {/* Where following actually belongs: next to somebody whose
+                    reasoning you just read and want to hear more of. */}
+                {thread.userId !== me.id && (
+                  <span className="ml-auto">
+                    <FollowButton
+                      userId={thread.userId}
+                      initiallyFollowing={follows.has(thread.userId)}
+                    />
+                  </span>
                 )}
               </div>
 

@@ -5,6 +5,8 @@ import { getDb } from "@/lib/db";
 import { directoryFor } from "@/lib/portfolios";
 import { serverDictionary } from "@/lib/i18n/server";
 import { Badge } from "@/components/ui/misc";
+import { FollowButton } from "@/components/feed/follow";
+import { following } from "@/lib/feed";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,12 @@ export const dynamic = "force-dynamic";
 export default async function PortfolioDirectoryPage() {
   const user = await requireUser();
   const { t } = await serverDictionary();
-  const entries = await directoryFor(await getDb(), user);
+  const db = await getDb();
+  const [entries, followed] = await Promise.all([
+    directoryFor(db, user),
+    following(db, user.id),
+  ]);
+  const follows = new Set(followed);
 
   return (
     <div className="space-y-6">
@@ -45,6 +52,13 @@ export default async function PortfolioDirectoryPage() {
                 {t.directory.ownedBy} {entry.ownerName ?? t.directory.nobody}
               </p>
             </div>
+
+            {entry.ownerUserId && entry.ownerUserId !== user.id && (
+              <FollowButton
+                userId={entry.ownerUserId}
+                initiallyFollowing={follows.has(entry.ownerUserId)}
+              />
+            )}
 
             {entry.readable ? (
               <Link

@@ -1,6 +1,7 @@
 import { recordActivity } from "@/lib/activity";
 import { getCurrentUser, unauthorized } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { notifyFollowers } from "@/lib/feed";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { addPost, PostError, readRoom, removePost, type Horizon } from "@/lib/playground";
 import { playgroundPostSchema } from "@/lib/schemas";
@@ -52,6 +53,19 @@ export async function POST(request: Request) {
       kind: parsed.data.parentId ? "playground_reply" : "playground_post",
       target: post.symbol ?? "playground",
     });
+
+    // The playground is a room everyone is already in, so a post carries no
+    // portfolio to check against — following somebody is simply asking to be
+    // told when they say something.
+    await notifyFollowers(db, {
+      subjectId: user.id,
+      kind: "feed_post",
+      title: parsed.data.parentId
+        ? `${user.displayName} replied in the playground`
+        : `${user.displayName} posted in the playground`,
+      body: post.symbol ? `${post.symbol} · ${post.body}` : post.body,
+      link: "/playground",
+    }).catch(() => {});
 
     return Response.json({ post });
   } catch (error) {
