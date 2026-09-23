@@ -71,6 +71,8 @@ export function PayoffExplorer({
   const [premiums, setPremiums] = useState<Record<string, string>>({});
   const [fees, setFees] = useState("0");
   const [price, setPrice] = useState<number | null>(null);
+  /** How many days from now to value the position at. 0 is today. */
+  const [daysAhead, setDaysAhead] = useState(0);
   if (!keys.length) return null;
   const chosen = options.filter(
     (p) => `${p.underlyingSymbol}|${p.expirationDate}|${p.currency}` === group,
@@ -167,21 +169,54 @@ export function PayoffExplorer({
   const hasToday =
     valid && spot > 0 && years > 0 && pricedLegs.every((leg) => leg.vol !== null);
 
+  const daysLeft = Math.round(years * 365.25);
+
+  /**
+   * Time left once the clock has been wound forward.
+   *
+   * The slider moves the valuation date, not the expiry. At zero it is today;
+   * at the far end there is nothing left and the curve lands exactly on the
+   * expiry line — which is the point being made. Waiting is not free, and the
+   * only way to see what it costs is to watch the curve fall towards the
+   * kinked line underneath it.
+   */
+  const daysRemaining = Math.max(0, daysLeft - daysAhead);
+  const yearsRemaining = Math.max(0, years - daysAhead / 365.25);
+
+  /** A few dates in between, so the decay is visible without moving anything. */
+  const STEPS = hasToday && daysLeft > 14
+    ? [0.66, 0.33].map((share) => ({
+        years: years * share,
+        days: Math.round(daysLeft * share),
+      }))
+    : [];
+
   const curve = valid
     ? Array.from({ length: 61 }, (_, i) => {
         const at = (anchor * 2 * i) / 60;
-        return {
+        const point: Record<string, number | null> = {
           price: at,
           pnl: expirationPayoff(legs, at, Number(fees)),
-          today: hasToday ? valueToday(pricedLegs, at, years, RATE, Number(fees)) : null,
+          today: hasToday
+            ? valueToday(pricedLegs, at, yearsRemaining, RATE, Number(fees))
+            : null,
         };
+        STEPS.forEach((step, index) => {
+          point[`step${index}`] = valueToday(
+            pricedLegs,
+            at,
+            step.years,
+            RATE,
+            Number(fees),
+          );
+        });
+        return point;
       })
     : [];
 
   const todayNow = hasToday
-    ? valueToday(pricedLegs, scenario, years, RATE, Number(fees))
+    ? valueToday(pricedLegs, scenario, yearsRemaining, RATE, Number(fees))
     : null;
-  const daysLeft = Math.round(years * 365.25);
   const money = (n: number) =>
     new Intl.NumberFormat(zh ? "zh-CN" : "en-US", {
       style: "currency",
@@ -194,8 +229,8 @@ export function PayoffExplorer({
       </h2>
       <p className="text-xs text-muted-foreground">
         {say(
-          "Two lines, and the difference between them is the point. The solid one is what you keep if you hold to the last day. The dashed one is what you could sell for today at that share price, which is higher wherever there is still time left — an option that has not expired is worth more than what it would pay out right now, and selling early gets that extra back.",
-          "两条线，它们之间的差距才是重点。实线是持有到最后一天你能拿到的钱。虚线是在那个股价下今天就卖掉能拿到的钱；只要还有时间没走完，虚线就更高——没到期的期权，价值高于它现在能兑现的金额，提前卖出就能把这部分拿回来。",
+          "The solid line is what you keep if you hold to the last day. The dashed line is what you could sell for instead, and the gap between them is the time value — the extra somebody will pay for the chance that it keeps going. That gap shrinks every day and is zero at expiry, which is what the faint lines behind show. Drag the time slider to watch it go.",
+          "实线是持有到最后一天你能拿到的钱。虚线是提前卖出能拿到的钱，两者之间的差距就是时间价值——别人愿意为「后面还有机会」多付的那部分。这个差距每天都在缩小，到期时归零，背后几条浅色的线画的就是这个过程。拖动时间滑块可以看到它一点点消失。",
         )}
       </p>
       <p className="text-xs text-muted-foreground">
@@ -334,6 +369,36 @@ export function PayoffExplorer({
           onChange={(e) => setPrice(Number(e.target.value))}
         />
       </label>
+
+      {/* The second dimension. A payoff chart answers "what if the share
+          moves"; this answers "what if it does not", which is the question
+          that costs people money. Drag it to expiry and the curve settles
+          exactly onto the kinked line. */}
+      {hasToday && daysLeft > 0 && (
+        <label className="block text-sm">
+          {say("Valued in", "假设经过")}{" "}
+          <strong>
+            {daysAhead === 0
+              ? say("today", "0 天（今天）")
+              : `${daysAhead} ${say("days from now", "天后")}`}
+          </strong>{" "}
+          <span className="text-muted-foreground">
+            ·{" "}
+            {daysRemaining === 0
+              ? say("expiry day", "到期当天")
+              : say(`${daysRemaining} days still to run`, `还剩 ${daysRemaining} 天`)}
+          </span>
+          <input
+            className="mt-3 block w-full accent-[var(--accent)]"
+            type="range"
+            min="0"
+            max={daysLeft}
+            step="1"
+            value={daysAhead}
+            onChange={(e) => setDaysAhead(Number(e.target.value))}
+          />
+        </label>
+      )}
       {valid ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -348,7 +413,12 @@ export function PayoffExplorer({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">
-              {say("If sold today at that price", "在那个股价下今天卖出")}
+              {daysAhead === 0
+                ? say("If sold today at that price", "在那个股价下今天卖出")
+                : say(
+                    `If sold in ${daysAhead} days at that price`,
+                    `${daysAhead} 天后在那个股价下卖出`,
+                  )}
             </p>
             <output
               className={`block text-2xl font-semibold ${todayNow === null ? "text-muted-foreground" : todayNow < 0 ? "text-negative" : "text-positive"}`}
@@ -395,12 +465,34 @@ export function PayoffExplorer({
                 dot={false}
                 isAnimationActive={false}
               />
+              {/* The faint curves are the same position at a third and two
+                  thirds of the way to expiry. Seeing them stacked is the
+                  clearest statement of time decay there is: the same share
+                  price is worth less every month you wait. */}
+              {STEPS.map((step, index) => (
+                <Line
+                  key={step.days}
+                  dataKey={`step${index}`}
+                  name={say(`${step.days} days left`, `还剩 ${step.days} 天`)}
+                  type="monotone"
+                  stroke={seriesColor(1)}
+                  strokeOpacity={0.3}
+                  strokeWidth={1}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              ))}
               {hasToday && (
                 <Line
                   dataKey="today"
-                  name={say("Sold today", "今天卖出")}
+                  name={
+                    daysAhead === 0
+                      ? say("Sold today", "今天卖出")
+                      : say(`Sold in ${daysAhead} days`, `${daysAhead} 天后卖出`)
+                  }
                   type="monotone"
                   stroke={seriesColor(1)}
+                  strokeWidth={2}
                   strokeDasharray="5 4"
                   dot={false}
                   isAnimationActive={false}

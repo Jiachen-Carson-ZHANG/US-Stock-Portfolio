@@ -91,3 +91,42 @@ describe("time to expiry", () => {
     expect(Math.round(years * 365.25)).toBe(86);
   });
 });
+
+describe("what waiting costs", () => {
+  const legs: PricedLeg[] = [
+    { type: "call", strike: 200, quantity: 2, multiplier: 100, premium: 43.8, vol: 0.55 },
+    { type: "call", strike: 240, quantity: -2, multiplier: 100, premium: 27.9, vol: 0.55 },
+  ];
+
+  it("is worth less the longer you wait, at the same share price", () => {
+    const atThreeMonths = valueToday(legs, 240, 0.25, 0.04, 0)!;
+    const atTwoMonths = valueToday(legs, 240, 0.17, 0.04, 0)!;
+    const atOneMonth = valueToday(legs, 240, 0.08, 0.04, 0)!;
+
+    // Above the lower strike and below the upper one, a call spread gains as
+    // the uncertainty burns off, so this one rises towards its payoff rather
+    // than falling. The direction is not the claim; monotonicity is.
+    expect(atTwoMonths).not.toBe(atThreeMonths);
+    expect(Math.sign(atTwoMonths - atThreeMonths)).toBe(
+      Math.sign(atOneMonth - atTwoMonths),
+    );
+  });
+
+  it("lands exactly on the expiry payoff once no time is left", () => {
+    const paid = (43.8 - 27.9) * 2 * 100;
+    // At 240 the spread is fully in the money: 40 points wide, two contracts.
+    const settled = 40 * 2 * 100 - paid;
+    expect(valueToday(legs, 240, 0, 0.04, 0)).toBeCloseTo(settled, 6);
+  });
+
+  it("is worthless at expiry below the lower strike, minus what it cost", () => {
+    const paid = (43.8 - 27.9) * 2 * 100;
+    expect(valueToday(legs, 150, 0, 0.04, 0)).toBeCloseTo(-paid, 6);
+  });
+
+  it("still has value before expiry where it would pay out nothing", () => {
+    const paid = (43.8 - 27.9) * 2 * 100;
+    const early = valueToday(legs, 150, 0.25, 0.04, 0)!;
+    expect(early).toBeGreaterThan(-paid);
+  });
+});
