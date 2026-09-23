@@ -3,13 +3,67 @@ import type { MarketDataProvider } from "./types";
 import { moomooGet, moomooPost } from "@/lib/moomoo/client";
 import { marketSession } from "@/lib/market-hours";
 
+/**
+ * moomoo returns option risk figures in the same snapshot as the price, under
+ * `option_ex_data`. They were being dropped, and the payoff explorer was
+ * reconstructing implied volatility by inverting Black-Scholes from the price
+ * — a decent approximation of a number the broker was already sending.
+ *
+ * Field names are read defensively because a feed that renames one should
+ * cost a missing greek, not a failed page.
+ */
+type OptionExData = {
+  implied_volatility?: number | string;
+  delta?: number | string;
+  gamma?: number | string;
+  theta?: number | string;
+  vega?: number | string;
+  rho?: number | string;
+  open_interest?: number | string;
+};
+
 type Snapshot = {
   code: string;
   name: string;
   last_price: number;
   prev_close_price: number;
   update_time: number;
+  option_ex_data?: OptionExData;
 };
+
+/**
+ * moomoo quotes implied volatility as a percentage and the pricing maths
+ * wants a fraction, so 42.5 becomes 0.425. A value already below 5 is taken
+ * as a fraction: no equity option trades at 500% vol, and a feed that changes
+ * units should not silently produce a curve that is a hundred times wrong.
+ */
+function toNumber(value: number | string | undefined): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function greeksFrom(data: OptionExData | undefined): Quote["greeks"] {
+  if (!data) return undefined;
+
+  const raw = toNumber(data.implied_volatility);
+  const impliedVolatility =
+    raw === undefined ? undefined : raw > 5 ? raw / 100 : raw;
+
+  const greeks = {
+    impliedVolatility,
+    delta: toNumber(data.delta),
+    gamma: toNumber(data.gamma),
+    theta: toNumber(data.theta),
+    vega: toNumber(data.vega),
+    rho: toNumber(data.rho),
+    openInterest: toNumber(data.open_interest),
+  };
+
+  return Object.values(greeks).some((value) => value !== undefined)
+    ? greeks
+    : undefined;
+}
 
 type Kline = {
   date: number;
@@ -83,6 +137,7 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
           marketStatus: status,
           dataTimestamp: new Date(snapshot.update_time).toISOString(),
           source: "moomoo",
+          greeks: greeksFrom(snapshot.option_ex_data),
         });
       }
     }

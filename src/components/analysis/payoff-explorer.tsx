@@ -25,6 +25,7 @@ import {
   yearsUntil,
   type PricedLeg,
 } from "@/lib/analysis/options-pricing";
+import type { OptionGreeks } from "@/types/market";
 import type { PositionView } from "@/types/portfolio";
 
 /**
@@ -37,10 +38,17 @@ const RATE = 0.04;
 export function PayoffExplorer({
   positions,
   underlyingPrices = {},
+  greeks = {},
 }: {
   positions: PositionView[];
-  /** Live share price per underlying, needed to read volatility out of the option's own quote. */
+  /** Live share price per underlying, needed to price the contracts. */
   underlyingPrices?: Record<string, number>;
+  /**
+   * The broker's own risk figures per contract. Preferred over anything
+   * derived here: the market quoted the price with these numbers, so using
+   * them keeps this screen and the broker's app telling the same story.
+   */
+  greeks?: Record<string, OptionGreeks>;
 }) {
   const zh = useLocale() === "zh";
   const say = (en: string, cn: string) => (zh ? cn : en);
@@ -103,17 +111,58 @@ export function PayoffExplorer({
   const spot = underlyingPrices[chosen[0]?.underlyingSymbol ?? ""] ?? 0;
   const years = yearsUntil(chosen[0]?.expirationDate ?? "");
 
-  const pricedLegs: PricedLeg[] = chosen.map((p) => ({
-    type: p.optionType!,
-    strike: p.strike!,
-    quantity: p.quantity,
-    multiplier: p.contractMultiplier ?? 100,
-    premium: parsedPremium(p),
-    vol:
-      spot > 0 && years > 0 && (p.currentPrice ?? 0) > 0
-        ? impliedVol(p.currentPrice!, p.optionType!, spot, p.strike!, years, RATE)
-        : null,
-  }));
+  /**
+   * Volatility per leg, the broker's figure first.
+   *
+   * moomoo publishes implied volatility alongside the price, which is the
+   * number the contract was actually quoted with. Falling back to solving it
+   * out of the price is a good reconstruction of the same quantity, and is
+   * what happens when the feed omits it — but it is a reconstruction, so the
+   * screen says which one it used.
+   */
+  const pricedLegs: PricedLeg[] = chosen.map((p) => {
+    const published = greeks[p.symbol]?.impliedVolatility;
+    const usable = published !== undefined && published > 0 ? published : null;
+
+    return {
+      type: p.optionType!,
+      strike: p.strike!,
+      quantity: p.quantity,
+      multiplier: p.contractMultiplier ?? 100,
+      premium: parsedPremium(p),
+      vol:
+        usable ??
+        (spot > 0 && years > 0 && (p.currentPrice ?? 0) > 0
+          ? impliedVol(p.currentPrice!, p.optionType!, spot, p.strike!, years, RATE)
+          : null),
+    };
+  });
+
+  const fromBroker = chosen.some(
+    (p) => (greeks[p.symbol]?.impliedVolatility ?? 0) > 0,
+  );
+
+  /**
+   * The position's overall sensitivity, added up across the legs.
+   *
+   * Delta is how many shares this behaves like: a spread at +0.30 delta on
+   * two contracts moves like 60 shares, so a dollar on the share is about
+   * sixty dollars here. Theta is what one day of waiting costs, which is the
+   * number people are most surprised by and the reason an option left alone
+   * quietly shrinks.
+   */
+  const totals = chosen.reduce(
+    (sum, p) => {
+      const g = greeks[p.symbol];
+      const units = p.quantity * (p.contractMultiplier ?? 100);
+      return {
+        delta: sum.delta + (g?.delta ?? 0) * units,
+        theta: sum.theta + (g?.theta ?? 0) * units,
+        any: sum.any || g?.delta !== undefined || g?.theta !== undefined,
+      };
+    },
+    { delta: 0, theta: 0, any: false },
+  );
 
   const hasToday =
     valid && spot > 0 && years > 0 && pricedLegs.every((leg) => leg.vol !== null);
@@ -157,13 +206,55 @@ export function PayoffExplorer({
         {hasToday && (
           <>
             {" "}
-            {say(
-              `Today's line assumes ${daysLeft} days still to run and uses the volatility implied by each contract's own market price.`,
-              `虚线假设还剩 ${daysLeft} 天，波动率由每张合约自己的市场价格反推得出。`,
-            )}
+            {fromBroker
+              ? say(
+                  `Today's line assumes ${daysLeft} days still to run and uses the implied volatility the broker publishes with each contract's price.`,
+                  `虚线假设还剩 ${daysLeft} 天，隐含波动率取自券商随价格一并发布的数据。`,
+                )
+              : say(
+                  `Today's line assumes ${daysLeft} days still to run. The broker did not publish an implied volatility for these contracts, so it was worked back out of each one's own market price instead.`,
+                  `虚线假设还剩 ${daysLeft} 天。券商未提供这些合约的隐含波动率，因此由每张合约自己的市场价格反推得出。`,
+                )}
           </>
         )}
       </p>
+
+      {totals.any && (
+        <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3 sm:grid-cols-4">
+          <div>
+            <dt className="text-xs text-muted-foreground">
+              {say("Moves like this many shares", "相当于持有多少股")}
+            </dt>
+            <dd className="tabular mt-0.5 text-sm font-medium">
+              {totals.delta.toFixed(0)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">
+              {say("A dollar on the share is worth", "正股每涨 1 美元")}
+            </dt>
+            <dd className="tabular mt-0.5 text-sm font-medium">
+              {money(totals.delta)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">
+              {say("One day of waiting costs", "每过一天的损耗")}
+            </dt>
+            <dd
+              className={`tabular mt-0.5 text-sm font-medium ${totals.theta < 0 ? "text-negative" : "text-positive"}`}
+            >
+              {money(totals.theta)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">
+              {say("Days to expiry", "剩余天数")}
+            </dt>
+            <dd className="tabular mt-0.5 text-sm font-medium">{daysLeft}</dd>
+          </div>
+        </dl>
+      )}
       <label className="block text-sm">
         {say("Position group", "持仓组合")}
         <select
@@ -195,8 +286,27 @@ export function PayoffExplorer({
                 setPremiums({ ...premiums, [p.id]: e.target.value })
               }
             />
-            <span className="text-xs text-muted-foreground">
+            <span className="block text-xs text-muted-foreground">
               {say("Multiplier", "乘数")}: {p.contractMultiplier ?? 100}
+              {greeks[p.symbol]?.impliedVolatility !== undefined && (
+                <>
+                  {" · "}
+                  {say("Volatility", "波动率")}{" "}
+                  {(greeks[p.symbol]!.impliedVolatility! * 100).toFixed(1)}%
+                </>
+              )}
+              {greeks[p.symbol]?.delta !== undefined && (
+                <>
+                  {" · "}
+                  {say("Delta", "Delta")} {greeks[p.symbol]!.delta!.toFixed(3)}
+                </>
+              )}
+              {greeks[p.symbol]?.theta !== undefined && (
+                <>
+                  {" · "}
+                  {say("Theta", "Theta")} {greeks[p.symbol]!.theta!.toFixed(3)}
+                </>
+              )}
             </span>
           </label>
         ))}

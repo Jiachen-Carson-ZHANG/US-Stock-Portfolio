@@ -381,6 +381,25 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS subject_id TEXT;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS decision   TEXT;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS decided_at TEXT;
 
+-- The option risk figures moomoo sends beside the price. Stored as JSON
+-- rather than seven columns because they arrive and are read as one lump,
+-- and a feed that adds an eighth should not need a migration.
+ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS greeks TEXT;
+
+-- Following somebody. One row per direction, so following is not mutual
+-- unless both sides ask for it, and the pair is unique so pressing the
+-- button twice does nothing.
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id            TEXT PRIMARY KEY,
+  subscriber_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subject_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at    TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_pair
+  ON subscriptions(subscriber_id, subject_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_subject
+  ON subscriptions(subject_id);
+
 
 -- The playground: one table for the whole room.
 --

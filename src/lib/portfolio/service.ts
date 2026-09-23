@@ -4,7 +4,7 @@ import { dedupe } from "@/lib/inflight";
 import { DEFAULT_SLUG, findById, listPortfolios, type Portfolio } from "@/lib/portfolios";
 import { mockState, syncMockPositions } from "./mock";
 import { matchOpenOrders, openOrders } from "@/lib/trading/orders";
-import type { Quote } from "@/types/market";
+import type { OptionGreeks, Quote } from "@/types/market";
 import { getMarketDataProvider } from "@/providers";
 import {
   marketSession,
@@ -69,6 +69,13 @@ export type PortfolioData = {
   byAssetClass: AssetClassPerformance[];
   /** Realized profit per symbol, replayed from the fills. */
   realizedBySymbol: Record<string, number>;
+  /**
+   * The broker's own risk figures per option contract — implied volatility,
+   * delta, theta. Passed through rather than re-derived: the market quoted
+   * the price with these numbers, so anything built on top of them agrees
+   * with the broker's own screen.
+   */
+  optionGreeks: Record<string, OptionGreeks>;
 };
 
 export function baseCurrency(): string {
@@ -366,6 +373,13 @@ export async function loadPortfolio(
     // From the fills, which cover the whole account, rather than the broker's
     // figure, which only covers positions still open.
     realizedBySymbol: realized,
+    optionGreeks: Object.fromEntries(
+      positions.flatMap((position) => {
+        if (position.instrumentType !== "option") return [];
+        const greeks = quotes.get(position.symbol)?.greeks;
+        return greeks ? [[position.symbol, greeks] as const] : [];
+      }),
+    ),
   };
 }
 

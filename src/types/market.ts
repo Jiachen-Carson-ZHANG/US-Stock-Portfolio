@@ -1,5 +1,24 @@
 export type MarketSession = "pre-market" | "regular" | "after-hours" | "closed";
 
+/**
+ * What the broker publishes about an option beyond its price.
+ *
+ * These are the market's own numbers, not ours. Implied volatility is the
+ * figure the price was quoted with; delta says how much the contract moves
+ * for a one-dollar move in the share; theta is what a day of waiting costs.
+ * Every field is optional because a share has none of them and a feed can
+ * omit any of them.
+ */
+export type OptionGreeks = {
+  impliedVolatility?: number;
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+  vega?: number;
+  rho?: number;
+  openInterest?: number;
+};
+
 export type Quote = {
   symbol: string;
   name?: string;
@@ -10,6 +29,8 @@ export type Quote = {
   marketStatus: MarketSession;
   dataTimestamp: string;
   source: string;
+  /** Present only for option contracts, and only when the feed sends them. */
+  greeks?: OptionGreeks;
 };
 
 export type HistoricalPrice = {

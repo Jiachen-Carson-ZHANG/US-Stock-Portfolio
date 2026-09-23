@@ -12,6 +12,7 @@ type QuoteRow = {
   market_status: string;
   data_timestamp: string;
   source: string;
+  greeks: string | null;
   cached_at: string;
 };
 
@@ -49,7 +50,24 @@ function toQuote(row: QuoteRow): Quote {
     marketStatus: row.market_status as Quote["marketStatus"],
     dataTimestamp: row.data_timestamp,
     source: row.source,
+    greeks: parseGreeks(row.greeks),
   };
+}
+
+/**
+ * A stored greeks blob, or nothing.
+ *
+ * Bad JSON in one row must not blank the whole quote — the price is the part
+ * that matters, and an option without its delta is still tradable.
+ */
+function parseGreeks(raw: string | null): Quote["greeks"] {
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Quote["greeks"]) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function readCache(db: DB, symbols: string[]): Promise<Map<string, QuoteRow>> {
@@ -67,8 +85,8 @@ async function readCache(db: DB, symbols: string[]): Promise<Map<string, QuoteRo
 async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
   const sql = `INSERT INTO quote_cache
        (symbol, price, previous_close, change, change_percent,
-        market_status, data_timestamp, source, cached_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        market_status, data_timestamp, source, greeks, cached_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(symbol) DO UPDATE SET
        price = excluded.price,
        previous_close = excluded.previous_close,
@@ -77,6 +95,7 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
        market_status = excluded.market_status,
        data_timestamp = excluded.data_timestamp,
        source = excluded.source,
+       greeks = excluded.greeks,
        cached_at = excluded.cached_at`;
 
   await db.transaction(async (tx) => {
@@ -90,6 +109,7 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
         quote.marketStatus,
         quote.dataTimestamp,
         quote.source,
+        quote.greeks ? JSON.stringify(quote.greeks) : null,
         now.toISOString(),
       ]);
     }
@@ -170,6 +190,7 @@ export async function getQuotes(
           market_status: quote.marketStatus,
           data_timestamp: quote.dataTimestamp,
           source: quote.source,
+          greeks: quote.greeks ? JSON.stringify(quote.greeks) : null,
           cached_at: now.toISOString(),
         });
       }

@@ -1,5 +1,5 @@
 import { requirePortfolio } from "@/lib/portfolios/context";
-import { loadHistory, loadPortfolio } from "@/lib/portfolio/service";
+import { loadHistory, loadPortfolio, portfolioStart } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { AssetClassSplit } from "@/components/dashboard/asset-class-split";
 import { PerformanceExplorer } from "@/components/analysis/explorer";
@@ -21,17 +21,28 @@ export default async function PerformancePage({
   );
   // Three independent reads, asked for together rather than one after
   // another. Each is a round trip, and round trips are the whole cost.
-  const [{ t }, portfolio, snapshots, analysis] = await Promise.all([
+  const db = await getDb();
+  const [{ t }, portfolio, snapshots, analysis, openedOn] = await Promise.all([
     serverDictionary(),
     loadPortfolio(current.id),
     loadHistory(current.id),
-    getDb().then((db) => readAnalysis(db, current.id)),
+    readAnalysis(db, current.id),
+    portfolioStart(db, current.id),
   ]);
-  // The funds the account is measured against, over exactly the window it
-  // has been measured for. Asked for after the snapshots because the window
-  // is what they are fetched for; a failure here leaves the rest of the page
-  // intact and the chart simply says it has nothing to compare.
-  const first = snapshots[0]?.snapshotDate;
+  // The funds the account is measured against, fetched from the day the first
+  // money went in rather than the first day a snapshot happens to exist.
+  // "What would this have done in VOO instead" is a question about your money,
+  // and your money started when you paid it in; a comparison beginning three
+  // months later quietly hides the first leg of the journey for both sides.
+  // A failure here leaves the rest of the page intact and the chart says it
+  // has nothing to compare.
+  const firstSnapshot = snapshots[0]?.snapshotDate;
+  const first =
+    openedOn && firstSnapshot
+      ? openedOn < firstSnapshot
+        ? openedOn
+        : firstSnapshot
+      : (openedOn ?? firstSnapshot);
   const last = snapshots.at(-1)?.snapshotDate;
   const [benchmarks, rates] = await Promise.all([
     first && last
@@ -66,6 +77,7 @@ export default async function PerformancePage({
           volatility out of the contracts' own quotes instead of assuming one. */}
       <PayoffExplorer
         positions={portfolio.positions}
+        greeks={portfolio.optionGreeks}
         underlyingPrices={Object.fromEntries(
           portfolio.optionGroups.flatMap((group) =>
             group.underlyingPrice === undefined

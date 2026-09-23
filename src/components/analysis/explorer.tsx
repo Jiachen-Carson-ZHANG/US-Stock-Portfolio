@@ -133,12 +133,6 @@ export function PerformanceExplorer({
           },
           { name: say("End", "期末"), range: [0, end], amount: end },
         ];
-  // The manually imported USD/CNY series is still accepted, and still shown
-  // when the live rate service cannot be reached, so an import somebody has
-  // already done is not thrown away.
-  const importedStart = data.fx.find((r) => r.date === first?.snapshotDate)?.value;
-  const importedEnd = data.fx.find((r) => r.date === last?.snapshotDate)?.value;
-
   /**
    * The same account, seen from each currency somebody actually spends.
    *
@@ -153,14 +147,12 @@ export function PerformanceExplorer({
 
     return VIEW_CURRENCIES.flatMap((code) => {
       const series = rates[code] ?? [];
-      const live = {
-        start: code === "USD" ? 1 : rateOn(series, first.snapshotDate),
-        end: code === "USD" ? 1 : rateOn(series, last.snapshotDate),
-      };
-      // The imported series is the fallback for yuan, which is the one
-      // somebody may already have filled in by hand.
-      const startRate = live.start ?? (code === "CNY" ? (importedStart ?? null) : null);
-      const endRate = live.end ?? (code === "CNY" ? (importedEnd ?? null) : null);
+      // One source, published daily by the European Central Bank. A
+      // hand-maintained rate table was a second answer to the same question,
+      // and two answers that disagree are worse than one that is occasionally
+      // a day behind.
+      const startRate = code === "USD" ? 1 : rateOn(series, first.snapshotDate);
+      const endRate = code === "USD" ? 1 : rateOn(series, last.snapshotDate);
       if (!startRate || !endRate) return [];
 
       const parts = fxDecomposition(start, end, startRate, endRate);
@@ -175,7 +167,7 @@ export function PerformanceExplorer({
         },
       ];
     });
-  }, [currency, first, last, rates, start, end, importedStart, importedEnd]);
+  }, [currency, first, last, rates, start, end]);
 
   async function save(body: unknown) {
     if (pending.current) return false;
