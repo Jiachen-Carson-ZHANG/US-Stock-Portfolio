@@ -7,6 +7,7 @@ import { ArenaCommentary } from "@/components/arena/commentary";
 import { PERIODS, type Leaderboard, type Period } from "@/lib/arena";
 import type { Trophy as TrophyRecord } from "@/lib/arena/trophies";
 import { useT } from "@/lib/i18n/context";
+import { Help } from "@/components/ui/help";
 import { cn, signClass } from "@/lib/utils";
 
 const MEDAL = ["text-chart-4", "text-muted-foreground", "text-chart-3"];
@@ -47,7 +48,10 @@ export function ArenaBoard({
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-lg font-semibold tracking-tight">{t.arena.title}</h1>
+        <h1 className="flex items-center gap-1.5 text-lg font-semibold tracking-tight">
+          {t.arena.title}
+          <Help title={t.help.arena}>{t.help.arenaBody}</Help>
+        </h1>
         <p className="text-sm text-muted-foreground">
           {t.arena.subtitle}
         </p>

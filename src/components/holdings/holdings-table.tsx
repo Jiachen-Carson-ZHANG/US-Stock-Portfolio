@@ -8,6 +8,7 @@ import { spreadPrices } from "@/lib/portfolio/chart-data";
 import { usePortfolioBase } from "@/lib/portfolios/path";
 import { cn, signClass } from "@/lib/utils";
 import { useLocale, useT } from "@/lib/i18n/context";
+import { Help } from "@/components/ui/help";
 import { localizedName } from "@/lib/i18n/symbols";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { MoneyDTO, PositionView } from "@/types/portfolio";
@@ -160,16 +161,31 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
           fallback={t.position.unlimited}
         />
         <div>
-          <p className="text-xs text-muted-foreground">{t.position.breakEven}</p>
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            {t.position.breakEven}
+            <Help title={t.help.breakEven} align="right">
+              {t.help.breakEvenBody}
+            </Help>
+          </p>
           <p className="tabular mt-0.5 text-sm font-medium">
             {group.breakEven === null ? "—" : group.breakEven.toFixed(2)}
+          </p>
+          {/* Break-even is a share price. On its own it is a number with
+              nothing to compare to, so the share's actual price sits directly
+              under it — above means the spread is in the money. */}
+          <p className="tabular mt-0.5 text-xs text-muted-foreground">
+            {t.position.stockPrice}{" "}
+            {group.underlyingPrice === undefined
+              ? "—"
+              : money(group.underlyingPrice, group.netCost.currency)}
           </p>
         </div>
       </div>
 
       <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {t.position.legs}
+          <Help title={t.help.optionPrice}>{t.help.optionPriceBody}</Help>
         </p>
         <ul className="divide-y divide-border rounded-lg border border-border">
           {group.legs.map((leg) => (
@@ -187,8 +203,17 @@ function GroupDetail({ group }: { group: OptionGroupDTO }) {
                 {leg.strike}
               </Link>
               <span className="text-muted-foreground">{leg.expirationDate}</span>
-              <span className="tabular ml-auto text-muted-foreground">
-                {money(leg.currentPrice, leg.currency)}
+              {/* Same shape as a stock row: what the contract is worth now,
+                  with what it cost in grey underneath, so the comparison
+                  needs no arithmetic. */}
+              <span className="ml-auto text-right">
+                <span className="tabular block">{money(leg.currentPrice, leg.currency)}</span>
+                <span
+                  className="tabular block text-xs text-muted-foreground"
+                  title={t.position.averageCost}
+                >
+                  {t.position.paid} {money(group.legCost[leg.symbol], leg.currency)}
+                </span>
               </span>
             </li>
           ))}
@@ -233,15 +258,20 @@ export function HoldingsTable({
   const t = useT();
   const locale = useLocale();
   const base = usePortfolioBase();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  // A set, not a single id: opening one spread used to close the one you were
+  // already looking at, which makes two positions impossible to compare.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const rows = buildHoldingRows(positions, optionGroups);
 
   function toggle(id: string, target?: string) {
+    const opening = !expanded.has(id);
     setExpanded((current) => {
-      const next = current === id ? null : id;
-      if (next && target) recordView(target);
+      const next = new Set(current);
+      if (opening) next.add(id);
+      else next.delete(id);
       return next;
     });
+    if (opening && target) recordView(target);
   }
 
   return (
@@ -264,7 +294,7 @@ export function HoldingsTable({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const isOpen = expanded === row.id;
+              const isOpen = expanded.has(row.id);
 
               if (row.kind === "group") {
                 const g = row.group;
@@ -437,9 +467,9 @@ export function HoldingsTable({
       </div>
 
       {/* Mobile: cards, no horizontal scrolling. */}
-      <ul className="space-y-2 lg:hidden">
+      <ul className="space-y-1.5 lg:hidden">
         {rows.map((row) => {
-          const isOpen = expanded === row.id;
+          const isOpen = expanded.has(row.id);
           const isGroup = row.kind === "group";
 
           const title = isGroup ? row.group.underlying : row.position.symbol;
@@ -456,20 +486,40 @@ export function HoldingsTable({
 
           return (
             <li key={row.id} className="rounded-xl border border-border bg-surface">
+              {/* Tighter than it was, and carrying more. The old card spent a
+                  whole row of height on a name and showed neither the price
+                  nor the share of the account, so reading a holding meant
+                  opening it. */}
               <button
                 type="button"
                 onClick={() => toggle(row.id, title)}
                 aria-expanded={isOpen}
-                className="flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left"
+                className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+                  <p className="truncate text-sm font-medium leading-tight">{title}</p>
+                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                    {subtitle}
+                  </p>
+                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                    {isGroup
+                      ? (() => {
+                          const prices = spreadPrices(row.group);
+                          return prices
+                            ? `${money(prices.now, row.group.netCost.currency)} · ${money(prices.paid, row.group.netCost.currency)} ${t.position.averageCost.toLowerCase()}`
+                            : "";
+                        })()
+                      : isCash
+                        ? ""
+                        : `${money(row.position.currentPrice, row.position.currency)} · ${money(unitCost(row.position), row.position.currency)} ${t.position.averageCost.toLowerCase()}`}
+                  </p>
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="tabular text-sm font-medium">{formatMoney(value)}</p>
-                  <p className="tabular text-xs">
+                  <p className="tabular text-sm font-medium leading-tight">
+                    {formatMoney(value)}
+                  </p>
+                  <p className="tabular text-[11px] leading-tight">
                     <span className={signClass(Number(today.amount))}>
                       {isCash ? "—" : formatMoney(today, { signed: true })}
                     </span>
@@ -477,6 +527,9 @@ export function HoldingsTable({
                     <span className={signClass(Number(unrealized.amount))}>
                       {isCash ? "—" : formatMoney(unrealized, { signed: true })}
                     </span>
+                  </p>
+                  <p className="tabular text-[11px] leading-tight text-muted-foreground">
+                    {row.weight.toFixed(1)}% {t.table.weight.toLowerCase()}
                   </p>
                 </div>
 

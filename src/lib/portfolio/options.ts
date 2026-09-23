@@ -239,14 +239,36 @@ export type OptionGroupDTO = {
   maxProfit: MoneyDTO | null;
   maxLoss: MoneyDTO | null;
   breakEven: number | null;
+  /**
+   * Where the underlying share trades right now. Break-even is quoted as a
+   * share price, so it is only readable beside the share price it is being
+   * compared to.
+   */
+  underlyingPrice?: number;
+  /**
+   * What each leg cost per contract, keyed by its symbol. Derived here rather
+   * than in the table because the broker's own average cost nets realized
+   * proceeds into itself and can come back negative; `costBasis` already
+   * handles that, and it is not worth repeating in the browser.
+   */
+  legCost: Record<string, number>;
   weightPercent: number;
 };
 
 export function toOptionGroupDTO(
   group: OptionGroup,
   investedTotal: Money,
+  underlyingPrice?: number,
 ): OptionGroupDTO {
   return {
+    underlyingPrice,
+    legCost: Object.fromEntries(
+      group.legs.map((leg) => {
+        const units = contractMultiplier(leg).times(Math.abs(leg.quantity));
+        if (units.isZero()) return [leg.symbol, 0];
+        return [leg.symbol, costBasis(leg).amount.abs().dividedBy(units).toNumber()];
+      }),
+    ),
     id: group.id,
     underlying: group.underlying,
     expirationDate: group.expirationDate,

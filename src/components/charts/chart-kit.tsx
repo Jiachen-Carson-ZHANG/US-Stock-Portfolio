@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Help } from "@/components/ui/help";
 
 export const SERIES = [
   "var(--chart-1)",
@@ -81,19 +82,23 @@ export const AXIS_TICK = {
 export function ChartFrame({
   title,
   note,
+  help,
   height = 260,
   children,
 }: {
   title: string;
   note?: string;
+  /** What the chart is actually showing, for a reader meeting it cold. */
+  help?: { title: string; body: string };
   height?: number;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
       <div className="mb-4">
-        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <h3 className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {title}
+          {help && <Help title={help.title}>{help.body}</Help>}
         </h3>
         {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
       </div>

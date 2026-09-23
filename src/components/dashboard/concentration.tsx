@@ -1,6 +1,7 @@
 "use client";
 
 import { useT } from "@/lib/i18n/context";
+import { Help } from "@/components/ui/help";
 import type { Concentration } from "@/types/portfolio";
 
 /**
@@ -18,8 +19,9 @@ export function ConcentrationTiles({ data }: { data: Concentration }) {
 
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
-      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {t.charts.concentration}
+        <Help title={t.help.concentration}>{t.help.concentrationBody}</Help>
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
         {t.charts.concentrationNote}

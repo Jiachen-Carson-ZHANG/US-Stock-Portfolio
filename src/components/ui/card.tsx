@@ -14,7 +14,7 @@ export function Card({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 export function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("px-5 pt-5 pb-3", className)} {...props} />;
+  return <div className={cn("px-3.5 pt-4 pb-2.5 sm:px-5 sm:pt-5 sm:pb-3", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
@@ -29,6 +29,13 @@ export function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
   );
 }
 
+/**
+ * Tighter on a phone than on a desktop.
+ *
+ * The same 20px of padding that gives a card room on a monitor eats a third
+ * of the width of a phone, which is how four figures ended up needing a full
+ * screen of scrolling each.
+ */
 export function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("px-5 pb-5", className)} {...props} />;
+  return <div className={cn("px-3.5 pb-4 sm:px-5 sm:pb-5", className)} {...props} />;
 }

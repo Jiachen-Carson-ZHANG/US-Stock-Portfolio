@@ -39,10 +39,12 @@ export function AllocationDonut({
   slices,
   title,
   note,
+  help,
 }: {
   slices: AllocationSlice[];
   title: string;
   note?: string;
+  help?: { title: string; body: string };
 }) {
   const data = fold(slices);
   const items = data.map((slice, index) => ({
@@ -55,7 +57,7 @@ export function AllocationDonut({
   }));
 
   return (
-    <ChartFrame title={title} note={note} height={300}>
+    <ChartFrame title={title} note={note} help={help} height={300}>
       <div className="grid h-full grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="h-[180px] sm:h-full">
           <ResponsiveContainer width="100%" height="100%">

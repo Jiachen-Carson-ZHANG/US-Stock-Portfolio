@@ -8,7 +8,7 @@ import { ShareBar } from "@/components/charts/share-bar";
 import { ConcentrationTiles } from "@/components/dashboard/concentration";
 import { MarketStatus } from "@/components/dashboard/market-status";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
-import { AddDeposit, ReconciliationBanner } from "@/components/dashboard/deposits";
+import { ReconciliationBanner } from "@/components/dashboard/deposits";
 import { usePortfolio, type LivePortfolio } from "@/components/dashboard/use-portfolio";
 import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { useT } from "@/lib/i18n/context";
@@ -67,10 +67,15 @@ export function LiveDashboard({
             </p>
           )}
           {canWrite && !isMock && (
-            <AddDeposit
-              portfolioSlug={portfolioSlug}
-              currency={data.summary.totalMarketValue.currency}
-            />
+            // The form itself moved to the records screen. A dashboard is for
+            // reading; typing bank transfers into it was always the odd one
+            // out, and it is the same two clicks from here.
+            <Link
+              href={`/${portfolioSlug}/records`}
+              className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {t.records.transfer}
+            </Link>
           )}
         </div>
         <MarketStatus
@@ -102,6 +107,7 @@ export function LiveDashboard({
           slices={data.allocations.byPosition}
           title={t.charts.allocation}
           note={t.charts.allocationNote}
+          help={{ title: t.help.allocation, body: t.help.allocationBody }}
         />
         <div className="space-y-4">
           <ShareBar title={t.charts.assetType} slices={data.allocations.byAssetType} />

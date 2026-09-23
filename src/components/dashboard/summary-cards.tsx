@@ -4,6 +4,8 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { signClass } from "@/lib/utils";
 import { useT } from "@/lib/i18n/context";
+import { currentSessionDate } from "@/lib/market-hours";
+import { Help } from "@/components/ui/help";
 import type { MoneyDTO, PortfolioSummary } from "@/types/portfolio";
 
 /**
@@ -28,6 +30,7 @@ function Stat({
   sub,
   tone,
   period,
+  help,
   children,
 }: {
   label: string;
@@ -35,22 +38,31 @@ function Stat({
   sub?: string;
   tone?: string;
   period?: string;
+  /** What this figure actually means, for anyone who has not met it before. */
+  help?: { title: string; body: string };
   children?: React.ReactNode;
 }) {
   return (
     <Card>
       <CardContent className="pt-5">
-        <CardTitle>{label}</CardTitle>
+        <span className="flex items-center gap-0.5">
+          <CardTitle className="truncate text-[10px] sm:text-xs">{label}</CardTitle>
+          {help && <Help title={help.title}>{help.body}</Help>}
+        </span>
         {/* Proportional figures: tabular-nums would read loose at this size. */}
-        <p className={`mt-2 text-2xl font-semibold tracking-tight ${tone ?? ""}`}>
+        <p
+          className={`mt-1.5 text-lg font-semibold tracking-tight sm:mt-2 sm:text-2xl ${tone ?? ""}`}
+        >
           {value}
         </p>
         {sub && (
-          <p className={`mt-0.5 text-sm ${tone ?? "text-muted-foreground"}`}>{sub}</p>
+          <p className={`mt-0.5 text-xs sm:text-sm ${tone ?? "text-muted-foreground"}`}>{sub}</p>
         )}
         {children}
         {period && (
-          <p className="mt-2 text-[11px] text-muted-foreground">{period}</p>
+          <p className="mt-1.5 text-[10px] text-muted-foreground sm:mt-2 sm:text-[11px]">
+            {period}
+          </p>
         )}
       </CardContent>
     </Card>
@@ -74,12 +86,16 @@ export function SummaryCards({
   const realized = Number(summary.realizedPnL.amount);
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    // Two across on a phone, not one. Four headline figures stacked one per
+    // screen means scrolling past three of them to reach the fourth; side by
+    // side they are all readable at a glance, which is what a summary is for.
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
       <Stat
         label={t.summary.portfolioValue}
+        help={{ title: t.help.portfolioValue, body: t.help.portfolioValueBody }}
         value={formatMoney(summary.totalMarketValue)}
         sub={`${summary.positionCount} ${t.summary.positions} · ${summary.cashPercent.toFixed(1)}% ${t.summary.cash}`}
-        period={when(summary.dataTimestamp, "as at")}
+        period={when(summary.dataTimestamp, t.summary.asAt)}
       >
         <p className={`mt-1.5 text-xs ${signClass(unrealized)}`}>
           {formatMoney(summary.totalUnrealizedPnL, { signed: true })} ·{" "}
@@ -93,20 +109,26 @@ export function SummaryCards({
         </p>
       </Stat>
 
+      {/* Today's profit belongs to a trading session, not to whenever the
+          stalest thing held last printed a price. The old label read "session
+          of 18 Sep" on the 22nd, because one option had not traded in four
+          days. */}
       <Stat
         label={t.summary.today}
+        help={{ title: t.help.today, body: t.help.todayBody }}
         value={formatMoney(summary.todayPnL, { signed: true })}
         sub={formatPercent(summary.todayPnLPercent, { signed: true })}
         tone={signClass(today)}
-        period={when(summary.dataTimestamp, "session of")}
+        period={when(currentSessionDate(), t.summary.sessionOf)}
       />
 
       <Stat
         label={t.summary.totalReturn}
+        help={{ title: t.help.totalReturn, body: t.help.totalReturnBody }}
         value={formatMoney(summary.totalReturn, { signed: true })}
         sub={formatPercent(summary.totalReturnPercent, { signed: true })}
         tone={signClass(totalReturn)}
-        period={when(since, "since")}
+        period={when(since, t.summary.since)}
       />
 
       {/* "Invested" is the money actually paid in. Cash and cost of holdings
@@ -117,9 +139,10 @@ export function SummaryCards({
           22,100?" is the first thing anyone asks. */}
       <Stat
         label={t.summary.totalInvested}
+        help={{ title: t.help.totalInvested, body: t.help.totalInvestedBody }}
         value={formatMoney(summary.netDeposits ?? totalInvested)}
         sub={summary.netDeposits ? t.summary.paidIn : undefined}
-        period={when(since, "since")}
+        period={when(since, t.summary.since)}
       >
         {summary.netDeposits ? (
           <dl className="mt-3 space-y-1 text-xs">
