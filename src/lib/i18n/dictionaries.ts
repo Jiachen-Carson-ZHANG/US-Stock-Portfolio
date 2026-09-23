@@ -13,7 +13,7 @@ const en = {
     portfolios: "Portfolios",
     holdings: "Holdings",
     performance: "Performance",
-    transactions: "Transactions",
+    transactions: "Feed",
     watchlist: "Watchlist",
     account: "Account",
     settings: "Settings",
@@ -500,11 +500,28 @@ const en = {
 
   records: {
     title: "Records",
-    subtitle:
-      "The few things the app cannot work out on its own. Money moved in or out, and the reference figures the performance maths needs.",
+    subtitle: "The few things this site cannot work out on its own.",
+    whyTitle: "Why this page has to exist",
+    whyBody:
+      "Your broker tells us every trade you make. It never tells us when you move money in or out of the account — that is a bank transfer, and it happens outside the market.",
+    whyExample:
+      "So picture this. On Monday the account is worth $10,000. On Tuesday it is worth $20,000. Did you have the best day of your life, or did you just transfer $10,000 in? From the outside those two look identical. Without being told, the site has to guess, and it guesses wrong: your return for the day reads +100%.",
+    whySo:
+      "That one number then spreads. It goes into your total return, into the chart, into the comparison against the S&P 500, and into the Arena leaderboard where it flatters you against everybody else. One unrecorded transfer quietly poisons every percentage on the site.",
+    whyFix:
+      "Recording it takes ten seconds and fixes all of them at once. The date and the amount are enough — the site then subtracts that money before working out how the investments did, so paying money in makes the account bigger without making the percentage better. That is the honest answer, and it is the only one that lets two people with different account sizes be compared at all.",
+    whyReview:
+      "Confirming a period is the second half. Saying \u201cI have checked May to September and every transfer is here\u201d is what lets the site trust the ledger enough to draw the chart. Until a period is confirmed it holds back the figures rather than publishing numbers it cannot stand behind.",
     transfer: "Record a transfer",
     transferHint:
-      "Money you paid into the account or took out of it. The broker reports trades but never transfers, so a deposit nobody records looks exactly like a gain of the same size.",
+      "Money you paid into the account or took out of it. Not a stock purchase — that is a trade, and the broker already reports those.",
+  },
+
+  feed: {
+    follow: "Follow",
+    following: "Following",
+    followHint:
+      "Get a bell when they trade or post. It shows you nothing new — a portfolio you cannot open stays closed — it only tells you when something happened.",
   },
 
   portfolios: {
@@ -699,7 +716,7 @@ const zh: Dictionary = {
     portfolios: "投资组合",
     holdings: "持仓",
     performance: "业绩表现",
-    transactions: "交易记录",
+    transactions: "动态",
     watchlist: "自选关注",
     account: "账户",
     settings: "设置",
@@ -1172,10 +1189,27 @@ const zh: Dictionary = {
 
   records: {
     title: "记录",
-    subtitle: "少数几件程序自己算不出来的事：资金转入转出，以及收益计算需要的参考数据。",
+    subtitle: "少数几件这个网站自己算不出来的事。",
+    whyTitle: "为什么需要这一页",
+    whyBody:
+      "券商会告诉我们你的每一笔交易，但永远不会告诉我们你什么时候往账户里转钱、或者把钱转出去——那是银行转账，发生在市场之外。",
+    whyExample:
+      "举个例子。周一账户值 1 万美元，周二值 2 万美元。是你人生中最赚的一天，还是你只是转进来了 1 万？从外面看，这两件事一模一样。没人告诉它，网站只能猜，而且会猜错：那天的收益率会显示 +100%。",
+    whySo:
+      "这个错误的数字会继续扩散：进入你的总收益、进入曲线图、进入和标普 500 的对比，还会进入竞技场排行榜，让你相对别人虚高。一笔没记录的转账，会悄悄污染全站每一个百分比。",
+    whyFix:
+      "记录它只要十秒，而且一次修好全部。填日期和金额就够了——网站会先把这笔钱扣掉，再计算投资本身做得怎么样。于是「转入资金」只会让账户变大，不会让收益率变好。这才是诚实的答案，也是两个规模不同的账户能够放在一起比较的唯一前提。",
+    whyReview:
+      "确认区间是另一半。你说一句「五月到九月我都检查过了，转账都在这里」，网站才敢用这份账本来画图。在区间被确认之前，它宁可不显示，也不会给出自己无法负责的数字。",
     transfer: "记录一笔转账",
-    transferHint:
-      "你转入或转出账户的钱。券商接口只报交易、不报转账，所以没有记录的入金，看起来就和同样金额的盈利一模一样。",
+    transferHint: "你转入或转出账户的钱。不是买股票——那是交易，券商已经报过了。",
+  },
+
+  feed: {
+    follow: "关注",
+    following: "已关注",
+    followHint:
+      "他们交易或发帖时会收到提醒。这不会让你看到任何新东西——看不了的组合依然看不了——只是告诉你什么时候发生了事情。",
   },
 
   portfolios: {

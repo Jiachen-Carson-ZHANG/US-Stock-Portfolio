@@ -276,20 +276,25 @@ export function HoldingsTable({
 
   return (
     <>
-      <div className="hidden overflow-hidden rounded-xl border border-border bg-surface lg:block">
+      {/* A tablet sat between the two layouts: wide enough for the sidebar, too
+          narrow for the table, so it got phone cards with a desktop chrome
+          around them. The table now starts at the same width the sidebar
+          does, and sheds the four least important columns until there is room
+          for them. */}
+      <div className="hidden overflow-hidden rounded-xl border border-border bg-surface md:block">
         <table className="w-full text-sm">
           <caption className="sr-only">{t.table.holdings}</caption>
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
               <th scope="col" className="px-4 py-3 text-left font-medium">{t.table.symbol}</th>
-              <th scope="col" className="px-4 py-3 text-left font-medium">{t.table.type}</th>
+              <th scope="col" className="hidden lg:table-cell px-4 py-3 text-left font-medium">{t.table.type}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.qty}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.price}</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.today}</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.cost}</th>
+              <th scope="col" className="hidden lg:table-cell px-4 py-3 text-right font-medium">{t.table.today}</th>
+              <th scope="col" className="hidden lg:table-cell px-4 py-3 text-right font-medium">{t.table.cost}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.marketValue}</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.unrealized}</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">{t.table.weight}</th>
+              <th scope="col" className="hidden lg:table-cell px-4 py-3 text-right font-medium">{t.table.weight}</th>
             </tr>
           </thead>
           <tbody>
@@ -322,7 +327,7 @@ export function HoldingsTable({
                           {g.expirationDate}
                         </span>
                       </th>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="hidden lg:table-cell px-4 py-3 text-muted-foreground">
                         {strategyLabel(t, g.strategy)}
                       </td>
                       <td className="tabular px-4 py-3 text-right">
@@ -345,10 +350,10 @@ export function HoldingsTable({
                           );
                         })()}
                       </td>
-                      <td className={cn("tabular px-4 py-3 text-right", signClass(today))}>
+                      <td className={cn("hidden lg:table-cell tabular px-4 py-3 text-right", signClass(today))}>
                         {formatMoney(g.todayPnL, { signed: true })}
                       </td>
-                      <td className="tabular px-4 py-3 text-right">
+                      <td className="hidden lg:table-cell tabular px-4 py-3 text-right">
                         {formatMoney(g.netCost)}
                       </td>
                       <td className="tabular px-4 py-3 text-right font-medium">
@@ -357,7 +362,7 @@ export function HoldingsTable({
                       <td className={cn("tabular px-4 py-3 text-right", signClass(unrealized))}>
                         {formatMoney(g.unrealizedPnL, { signed: true })}
                       </td>
-                      <td className="tabular px-4 py-3 text-right text-muted-foreground">
+                      <td className="hidden lg:table-cell tabular px-4 py-3 text-right text-muted-foreground">
                         {row.weight.toFixed(1)}%
                       </td>
                     </tr>
@@ -405,7 +410,7 @@ export function HoldingsTable({
                         </span>
                       )}
                     </th>
-                    <td className="px-4 py-3 text-muted-foreground">{typeLabel(t, p)}</td>
+                    <td className="hidden lg:table-cell px-4 py-3 text-muted-foreground">{typeLabel(t, p)}</td>
                     <td className="tabular px-4 py-3 text-right">{qty(p.quantity)}</td>
                     <td className="tabular px-4 py-3 text-right">
                       {isCash ? (
@@ -428,13 +433,13 @@ export function HoldingsTable({
                     </td>
                     <td
                       className={cn(
-                        "tabular px-4 py-3 text-right",
+                        "hidden lg:table-cell tabular px-4 py-3 text-right",
                         signClass(Number(p.todayPnL.amount)),
                       )}
                     >
                       {isCash ? "—" : formatMoney(p.todayPnL, { signed: true })}
                     </td>
-                    <td className="tabular px-4 py-3 text-right">
+                    <td className="hidden lg:table-cell tabular px-4 py-3 text-right">
                       {isCash ? "—" : formatMoney(p.costBasis)}
                     </td>
                     <td className="tabular px-4 py-3 text-right font-medium">
@@ -448,7 +453,7 @@ export function HoldingsTable({
                     >
                       {isCash ? "—" : formatMoney(p.unrealizedPnL, { signed: true })}
                     </td>
-                    <td className="tabular px-4 py-3 text-right text-muted-foreground">
+                    <td className="hidden lg:table-cell tabular px-4 py-3 text-right text-muted-foreground">
                       {row.weight.toFixed(1)}%
                     </td>
                   </tr>
@@ -467,7 +472,7 @@ export function HoldingsTable({
       </div>
 
       {/* Mobile: cards, no horizontal scrolling. */}
-      <ul className="space-y-1.5 lg:hidden">
+      <ul className="space-y-1.5 md:hidden">
         {rows.map((row) => {
           const isOpen = expanded.has(row.id);
           const isGroup = row.kind === "group";

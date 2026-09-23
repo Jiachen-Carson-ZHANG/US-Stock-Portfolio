@@ -44,6 +44,21 @@ export default async function RecordsPage({
         <p className="mt-1 text-sm text-muted-foreground">{t.records.subtitle}</p>
       </header>
 
+      {/* The explanation comes before the form, not after it and not behind a
+          question mark. Nobody fills in a box they do not believe in, and
+          "why am I typing my bank transfers into a stock website" is a
+          completely reasonable thing to want answered first. */}
+      <section className="rounded-xl border border-border bg-muted/40 p-5">
+        <h2 className="text-sm font-medium">{t.records.whyTitle}</h2>
+        <div className="mt-2 space-y-3 text-sm leading-relaxed text-muted-foreground">
+          <p>{t.records.whyBody}</p>
+          <p>{t.records.whyExample}</p>
+          <p>{t.records.whySo}</p>
+          <p>{t.records.whyFix}</p>
+          <p>{t.records.whyReview}</p>
+        </div>
+      </section>
+
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">{t.records.transfer}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t.records.transferHint}</p>
