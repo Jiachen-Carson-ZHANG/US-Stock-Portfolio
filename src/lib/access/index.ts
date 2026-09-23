@@ -69,10 +69,11 @@ export async function requestAccess(
   const portfolio = await findById(tx, input.portfolioId);
   if (!portfolio) return { created: false };
 
+  const requestId = randomUUID();
   const inserted = await tx.run(
     `INSERT INTO access_requests (id, portfolio_id, user_id, message, status, created_at)
      VALUES (?, ?, ?, ?, 'pending', ?) ON CONFLICT DO NOTHING`,
-    [randomUUID(), input.portfolioId, input.userId, input.message ?? null, now.toISOString()],
+    [requestId, input.portfolioId, input.userId, input.message ?? null, now.toISOString()],
   );
 
   if (inserted.changes === 0) return { created: false };
@@ -88,6 +89,7 @@ export async function requestAccess(
         title: `${input.userName} would like to see ${portfolio.displayName}`,
         body: input.message ?? null,
         link: "/account",
+        subjectId: requestId,
       },
       now,
     );

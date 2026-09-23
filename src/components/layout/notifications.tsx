@@ -46,6 +46,49 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
     };
   }, [open, items]);
 
+  const [deciding, setDeciding] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  /**
+   * Answers a request without leaving the bell.
+   *
+   * The whole point is that "somebody wants in" and "yes" should be one
+   * gesture rather than a trip to a settings page to find the same name
+   * again. The answer is written onto the notification, so the list keeps
+   * saying what you decided instead of the question quietly vanishing.
+   */
+  async function decide(id: string, approve: boolean) {
+    setDeciding(id);
+    setFailed(null);
+    try {
+      const response = await fetch("/api/notifications/decide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id, approve }),
+      });
+      if (!response.ok) {
+        setFailed(id);
+        return;
+      }
+      setItems((current) =>
+        current?.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                decision: approve ? "approved" : "declined",
+                decidedAt: new Date().toISOString(),
+                readAt: item.readAt ?? new Date().toISOString(),
+              }
+            : item,
+        ) ?? null,
+      );
+      setUnread((count) => Math.max(0, count - 1));
+      router.refresh();
+    } finally {
+      setDeciding(null);
+    }
+  }
+
   async function markAllRead() {
     await fetch("/api/notifications", {
       method: "POST",
@@ -112,6 +155,65 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
                     </p>
                   </div>
                 );
+                // Only two kinds ask a question, and only while nobody has
+                // answered it yet. Everything else stays a plain line you can
+                // click through.
+                const askable =
+                  (item.kind === "account_request" || item.kind === "access_request") &&
+                  item.subjectId !== null;
+
+                if (askable) {
+                  return (
+                    <li key={item.id}>
+                      {content}
+                      <div className="flex items-center gap-2 px-2 pb-2">
+                        {item.decision ? (
+                          <p className="text-xs text-muted-foreground">
+                            {item.decision === "approved"
+                              ? t.notifications.approved
+                              : t.notifications.declined}
+                          </p>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={deciding === item.id}
+                              onClick={() => void decide(item.id, true)}
+                              className="rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background disabled:opacity-60"
+                            >
+                              {deciding === item.id
+                                ? t.notifications.deciding
+                                : t.notifications.approve}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deciding === item.id}
+                              onClick={() => void decide(item.id, false)}
+                              className="rounded-md border border-border px-2 py-1 text-xs disabled:opacity-60"
+                            >
+                              {t.notifications.decline}
+                            </button>
+                          </>
+                        )}
+                        {item.link && (
+                          <Link
+                            href={item.link}
+                            onClick={() => setOpen(false)}
+                            className="ml-auto text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                          >
+                            {t.notifications.view}
+                          </Link>
+                        )}
+                      </div>
+                      {failed === item.id && (
+                        <p className="px-2 pb-2 text-xs text-negative">
+                          {t.notifications.decideFailed}
+                        </p>
+                      )}
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.id}>
                     {item.link ? (

@@ -100,6 +100,9 @@ export async function register(
           ? `@${username} · referred by ${input.referredBy.trim()}`
           : `@${username}`,
         link: "/settings",
+        // Which account, so the bell can answer without sending them to
+        // settings to find the same person again.
+        subjectId: id,
       },
       now,
     );

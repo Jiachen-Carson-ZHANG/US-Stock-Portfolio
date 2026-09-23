@@ -14,11 +14,14 @@ export type ActivityKind =
   | "sync"
   | "ai_insight"
   | "portfolio_create"
+  | "portfolio_remove"
   | "access_grant"
   | "access_revoke"
   | "mock_trade"
   | "account_approve"
-  | "account_decline";
+  | "account_decline"
+  | "playground_post"
+  | "playground_reply";
 
 export type ActivityEvent = {
   username: string;

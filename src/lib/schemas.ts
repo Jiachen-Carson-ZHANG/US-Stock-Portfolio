@@ -125,6 +125,35 @@ export const accountDecisionSchema = z.object({
   approve: z.boolean(),
 });
 
+/** The name you are shown under. Not the username, which is the address. */
+export const displayNameSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Enter a name.")
+    .max(40, "That is longer than a name needs to be."),
+});
+
+/** A topic or a reply in the playground. */
+export const playgroundPostSchema = z.object({
+  body: z.string().trim().min(1, "Write something first.").max(2000),
+  symbol: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9.\-]{1,24}$/, "That does not look like a ticker.")
+    .optional()
+    .or(z.literal("")),
+  horizon: z.enum(["three-months", "one-year"]).optional().or(z.literal("")),
+  parentId: z.string().uuid().optional().or(z.literal("")),
+});
+
+/** Answering a question straight from the bell. */
+export const notificationDecisionSchema = z.object({
+  notificationId: z.string().uuid(),
+  approve: z.boolean(),
+});
+
 export const accessRequestSchema = z.object({
   slug: z.string().trim().toLowerCase().min(1).max(32),
   message: z.string().trim().max(280).default(""),

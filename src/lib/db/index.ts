@@ -310,6 +310,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   title      TEXT NOT NULL,
   body       TEXT,
   link       TEXT,
+  subject_id TEXT,
+  decision   TEXT,
+  decided_at TEXT,
   created_at TEXT NOT NULL,
   read_at    TEXT
 );
@@ -368,6 +371,43 @@ UPDATE broker_connections
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_broker_connection_portfolio
   ON broker_connections(portfolio_id, provider);
+
+-- A notification that asks a question needs to know what it is asking about,
+-- and to remember the answer. Without the subject, "approve" from the bell
+-- would have to guess which request it meant; without the decision, answering
+-- one would leave no trace and the same question would look unanswered
+-- forever.
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS subject_id TEXT;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS decision   TEXT;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS decided_at TEXT;
+
+
+-- The playground: one table for the whole room.
+--
+-- A reply is a post with a parent, which keeps "somebody said something" and
+-- "somebody answered" the same shape and means one query reads the lot. The
+-- author's name is copied in rather than joined every time, so a thread still
+-- reads correctly after somebody renames themselves.
+--
+-- The horizon column is what the room is for: is this a name for the next
+-- few months, or one for the next year, or just talk. Nullable, because most
+-- talk is just talk and forcing a choice would only get a meaningless one.
+CREATE TABLE IF NOT EXISTS playground_posts (
+  id         TEXT PRIMARY KEY,
+  parent_id  TEXT REFERENCES playground_posts(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  author     TEXT NOT NULL,
+  symbol     TEXT,
+  horizon    TEXT,
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_playground_thread
+  ON playground_posts(parent_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_playground_recent
+  ON playground_posts(created_at DESC);
+
+
 
 -- "Paper" was the accounting term; "mock" is what the family calls it, and
 -- what the address says. Renamed before anyone had one, so this only has to
