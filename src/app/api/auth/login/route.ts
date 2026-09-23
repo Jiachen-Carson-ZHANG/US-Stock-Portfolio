@@ -46,7 +46,28 @@ export async function POST(request: Request) {
   }
 
   const { username, password } = parsed.data;
-  const db = await getDb();
+
+  // Everything past this point talks to the database. Without this, a
+  // database that is unreachable — a missing DATABASE_URL on a second
+  // deployment, most likely — threw straight out of the route and the
+  // browser got Next's own "a server error occurred" page, which tells
+  // nobody anything and looks like the password was the problem.
+  let db;
+  try {
+    db = await getDb();
+  } catch (error) {
+    logger.error("auth.login.unavailable", {
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return Response.json(
+      {
+        error: "Sign-in is unavailable right now.",
+        reason:
+          "This copy of the site cannot reach its database. It is not your password — nothing you type will work until the connection is fixed.",
+      },
+      { status: 503 },
+    );
+  }
 
   const limit = await checkRateLimit(db, username);
   if (limit.blocked) {
@@ -77,6 +98,11 @@ export async function POST(request: Request) {
 
   await clearFailedAttempts(db, username);
   await recordActivity(db, { userId: user.id, username, kind: "login" });
+
+  // A new session, alongside any that already exist. Signing in on a phone
+  // has never signed anybody out of their laptop, and should not: only
+  // changing a password ends the other sessions, which is when it is
+  // actually wanted.
   const { token } = await createSession(db, user.id);
 
   const cookieStore = await cookies();

@@ -83,6 +83,31 @@ export function PortfolioAdmin({
     router.refresh();
   }
 
+  /**
+   * Removing a practice portfolio.
+   *
+   * Confirmed in the browser and refused again on the server for anything
+   * that is not a practice account, because this is the one control here
+   * that cannot be undone by clicking it a second time.
+   */
+  async function remove(slug: string) {
+    if (!window.confirm(t.portfolios.confirmRemove.replace("{slug}", slug))) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch("/api/portfolios", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    });
+    const body = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) {
+      setError(body.error ?? t.portfolios.removeFailed);
+      return;
+    }
+    router.refresh();
+  }
+
   async function setAccess(portfolioId: string, userId: string, grant: boolean) {
     setBusy(true);
     await fetch("/api/portfolios", {
@@ -117,6 +142,16 @@ export function PortfolioAdmin({
                 <span className="text-xs text-muted-foreground">
                   {t.portfolios.owner}: {owner?.displayName ?? t.portfolios.unassigned}
                 </span>
+                {portfolio.kind === "mock" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(portfolio.slug)}
+                    className="ml-auto text-xs text-muted-foreground hover:text-negative disabled:opacity-50"
+                  >
+                    {t.portfolios.remove}
+                  </button>
+                )}
               </div>
 
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">

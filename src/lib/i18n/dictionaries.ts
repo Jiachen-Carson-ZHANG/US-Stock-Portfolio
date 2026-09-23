@@ -9,6 +9,7 @@ const en = {
   nav: {
     overview: "Overview",
     arena: "Arena",
+    playground: "Playground",
     portfolios: "Portfolios",
     holdings: "Holdings",
     performance: "Performance",
@@ -29,6 +30,8 @@ const en = {
     signingIn: "Signing in…",
     invalid: "Invalid username or password",
     tooMany: "Too many attempts. Try again in a few minutes.",
+    unavailable:
+      "Sign-in is unavailable: this copy of the site cannot reach its database. Nothing you type will work until that is fixed, so it is not your password.",
     unreachable: "Cannot reach the server. Check your connection.",
   },
 
@@ -59,6 +62,9 @@ const en = {
     short: "short",
     netDeposits: "Net deposits",
     totalReturn: "Total return",
+    asAt: "as at",
+    sessionOf: "trading day of",
+    since: "since",
   },
 
   charts: {
@@ -146,6 +152,8 @@ const en = {
     netDebit: "Net debit paid",
     netCredit: "Net credit received",
     legs: "Legs",
+    stockPrice: "Stock price now",
+    paid: "Paid",
   },
 
   performance: {
@@ -356,6 +364,12 @@ const en = {
     lengthHint: "At least 8 characters. Nothing else required.",
     change: "Change password",
     changing: "Changing…",
+    displayName: "Your name",
+    displayNameNote:
+      "The name everybody else sees — in the sidebar, on the leaderboard, and above your portfolio. Your username stays as it is, because web addresses are built from it.",
+    saveName: "Save name",
+    nameSaved: "Saved. Your name is updated everywhere it appears.",
+    nameFailed: "That name could not be saved.",
     mismatch: "The two new passwords do not match.",
     tooShort: "Use at least 8 characters.",
     changed: "Password changed.",
@@ -397,12 +411,110 @@ const en = {
     markAllRead: "Mark all read",
     empty: "Nothing yet.",
     justNow: "just now",
+    approve: "Approve",
+    decline: "Decline",
+    view: "View",
+    approved: "You approved this",
+    declined: "You declined this",
+    deciding: "Saving…",
+    decideFailed: "That could not be answered. It may already have been.",
+  },
+
+  /**
+   * Plain-language explanations behind the question marks.
+   *
+   * Written for somebody who has never traded. Where a term cannot be
+   * avoided, it is defined in the same breath. If a line here reads like a
+   * textbook, it is wrong and should be rewritten rather than trimmed.
+   */
+  help: {
+    portfolioValue: "Portfolio value",
+    portfolioValueBody:
+      "What the whole account is worth right now: everything owned, priced at today's market, plus the cash sitting in it. Sell the lot today and this is roughly the cheque.",
+    today: "Today",
+    todayBody:
+      "How much the account moved since yesterday's closing price. Only today counts here. Something you have held for a year and are well ahead on still shows only what it did since yesterday.",
+    totalReturn: "Total return",
+    totalReturnBody:
+      "Everything made or lost since this account started, in one number. It adds the profit still sitting inside things that are owned to the profit already taken from things that were sold.",
+    totalInvested: "Total invested",
+    totalInvestedBody:
+      "Real money put in, less anything taken back out. Profit that was made and left in the account is not counted here, because it was never paid in. That is why cash plus holdings usually does not equal this number.",
+    unrealized: "Profit on paper",
+    unrealizedBody:
+      "Profit on something still owned. It changes every day and is not yours until it is sold. A holding can show a large number here and end up with none of it.",
+    realized: "Profit already taken",
+    realizedBody:
+      "Profit from something already sold. The money is in cash, and this number cannot change again whatever the price does afterwards.",
+    allocation: "Where the money is",
+    allocationBody:
+      "How the money is split between holdings. Measured by what each one cost rather than what it is worth now, so a position that doubled does not look like twice the bet it actually was. Option spreads count once, at what was paid for the pair.",
+    concentration: "Concentration",
+    concentrationBody:
+      "How much rides on the largest holdings. A high number means a couple of names decide how the whole account does, which is fine as a choice and dangerous as a surprise.",
+    breakEven: "Break-even",
+    breakEvenBody:
+      "The share price at which this option position would be worth exactly what was paid for it. Above that line it is ahead, below it, behind. That is why the share's current price sits underneath it.",
+    buyingPower: "Buying power",
+    buyingPowerBody:
+      "Cash that can actually be spent right now. It is lower than the cash balance whenever orders are waiting, because that money is already promised to them. Without this, ten waiting orders could each spend the same dollars.",
+    orderKinds: "Order types",
+    orderKindsBody:
+      "A market order buys or sells at whatever the price is this second. A limit order waits until the price is at least as good as the one named, and may never happen. A stop order sits quiet until the price passes the level named, then buys or sells at whatever the market is — used to cap a loss.",
+    mock: "Practice account",
+    mockBody:
+      "Practice money against real, live prices. The trades are checked against what the market is actually doing, so the result means something. The money does not exist.",
+    arena: "Arena",
+    arenaBody:
+      "Everybody's results side by side, as percentages. A percentage compares a small account and a large one fairly, and it is all that is shared — nobody sees anyone else's amounts, holdings or trades.",
+    timeWeighted: "Why the percentage is not just profit over money in",
+    timeWeightedBody:
+      "Paying money in makes an account bigger without making it better, and taking money out does the reverse. The percentage here is worked out so that transfers neither flatter nor punish it, which is the only way two people's results can be compared.",
+    optionPrice: "Option prices",
+    optionPriceBody:
+      "An option is quoted per share but traded in lots of a hundred, so a contract priced at 19.48 costs 1,948. The price in black is what it is worth now; the grey number underneath is what was paid for it.",
+  },
+
+  playground: {
+    title: "Playground",
+    subtitle:
+      "Somewhere to talk. Share a name you like, argue with somebody else's, and say what you think is worth watching.",
+    newTopic: "Start something",
+    body: "What do you want to say?",
+    bodyPlaceholder: "A name, a reason, a question…",
+    symbol: "Ticker (optional)",
+    horizon: "Timeframe",
+    horizonNone: "Just talking",
+    horizonThreeMonths: "Next three months",
+    horizonOneYear: "Next year",
+    post: "Post",
+    posting: "Posting…",
+    reply: "Reply",
+    replyPlaceholder: "Say something back…",
+    remove: "Remove",
+    empty: "Nobody has said anything yet. Be first.",
+    filterAll: "Everything",
+    replies: "replies",
+    oneReply: "reply",
+  },
+
+  records: {
+    title: "Records",
+    subtitle:
+      "The few things the app cannot work out on its own. Money moved in or out, and the reference figures the performance maths needs.",
+    transfer: "Record a transfer",
+    transferHint:
+      "Money you paid into the account or took out of it. The broker reports trades but never transfers, so a deposit nobody records looks exactly like a gain of the same size.",
   },
 
   portfolios: {
     title: "Portfolios",
     note: "A person sees a portfolio if they own it or if it is ticked for them here. Owners see everything regardless.",
     owner: "owner",
+    remove: "Remove",
+    confirmRemove:
+      "Remove /{slug}? Its practice trades and order history go with it, and this cannot be undone.",
+    removeFailed: "That portfolio could not be removed.",
     unassigned: "unassigned",
     address: "Address",
     addressHint: "Follows the username unless you change it.",
@@ -570,6 +682,7 @@ const en = {
     none: "—",
     cancel: "Cancel",
     save: "Save",
+    saving: "Saving…",
     error: "Something went wrong.",
   },
 };
@@ -582,6 +695,7 @@ const zh: Dictionary = {
   nav: {
     overview: "总览",
     arena: "竞技场",
+    playground: "讨论区",
     portfolios: "投资组合",
     holdings: "持仓",
     performance: "业绩表现",
@@ -602,6 +716,8 @@ const zh: Dictionary = {
     signingIn: "登录中…",
     invalid: "用户名或密码不正确",
     tooMany: "尝试次数过多，请几分钟后再试。",
+    unavailable:
+      "暂时无法登录：这个站点连不上数据库。在修复之前，输入什么都不会成功——问题不在你的密码。",
     unreachable: "无法连接服务器，请检查网络。",
   },
 
@@ -632,6 +748,9 @@ const zh: Dictionary = {
     short: "空头",
     netDeposits: "净入金",
     totalReturn: "总收益",
+    asAt: "数据截至",
+    sessionOf: "交易日",
+    since: "起算日",
   },
 
   charts: {
@@ -717,6 +836,8 @@ const zh: Dictionary = {
     netDebit: "净支出",
     netCredit: "净收入",
     legs: "组合腿",
+    stockPrice: "正股现价",
+    paid: "买入价",
   },
 
   performance: {
@@ -925,6 +1046,12 @@ const zh: Dictionary = {
     lengthHint: "至少 8 个字符，没有其他要求。",
     change: "修改密码",
     changing: "修改中…",
+    displayName: "你的名字",
+    displayNameNote:
+      "其他人看到的名字——侧边栏、排行榜，以及你的组合标题都用它。用户名不变，因为网址是根据用户名生成的。",
+    saveName: "保存名字",
+    nameSaved: "已保存，所有显示位置都会更新。",
+    nameFailed: "无法保存这个名字。",
     mismatch: "两次输入的新密码不一致。",
     tooShort: "请至少输入 8 个字符。",
     changed: "密码已修改。",
@@ -964,12 +1091,100 @@ const zh: Dictionary = {
     markAllRead: "全部标为已读",
     empty: "暂无通知。",
     justNow: "刚刚",
+    approve: "同意",
+    decline: "拒绝",
+    view: "查看",
+    approved: "你已同意",
+    declined: "你已拒绝",
+    deciding: "处理中…",
+    decideFailed: "无法处理，可能已经被处理过了。",
+  },
+
+  help: {
+    portfolioValue: "总市值",
+    portfolioValueBody:
+      "账户现在值多少钱：所有持仓按今天的市场价格计算，加上账户里的现金。今天全部卖出，大致就能拿到这个数。",
+    today: "今日盈亏",
+    todayBody:
+      "相对昨天收盘价，账户今天涨跌了多少。这里只算今天。一只持有一年、已经赚了很多的股票，在这里也只显示它从昨天到现在的变化。",
+    totalReturn: "总收益",
+    totalReturnBody:
+      "从开户至今赚到或亏掉的全部金额，合成一个数字。它把还握在手里的持仓的浮动盈亏，和已经卖出落袋的盈亏加在一起。",
+    totalInvested: "累计投入",
+    totalInvestedBody:
+      "真正转进来的钱，减去转出去的钱。赚到之后留在账户里的利润不算在这里，因为那不是投入的本金。所以「现金加持仓」通常不等于这个数字。",
+    unrealized: "浮动盈亏",
+    unrealizedBody:
+      "还没卖出的持仓上的盈亏。它每天都在变，卖出之前都不算真正到手。一只股票可以在这里显示一大笔浮盈，最后一分也没落袋。",
+    realized: "已实现盈亏",
+    realizedBody:
+      "已经卖出兑现的盈亏。钱已经变成现金，之后价格再怎么走，这个数字都不会再变。",
+    allocation: "钱在哪里",
+    allocationBody:
+      "钱在各个持仓之间是怎么分配的。按买入成本计算，而不是按现价，这样一只翻倍的股票不会看起来像当初下了两倍的注。期权价差按整组的净成本只计入一次。",
+    concentration: "集中度",
+    concentrationBody:
+      "最大的几个持仓占了多少比重。数字高，说明整个账户的表现基本由一两只票决定——主动这样配置没问题，事后才发现就危险了。",
+    breakEven: "盈亏平衡点",
+    breakEvenBody:
+      "正股要涨到这个价，这组期权才刚好值回当初付出的成本。高于这条线是赚，低于就是亏。所以正股现价就放在它下面。",
+    buyingPower: "可用资金",
+    buyingPowerBody:
+      "现在真正能花出去的钱。只要有挂单在等着成交，它就会低于现金余额，因为那部分钱已经被挂单预留了。没有这个机制，十张挂单会各自花掉同一笔钱。",
+    orderKinds: "订单类型",
+    orderKindsBody:
+      "市价单：按此刻的价格立刻成交。限价单：等价格至少达到你指定的水平才成交，也可能永远不成交。止损单：价格触及你设定的水平之前什么都不做，触及后按市价买入或卖出，通常用来控制亏损。",
+    mock: "模拟账户",
+    mockBody:
+      "用模拟的钱，对着真实的实时行情交易。成交与否是按市场真实走势判断的，所以结果有意义；只是钱是假的。",
+    arena: "竞技场",
+    arenaBody:
+      "所有人的成绩并排比较，用百分比。百分比让大账户和小账户可以公平比较，而且分享的也只有百分比——谁都看不到别人的金额、持仓和交易。",
+    timeWeighted: "为什么收益率不是简单的「赚的钱 ÷ 投入的钱」",
+    timeWeightedBody:
+      "转入资金会让账户变大，但不代表做得更好；转出则相反。这里的收益率经过处理，让转入转出既不美化也不拖累成绩——只有这样，两个人的结果才谈得上比较。",
+    optionPrice: "期权价格",
+    optionPriceBody:
+      "期权按每股报价，但每张合约对应一百股，所以报价 19.48 的一张合约实际是 1,948 元。黑色是现在的价格，下面灰色的是当初买入的价格。",
+  },
+
+  playground: {
+    title: "讨论区",
+    subtitle: "聊天的地方。分享你看好的票，反驳别人的，说说接下来值得关注什么。",
+    newTopic: "发个话题",
+    body: "你想说什么？",
+    bodyPlaceholder: "一只股票、一个理由、一个问题……",
+    symbol: "股票代码（可不填）",
+    horizon: "时间跨度",
+    horizonNone: "随便聊聊",
+    horizonThreeMonths: "未来三个月",
+    horizonOneYear: "未来一年",
+    post: "发布",
+    posting: "发布中…",
+    reply: "回复",
+    replyPlaceholder: "说点什么……",
+    remove: "删除",
+    empty: "还没有人发言，来当第一个。",
+    filterAll: "全部",
+    replies: "条回复",
+    oneReply: "条回复",
+  },
+
+  records: {
+    title: "记录",
+    subtitle: "少数几件程序自己算不出来的事：资金转入转出，以及收益计算需要的参考数据。",
+    transfer: "记录一笔转账",
+    transferHint:
+      "你转入或转出账户的钱。券商接口只报交易、不报转账，所以没有记录的入金，看起来就和同样金额的盈利一模一样。",
   },
 
   portfolios: {
     title: "投资组合",
     note: "只有拥有者本人，或在此处被勾选的人，才能查看某个组合。管理员始终可见全部。",
     owner: "归属",
+    remove: "删除",
+    confirmRemove: "确定删除 /{slug} 吗？它的模拟交易和订单记录会一并删除，且无法恢复。",
+    removeFailed: "无法删除该组合。",
     unassigned: "未指定",
     address: "网址",
     addressHint: "默认使用用户名，可自行修改。",
@@ -1122,6 +1337,7 @@ const zh: Dictionary = {
     none: "—",
     cancel: "取消",
     save: "保存",
+    saving: "保存中…",
     error: "出错了。",
   },
 };

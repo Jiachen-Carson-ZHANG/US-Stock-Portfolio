@@ -1,6 +1,7 @@
 import { isOpenAccess, requireUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { AccessRequests } from "@/components/layout/access-requests";
+import { DisplayName } from "@/components/account/display-name";
 import { ChangePassword } from "@/components/layout/account-actions";
 import { pendingRequestsFor } from "@/lib/access";
 import { Badge } from "@/components/ui/misc";
@@ -57,6 +58,14 @@ export default async function AccountPage() {
       </header>
 
       <AccessRequests requests={requests} />
+
+      <section className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="text-sm font-medium">{t.account.displayName}</h2>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t.account.displayNameNote}
+        </p>
+        <DisplayName current={user.displayName} />
+      </section>
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

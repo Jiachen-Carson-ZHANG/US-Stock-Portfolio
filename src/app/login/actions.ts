@@ -50,7 +50,20 @@ export async function loginAction(
   if (!parsed.success) return { error: t.login.invalid };
 
   const { username, password } = parsed.data;
-  const db = await getDb();
+
+  // Everything below needs the database. Left unguarded, a deployment that
+  // cannot reach it threw out of the action and the browser showed Next's
+  // own "a server error occurred" page — which reads as though the password
+  // was wrong, when in fact nothing typed there could ever have worked.
+  let db;
+  try {
+    db = await getDb();
+  } catch (error) {
+    logger.error("auth.login.unavailable", {
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return { error: t.login.unavailable };
+  }
 
   const limit = await checkRateLimit(db, username);
   if (limit.blocked) {
@@ -79,6 +92,9 @@ export async function loginAction(
   await clearFailedAttempts(db, username);
   await recordActivity(db, { userId: user.id, username, kind: "login" });
 
+  // Added to whatever sessions already exist rather than replacing them.
+  // Signing in on a phone does not sign anybody out of their laptop; only a
+  // password change does that, which is the one time it is wanted.
   const { token } = await createSession(db, user.id);
   const cookieStore = await cookies();
   cookieStore.set(

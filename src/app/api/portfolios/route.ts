@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import {
   createPortfolio,
+  DEFAULT_SLUG,
   findBySlug,
   grantAccess,
   listPortfolios,
@@ -127,6 +128,62 @@ export async function PATCH(request: Request) {
     username: auth.user.username,
     kind: grant ? "access_grant" : "access_revoke",
     target: portfolioId,
+  });
+
+  return Response.json({ ok: true });
+}
+
+/**
+ * Removing a portfolio.
+ *
+ * Only a simulated one, and only when it is empty of anything worth keeping
+ * — a test account made while setting things up, not somebody's record. A
+ * portfolio that follows a real brokerage account is never deletable here:
+ * it holds the only copy of a trade history that cannot be re-fetched past
+ * moomoo's ninety-day window, and there is no undo for that.
+ *
+ * The default slug is refused too, whatever its kind. It is the one address
+ * every link in the family points at.
+ */
+export async function DELETE(request: Request) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
+
+  const auth = await requireApiOwner();
+  if ("response" in auth) return auth.response;
+
+  const body = await request.json().catch(() => ({}));
+  const slug = typeof body?.slug === "string" ? body.slug.toLowerCase() : "";
+  if (!slug) return Response.json({ error: "Invalid request" }, { status: 400 });
+
+  const db = await getDb();
+  const portfolio = await findBySlug(db, slug);
+  if (!portfolio) return Response.json({ error: "No such portfolio" }, { status: 404 });
+
+  if (portfolio.slug === DEFAULT_SLUG) {
+    return Response.json(
+      { error: "That is the family portfolio and cannot be removed." },
+      { status: 409 },
+    );
+  }
+  if (portfolio.kind !== "mock") {
+    return Response.json(
+      {
+        error:
+          "Only a practice portfolio can be removed here. One that follows a real account holds trade history that cannot be fetched again.",
+      },
+      { status: 409 },
+    );
+  }
+
+  await db.run(`DELETE FROM portfolios WHERE id = ?`, [portfolio.id]);
+
+  logger.info("portfolio.removed", { slug: portfolio.slug });
+  await recordActivity(db, {
+    userId: auth.user.id,
+    username: auth.user.username,
+    kind: "portfolio_remove",
+    target: portfolio.slug,
   });
 
   return Response.json({ ok: true });
