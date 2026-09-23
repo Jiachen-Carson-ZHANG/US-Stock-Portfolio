@@ -11,6 +11,14 @@ import { baseCurrency } from "@/lib/portfolio/service";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Long enough to survive the database waking from suspend, which has been
+ * measured at 26 seconds. Without this the platform's default cut the render
+ * short and the reader got an error page instead of one slow load.
+ */
+export const maxDuration = 60;
+
+
 function usd(value: number, currency: string) {
   return formatMoney({ amount: String(value), currency });
 }

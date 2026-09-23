@@ -11,6 +11,14 @@ import { following } from "@/lib/feed";
 export const dynamic = "force-dynamic";
 
 /**
+ * Long enough to survive the database waking from suspend, which has been
+ * measured at 26 seconds. Without this the platform's default cut the render
+ * short and the reader got an error page instead of one slow load.
+ */
+export const maxDuration = 60;
+
+
+/**
  * The directory.
  *
  * Shows every portfolio on the site, including the ones this person cannot

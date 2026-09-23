@@ -582,7 +582,19 @@ async function initialise(): Promise<DB> {
     ssl: sslOption(url),
     max: Number(process.env.DATABASE_POOL_MAX ?? 10),
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    // Long enough to sit through the database waking up.
+    //
+    // Neon's free tier suspends the compute after a few minutes idle, and
+    // starting it again is not instant: measured from the deployment, a
+    // trivial SELECT 1 took 26.5 seconds cold and 2ms warm. At ten seconds
+    // the first visit after any quiet spell failed outright, and because the
+    // whole request died there was no trace of it anywhere — which is exactly
+    // what "something went wrong, with nothing in the log" was.
+    //
+    // Waiting is the right answer rather than failing: one slow page after a
+    // quiet hour is much better than an error, and the scheduled ping means
+    // it should rarely be cold at all.
+    connectionTimeoutMillis: Number(process.env.DATABASE_CONNECT_TIMEOUT_MS ?? 30_000),
   });
 
   // A pooled client can be dropped by the server at any time; without a handler

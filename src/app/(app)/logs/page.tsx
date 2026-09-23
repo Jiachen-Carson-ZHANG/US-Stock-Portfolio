@@ -6,6 +6,14 @@ import { BackLink } from "@/components/ui/back-link";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Long enough to survive the database waking from suspend, which has been
+ * measured at 26 seconds. Without this the platform's default cut the render
+ * short and the reader got an error page instead of one slow load.
+ */
+export const maxDuration = 60;
+
+
 function ms(value: number | null): string {
   if (value === null) return "—";
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value}ms`;
