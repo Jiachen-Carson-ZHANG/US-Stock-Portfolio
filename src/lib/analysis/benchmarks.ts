@@ -1,7 +1,6 @@
-import type { MarketDataProvider } from "@/providers/market-data/types";
-// Not marked server-only on purpose: the loader needs a provider and so can
-// only run on the server, but the comparison maths below is pure and the
-// chart re-runs it in the browser whenever the date range changes.
+// Pure on purpose. The chart re-runs the comparison in the browser whenever
+// the date range changes, so nothing here may touch the network or the
+// database — fetching lives in benchmarks-server.ts.
 import type { AdjustedPoint } from "./math";
 
 /**
@@ -30,37 +29,6 @@ export type BenchmarkSeries = {
   /** Close by date, already filtered to trading days the feed returned. */
   points: { date: string; value: number }[];
 };
-
-/**
- * Daily closes for each benchmark over the window the portfolio covers.
- *
- * One failure does not sink the rest: a feed that cannot price ONEQ still
- * gives a comparison against the other two, and the blend is then made from
- * whatever arrived. Better a chart with two lines than an empty box.
- */
-export async function loadBenchmarks(
-  provider: MarketDataProvider,
-  from: string,
-  to: string,
-): Promise<BenchmarkSeries[]> {
-  const loaded = await Promise.all(
-    BENCHMARKS.map(async ({ key, label }): Promise<BenchmarkSeries | null> => {
-      try {
-        const history = await provider.getHistoricalPrices(key, { from, to });
-        const points = history
-          .filter((row) => Number.isFinite(row.close) && row.close > 0)
-          .map((row) => ({ date: row.date, value: row.close }));
-        return points.length >= 2 ? { key, label, points } : null;
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  const series = loaded.filter((item): item is BenchmarkSeries => item !== null);
-  const blend = equalMix(series);
-  return blend ? [...series, blend] : series;
-}
 
 /**
  * A third in each, rebalanced daily.

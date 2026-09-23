@@ -7,10 +7,16 @@ import { readAnalysis } from "@/lib/analysis/store";
 import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
 import { getDb } from "@/lib/db";
 import { Help } from "@/components/ui/help";
-import { loadBenchmarks } from "@/lib/analysis/benchmarks";
-import { loadRates } from "@/lib/analysis/fx";
+import { loadBenchmarks } from "@/lib/analysis/benchmarks-server";
+import { loadRates } from "@/lib/analysis/fx-server";
 import { getMarketDataProvider } from "@/providers";
 export const dynamic = "force-dynamic";
+
+/**
+ * Longer than the default, for the one load a day that has to fetch the
+ * benchmark closes and exchange rates rather than read them from cache.
+ */
+export const maxDuration = 60;
 export default async function PerformancePage({
   params,
 }: {
