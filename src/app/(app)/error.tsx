@@ -1,52 +1,71 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect } from "react";
+import {
+  looksLikeStaleCode,
+  reloadOnceForStaleCode,
+  reportClientError,
+} from "@/lib/stale-code";
 
 /**
  * A failure inside the app keeps the app around it.
  *
  * The root error screen replaces everything, sidebar included, so one page
  * failing looked like the whole site had. Here the navigation stays and only
- * the content is replaced, which is both truer and far less alarming — every
- * other tab still works, and the reader can prove it by clicking one.
+ * the content is replaced.
+ *
+ * Both buttons do a real page load rather than a client-side retry. The most
+ * common failure here, by far, is a tab left open across a deploy: its code
+ * is older than the server's, and retrying with that same code — which is
+ * all React's reset() does — cannot succeed. That is why "Try again" used to
+ * do nothing at all. A reload fetches current code and always recovers.
  */
-export default function AppError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function AppError({ error }: { error: Error & { digest?: string } }) {
+  // Stale code is recognisable and always fixed by one reload, so do it
+  // without waiting to be asked. The reader sees a brief flicker instead of
+  // an error screen.
+  useEffect(() => {
+    // Reported first, so the log has it even when the reload below replaces
+    // the page a moment later.
+    reportClientError("app-boundary", error, error.digest);
+    if (looksLikeStaleCode(error)) reloadOnceForStaleCode();
+  }, [error]);
+
   return (
     <div className="rounded-xl border border-border bg-surface p-8 text-center">
       <h1 className="text-base font-semibold tracking-tight">
         This page could not be loaded
       </h1>
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-        Everything else still works — the other tabs are fine, and nothing has
-        been lost. Most of these are momentary, so trying again usually does it.
+        Nothing has been lost. If the site was updated while this page was open,
+        reloading picks up the new version.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"
-          onClick={reset}
+          onClick={() => window.location.reload()}
           className="min-h-11 rounded-xl bg-foreground px-5 text-sm font-medium text-background"
         >
-          Try again
+          Reload
         </button>
-        <Link
-          href="/"
-          className="min-h-11 rounded-xl border border-border px-5 text-sm leading-[2.75rem]"
+        {/* A full page load, not a client-side navigation: if client-side
+            navigation is what broke, the way out cannot depend on it. */}
+        <button
+          type="button"
+          // A full load on purpose; router.push is the client-side
+          // navigation this screen exists to recover from.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          onClick={() => window.location.assign("/")}
+          className="min-h-11 rounded-xl border border-border px-5 text-sm"
         >
           Back to the overview
-        </Link>
+        </button>
       </div>
 
       {error.digest && (
         <p className="mt-6 text-xs text-muted-foreground">
-          Reference <span className="tabular">{error.digest}</span> — an owner
-          can look this up under Settings, Speed and activity
+          Reference <span className="tabular">{error.digest}</span>
         </p>
       )}
     </div>

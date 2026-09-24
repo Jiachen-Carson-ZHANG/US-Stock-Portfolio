@@ -1,5 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
+import {
+  looksLikeStaleCode,
+  reloadOnceForStaleCode,
+  reportClientError,
+} from "@/lib/stale-code";
+
 /**
  * What a reader sees when a page fails.
  *
@@ -13,12 +20,17 @@
  */
 export default function ErrorScreen({
   error,
-  reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
 }) {
   const message = error.message ?? "";
+
+  // A tab left open across a deploy is the usual cause, and one reload is the
+  // cure; retrying with the same stale code (React's reset) never works.
+  useEffect(() => {
+    reportClientError("root-boundary", error, error.digest);
+    if (looksLikeStaleCode(error)) reloadOnceForStaleCode();
+  }, [error]);
 
   const { title, body } = categorise(message);
 
@@ -30,10 +42,10 @@ export default function ErrorScreen({
 
         <button
           type="button"
-          onClick={reset}
+          onClick={() => window.location.reload()}
           className="mt-6 min-h-11 rounded-xl bg-foreground px-5 text-sm font-medium text-background"
         >
-          Try again
+          Reload
         </button>
 
         {error.digest && (

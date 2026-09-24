@@ -21,6 +21,21 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Which deployment this build is, so an old browser tab can notice it is
+  // talking to a newer one.
+  //
+  // Without it, a phone that kept the site open across a deploy went on
+  // running the old code against the new server: navigations fetched pages it
+  // could no longer read, and asked for script files that no longer existed.
+  // The page froze on its loading skeleton, and every button — including
+  // "try again", which only retries with the same stale code — did nothing
+  // until the page was refreshed by hand.
+  //
+  // With it, Next compares the id on every navigation and, on a mismatch,
+  // reloads the page instead of attempting a client-side navigation it cannot
+  // complete. One reload, and the tab is running current code again.
+  deploymentId:
+    process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? undefined,
   // Emits a self-contained server bundle, so a container does not need the
   // whole node_modules tree and the app stays portable across hosts.
   output: "standalone",
