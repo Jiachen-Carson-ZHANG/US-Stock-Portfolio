@@ -162,10 +162,30 @@ export function canWrite(user: AuthUser, portfolio: Portfolio): boolean {
   return portfolio.ownerUserId === user.id;
 }
 
-/** Where "/" sends someone: their own portfolio, else the first they can see. */
+/**
+ * Where "/" sends somebody, and which portfolio the navigation assumes.
+ *
+ * A real brokerage account outranks a practice one. Somebody who owns both —
+ * which is everybody, since approval creates a practice account — was landing
+ * on whichever happened to be created first, so following an unscoped link
+ * could drop them into the simulator when they meant their actual holdings.
+ * Ordering by creation date made that look random; it was only ever a
+ * question of which row came back first.
+ *
+ * Own it, then be able to read it: an administrator can see everybody's
+ * portfolios, and theirs should still be the one that opens.
+ */
 export async function defaultFor(db: DB, user: AuthUser): Promise<Portfolio | null> {
   const visible = await visibleTo(db, user);
-  return visible.find((p) => p.ownerUserId === user.id) ?? visible[0] ?? null;
+  const mine = visible.filter((p) => p.ownerUserId === user.id);
+
+  return (
+    mine.find((p) => p.kind === "broker") ??
+    mine[0] ??
+    visible.find((p) => p.kind === "broker") ??
+    visible[0] ??
+    null
+  );
 }
 
 export async function createPortfolio(

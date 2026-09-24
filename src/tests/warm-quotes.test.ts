@@ -98,3 +98,71 @@ describe("warming the price cache for everybody at once", () => {
     expect(await symbolsToWarm()).toEqual(["NVDA"]);
   });
 });
+
+describe("which portfolio opens by default", () => {
+  it("prefers the real brokerage account over the practice one", async () => {
+    const { createPortfolio, defaultFor } = await import("@/lib/portfolios");
+    const id = randomUUID();
+    await db.run(
+      `INSERT INTO users (id, username, display_name, password_hash, role, status, created_at)
+       VALUES (?, 'carson', 'Carson', 'x', 'viewer', 'active', ?)`,
+      [id, new Date().toISOString()],
+    );
+
+    // The practice account is created second in real life, but ordering by
+    // creation date is exactly what made this look random — so make the
+    // practice one older here, which is the case the old code got wrong.
+    const mock = await createPortfolio(db, {
+      slug: "carson-mock",
+      displayName: "Carson practice",
+      ownerUserId: id,
+      kind: "mock",
+      openingCash: "10000",
+    });
+    const real = await createPortfolio(db, {
+      slug: "carson-real",
+      displayName: "Carson",
+      ownerUserId: id,
+      kind: "broker",
+    });
+
+    const user = {
+      id,
+      username: "carson",
+      displayName: "Carson",
+      role: "viewer" as const,
+      status: "active" as const,
+    };
+
+    expect((await defaultFor(db, user))?.id).toBe(real.id);
+    expect((await defaultFor(db, user))?.id).not.toBe(mock.id);
+  });
+
+  it("falls back to the practice account when there is no real one", async () => {
+    const { createPortfolio, defaultFor } = await import("@/lib/portfolios");
+    const id = randomUUID();
+    await db.run(
+      `INSERT INTO users (id, username, display_name, password_hash, role, status, created_at)
+       VALUES (?, 'mideil', 'Mideil', 'x', 'viewer', 'active', ?)`,
+      [id, new Date().toISOString()],
+    );
+
+    const mock = await createPortfolio(db, {
+      slug: "mideil-mock",
+      displayName: "Mideil practice",
+      ownerUserId: id,
+      kind: "mock",
+      openingCash: "10000",
+    });
+
+    const user = {
+      id,
+      username: "mideil",
+      displayName: "Mideil",
+      role: "viewer" as const,
+      status: "active" as const,
+    };
+
+    expect((await defaultFor(db, user))?.id).toBe(mock.id);
+  });
+});
