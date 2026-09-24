@@ -88,8 +88,16 @@ function persist(event: string, fields: LogFields): void {
     .join(" · ")
     .slice(0, 300);
 
-  void import("@/lib/observe")
-    .then(({ recordFailure }) => recordFailure(`server ${event}`, detail))
+  // Loaded lazily, and run through `after` so the platform does not freeze
+  // it half-written once the response is out.
+  void import("@/lib/later")
+    .then(({ runLater }) =>
+      runLater(() =>
+        import("@/lib/observe").then(({ recordFailure }) =>
+          recordFailure(`server ${event}`, detail),
+        ),
+      ),
+    )
     .catch(() => {
       // The copy is a convenience. The console line above is the record.
     });

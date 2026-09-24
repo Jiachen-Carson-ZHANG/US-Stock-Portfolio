@@ -1,4 +1,5 @@
 import { requireOwner } from "@/lib/auth/guards";
+import { runLater } from "@/lib/later";
 import { getDb } from "@/lib/db";
 import { recentActivity } from "@/lib/activity";
 import {
@@ -51,7 +52,7 @@ export default async function LogsPage() {
 
   const db = await getDb();
   // Trimmed on the way in rather than by a job nobody remembers to set up.
-  void pruneTimings().catch(() => {});
+  runLater(() => pruneTimings());
 
   const [errors, paths, recent, activity] = await Promise.all([
     recentErrors(24),

@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { runLater } from "@/lib/later";
 import { dedupe } from "@/lib/inflight";
 import { logger } from "@/lib/logger";
 
@@ -47,7 +48,7 @@ export async function cachedSeries<T>(
   if (row) {
     const parsed = parse<T>(row.payload);
     if (parsed !== undefined) {
-      void refresh.catch(() => {});
+      runLater(() => refresh);
       return parsed;
     }
   }

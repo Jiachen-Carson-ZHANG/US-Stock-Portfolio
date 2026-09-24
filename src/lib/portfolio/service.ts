@@ -1,4 +1,5 @@
 import "server-only";
+import { runLater } from "@/lib/later";
 import { observe } from "@/lib/observe";
 import { getDb, type DB } from "@/lib/db";
 import { dedupe } from "@/lib/inflight";
@@ -262,6 +263,12 @@ export async function ensureFreshPositions(portfolioId: string, now: Date): Prom
       new Promise<void>((resolve) => setTimeout(resolve, BLOCKING_SYNC_DEADLINE_MS)),
     ]);
   }
+
+  // Whether or not the page waited, the sync has to be allowed to finish.
+  // Left as a bare promise it was frozen with the function the moment the
+  // page went out, so a non-blocking sync never completed at all and the
+  // same stale holdings were served until one happened to block.
+  runLater(() => work);
 }
 
 async function pricedPositions(portfolioId: string, now: Date): Promise<{

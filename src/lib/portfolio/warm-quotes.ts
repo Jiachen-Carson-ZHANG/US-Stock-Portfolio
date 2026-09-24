@@ -68,7 +68,9 @@ export async function warmQuotes(now: Date = new Date()): Promise<{
   const provider = await getMarketDataProvider(portfolios[0].id);
 
   await observe("quotes.warm", null, async () => {
-    await getQuotes(db, symbols, provider, now);
+    // Waits for the broker, unlike a page load. A background job that serves
+    // the cache and refreshes "later" never refreshes at all on this host.
+    await getQuotes(db, symbols, provider, now, { waitForFresh: true });
   });
 
   logger.info("quotes.warmed", { symbols: symbols.length, session });

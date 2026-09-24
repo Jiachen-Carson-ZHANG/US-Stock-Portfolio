@@ -1,4 +1,5 @@
 import type { DB } from "@/lib/db";
+import { runLater } from "@/lib/later";
 import { dedupe } from "@/lib/inflight";
 import { logger } from "@/lib/logger";
 import { recordFailure } from "@/lib/observe";
@@ -178,6 +179,10 @@ export async function getQuotes(
   symbols: string[],
   provider: MarketDataProvider,
   now: Date = new Date(),
+  // The scheduler's refresh must actually refresh. Serving the cache and
+  // refreshing behind it is right for a person waiting on a page and wrong for
+  // a job whose only purpose is the refresh.
+  options: { waitForFresh?: boolean } = {},
 ): Promise<QuoteResult> {
   const cached = await readCache(db, symbols);
   const ttlMs = cacheTtlSeconds() * 1000;
@@ -203,7 +208,9 @@ export async function getQuotes(
   // such is better than a page that will not load, every time. The only case
   // that still waits is having nothing whatsoever to show.
   const servableNow =
-    expired.length > 0 && expired.every((symbol) => cached.has(symbol));
+    !options.waitForFresh &&
+    expired.length > 0 &&
+    expired.every((symbol) => cached.has(symbol));
 
   let isStale = false;
 
@@ -211,11 +218,13 @@ export async function getQuotes(
     // Fire and forget, deduplicated: the page renders from cache and the next
     // request sees the new prices. A failure here is invisible by design —
     // the following call will simply try again.
-    void dedupe(`quotes:${[...expired].sort().join(",")}`, async () => {
-      const fresh = await provider.getQuotes(expired);
-      await writeCache(db, fresh, new Date());
-      return fresh;
-    }).catch(() => {});
+    runLater(() =>
+      dedupe(`quotes:${[...expired].sort().join(",")}`, async () => {
+        const fresh = await provider.getQuotes(expired);
+        await writeCache(db, fresh, new Date());
+        return fresh;
+      }),
+    );
   } else if (expired.length > 0) {
     try {
       const fresh = await dedupe(
@@ -254,7 +263,7 @@ export async function getQuotes(
       // screen with no trace anywhere of why. It leaves a trace now.
       const reason = error instanceof Error ? error.message : "unknown";
       logger.warn("quotes.fetch_failed", { symbols: expired.length, reason });
-      void recordFailure("quotes.fetch", reason).catch(() => {});
+      runLater(() => recordFailure("quotes.fetch", reason));
     }
   }
 

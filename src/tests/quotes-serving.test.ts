@@ -111,3 +111,21 @@ describe("a page must never wait on the broker when it has something to show", (
     expect(isStale).toBe(true);
   });
 });
+
+describe("the scheduler's refresh", () => {
+  it("actually fetches, instead of serving the cache and refreshing 'later'", async () => {
+    // The bug this guards: a stale price was served at once and its refresh
+    // started in the background — which the host freezes as soon as the
+    // response is out. The scheduler went down the same path and so never
+    // refreshed anything at all.
+    await seedCache("VST", 100, new Date(NOW.getTime() - 3_600_000));
+    const fetched = vi.fn(async () => [quote("VST", 140)]);
+
+    const { quotes } = await getQuotes(db, ["VST"], provider(fetched), NOW, {
+      waitForFresh: true,
+    });
+
+    expect(fetched).toHaveBeenCalled();
+    expect(quotes.get("VST")?.price).toBe(140);
+  });
+});

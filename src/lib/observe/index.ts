@@ -1,4 +1,5 @@
 import "server-only";
+import { runLater } from "@/lib/later";
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -74,17 +75,13 @@ export async function observe<T>(
 
   try {
     const result = await currentSpan.run(span, work);
-    void record(label, who, Date.now() - started, span, "ok", null);
+    const ms = Date.now() - started;
+    runLater(() => record(label, who, ms, span, "ok", null));
     return result;
   } catch (error) {
-    void record(
-      label,
-      who,
-      Date.now() - started,
-      span,
-      "error",
-      error instanceof Error ? error.message.slice(0, 300) : "unknown",
-    );
+    const ms = Date.now() - started;
+    const detail = error instanceof Error ? error.message.slice(0, 300) : "unknown";
+    runLater(() => record(label, who, ms, span, "error", detail));
     throw error;
   }
 }
