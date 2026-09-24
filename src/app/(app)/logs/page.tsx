@@ -1,7 +1,14 @@
 import { requireOwner } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { recentActivity } from "@/lib/activity";
-import { pruneTimings, recentTimings, slowestPaths, SLOW_ENOUGH_MS } from "@/lib/observe";
+import {
+  pruneTimings,
+  recentErrors,
+  recentTimings,
+  slowestPaths,
+  SLOW_ENOUGH_MS,
+  type ErrorGroup,
+} from "@/lib/observe";
 import { BackLink } from "@/components/ui/back-link";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +53,22 @@ export default async function LogsPage() {
   // Trimmed on the way in rather than by a job nobody remembers to set up.
   void pruneTimings().catch(() => {});
 
-  const [paths, recent, activity] = await Promise.all([
+  const [errors, paths, recent, activity] = await Promise.all([
+    recentErrors(24),
     slowestPaths(24),
     recentTimings(60),
     recentActivity(db, 60),
   ]);
+
+  const SOURCE: Record<ErrorGroup["source"], { label: string; hint: string }> = {
+    browser: {
+      label: "Browser",
+      hint: "Failed in somebody's browser. STALE TAB means a page left open across an update",
+    },
+    server: { label: "Server", hint: "A failure the server caught and logged" },
+    page: { label: "Page", hint: "A page that threw while being built" },
+    operation: { label: "Operation", hint: "A timed step that failed" },
+  };
 
   return (
     <div className="space-y-6">
@@ -63,6 +81,45 @@ export default async function LogsPage() {
           recorded, so an empty table here means everything was fast.
         </p>
       </header>
+
+      {/* Errors first: they are what anybody opens this page to find. */}
+      <section className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="text-sm font-medium">Errors, last 24 hours</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Every failure, wherever it happened — including in somebody&rsquo;s
+          browser, which is where a frozen page actually breaks. Grouped by
+          where, newest first.
+        </p>
+
+        {errors.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">No errors. Nothing to look at.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-border">
+            {errors.map((group) => (
+              <li key={`${group.source}-${group.path}`} className="py-3">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span
+                    className="rounded-md border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                    title={SOURCE[group.source].hint}
+                  >
+                    {SOURCE[group.source].label}
+                  </span>
+                  <span className="text-sm font-medium">{group.path}</span>
+                  <span className="tabular text-sm text-negative">×{group.count}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {when(group.latestAt)}
+                  </span>
+                </div>
+                {group.latestDetail && (
+                  <p className="mt-1 break-words text-xs text-muted-foreground">
+                    {group.latestDetail}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">Slowest operations, last 24 hours</h2>

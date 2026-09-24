@@ -66,16 +66,48 @@ function scrub(fields: LogFields): LogFields {
   return safe;
 }
 
+/**
+ * Errors also go where an owner can read them.
+ *
+ * The console is the hosting provider's log, which nobody here can open from
+ * the site — so every handled failure (an order the broker refused, a sync
+ * that timed out) was recorded somewhere invisible. Errors are now copied into
+ * the same table the Speed and activity page reads.
+ *
+ * Only errors: warnings and info are routine, and copying them would bury the
+ * lines that matter. Already scrubbed of secrets by the time they get here.
+ * Loaded lazily so the logger keeps no import of the database — the database
+ * layer logs too, and the two must not depend on each other at load time.
+ */
+function persist(event: string, fields: LogFields): void {
+  // Only on the server; a stray import in the browser has no database.
+  if (typeof window !== "undefined") return;
+
+  const detail = Object.entries(fields)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(" · ")
+    .slice(0, 300);
+
+  void import("@/lib/observe")
+    .then(({ recordFailure }) => recordFailure(`server ${event}`, detail))
+    .catch(() => {
+      // The copy is a convenience. The console line above is the record.
+    });
+}
+
 function emit(level: "info" | "warn" | "error", event: string, fields: LogFields) {
+  const safe = scrub(fields);
   const line = JSON.stringify({
     level,
     event,
     at: new Date().toISOString(),
-    ...scrub(fields),
+    ...safe,
   });
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
   else console.log(line);
+
+  if (level === "error") persist(event, safe);
 }
 
 export const logger = {

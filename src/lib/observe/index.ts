@@ -191,6 +191,9 @@ export async function slowestPaths(sinceHours = 24): Promise<PathSummary[]> {
             COUNT(*) FILTER (WHERE outcome <> 'ok')::int AS errors
        FROM request_timings
       WHERE created_at >= ?
+        AND path NOT LIKE 'client %'
+        AND path NOT LIKE 'server %'
+        AND path NOT LIKE 'render %'
       GROUP BY path
       ORDER BY median_ms DESC
       LIMIT 40`,
@@ -218,4 +221,58 @@ export async function pruneTimings(days = 7): Promise<number> {
   const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
   const result = await db.run(`DELETE FROM request_timings WHERE created_at < ?`, [cutoff]);
   return result.changes;
+}
+
+export type ErrorGroup = {
+  source: "browser" | "server" | "page" | "operation";
+  path: string;
+  count: number;
+  latestAt: string;
+  latestDetail: string | null;
+};
+
+/**
+ * Every failure in a window, grouped by where it happened.
+ *
+ * Four sources, because they point at different fixes: a browser error is
+ * usually a tab running old code or a phone quirk; a server error is a handled
+ * failure the code logged; a page error is a render that threw; an operation
+ * is a timed loader that failed. Seeing which source is growing says where to
+ * look before reading a single message.
+ */
+export async function recentErrors(sinceHours = 24): Promise<ErrorGroup[]> {
+  const db = await getDb();
+  const since = new Date(Date.now() - sinceHours * 3_600_000).toISOString();
+
+  const rows = await db.all<{
+    path: string;
+    n: number;
+    latest_at: string;
+    latest_detail: string | null;
+  }>(
+    `SELECT path,
+            COUNT(*)::int AS n,
+            MAX(created_at) AS latest_at,
+            (ARRAY_AGG(detail ORDER BY created_at DESC))[1] AS latest_detail
+       FROM request_timings
+      WHERE created_at >= ? AND outcome <> 'ok'
+      GROUP BY path
+      ORDER BY MAX(created_at) DESC
+      LIMIT 60`,
+    [since],
+  );
+
+  return rows.map((row) => ({
+    source: row.path.startsWith("client ")
+      ? "browser"
+      : row.path.startsWith("server ")
+        ? "server"
+        : row.path.startsWith("render ")
+          ? "page"
+          : "operation",
+    path: row.path.replace(/^(client|server|render) /, ""),
+    count: row.n,
+    latestAt: row.latest_at,
+    latestDetail: row.latest_detail,
+  }));
 }

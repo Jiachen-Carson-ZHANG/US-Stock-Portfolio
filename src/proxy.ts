@@ -15,6 +15,9 @@ const PUBLIC_PATHS = new Set([
   "/api/cron/orders",
   "/api/cron/quotes",
   "/api/health",
+  // Browser error reports, which must arrive even when the session is the
+  // thing that broke. The route caps its own volume.
+  "/api/client-errors",
 ]);
 
 /**
