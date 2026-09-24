@@ -387,6 +387,11 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS decided_at TEXT;
 -- and a feed that adds an eighth should not need a migration.
 ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS greeks TEXT;
 
+-- The day's shape beside the price: open, high, low, volume. Stored as JSON
+-- for the same reason the greeks are — it arrives and is read as one lump,
+-- and a feed that adds a field should not need a migration.
+ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS session TEXT;
+
 -- Following somebody. One row per direction, so following is not mutual
 -- unless both sides ask for it, and the pair is unique so pressing the
 -- button twice does nothing.

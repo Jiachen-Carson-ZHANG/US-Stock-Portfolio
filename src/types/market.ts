@@ -31,6 +31,21 @@ export type Quote = {
   source: string;
   /** Present only for option contracts, and only when the feed sends them. */
   greeks?: OptionGreeks;
+  /**
+   * The rest of what the broker publishes beside the price: where it opened,
+   * how far it has travelled today, and how much has changed hands.
+   *
+   * A price on its own is the least informative number on a trading screen.
+   * "212.40" says nothing about whether that is the high of the day or the
+   * low of it, and the answer changes what a limit order should be.
+   */
+  session?: {
+    open?: number;
+    high?: number;
+    low?: number;
+    volume?: number;
+    turnover?: number;
+  };
 };
 
 export type HistoricalPrice = {

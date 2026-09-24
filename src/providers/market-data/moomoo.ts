@@ -28,6 +28,12 @@ type Snapshot = {
   last_price: number;
   prev_close_price: number;
   update_time: number;
+  // The day's shape, which the snapshot already carries and we were dropping.
+  open_price?: number | string;
+  high_price?: number | string;
+  low_price?: number | string;
+  volume?: number | string;
+  turnover?: number | string;
   option_ex_data?: OptionExData;
 };
 
@@ -41,6 +47,17 @@ function toNumber(value: number | string | undefined): number | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function sessionFrom(snapshot: Snapshot): Quote["session"] {
+  const shape = {
+    open: toNumber(snapshot.open_price),
+    high: toNumber(snapshot.high_price),
+    low: toNumber(snapshot.low_price),
+    volume: toNumber(snapshot.volume),
+    turnover: toNumber(snapshot.turnover),
+  };
+  return Object.values(shape).some((value) => value !== undefined) ? shape : undefined;
 }
 
 function greeksFrom(data: OptionExData | undefined): Quote["greeks"] {
@@ -147,6 +164,7 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
           dataTimestamp: new Date(snapshot.update_time).toISOString(),
           source: "moomoo",
           greeks: greeksFrom(snapshot.option_ex_data),
+          session: sessionFrom(snapshot),
         });
       }
     }

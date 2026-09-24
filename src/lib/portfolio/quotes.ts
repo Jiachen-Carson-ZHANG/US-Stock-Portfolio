@@ -15,6 +15,7 @@ type QuoteRow = {
   data_timestamp: string;
   source: string;
   greeks: string | null;
+  session: string | null;
   cached_at: string;
 };
 
@@ -59,7 +60,8 @@ function toQuote(row: QuoteRow): Quote {
     marketStatus: row.market_status as Quote["marketStatus"],
     dataTimestamp: row.data_timestamp,
     source: row.source,
-    greeks: parseGreeks(row.greeks),
+    greeks: parseJson<Quote["greeks"]>(row.greeks),
+    session: parseJson<Quote["session"]>(row.session),
   };
 }
 
@@ -69,11 +71,11 @@ function toQuote(row: QuoteRow): Quote {
  * Bad JSON in one row must not blank the whole quote — the price is the part
  * that matters, and an option without its delta is still tradable.
  */
-function parseGreeks(raw: string | null): Quote["greeks"] {
+function parseJson<T>(raw: string | null): T | undefined {
   if (!raw) return undefined;
   try {
     const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Quote["greeks"]) : undefined;
+    return parsed && typeof parsed === "object" ? (parsed as T) : undefined;
   } catch {
     return undefined;
   }
@@ -94,8 +96,8 @@ async function readCache(db: DB, symbols: string[]): Promise<Map<string, QuoteRo
 async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
   const sql = `INSERT INTO quote_cache
        (symbol, price, previous_close, change, change_percent,
-        market_status, data_timestamp, source, greeks, cached_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        market_status, data_timestamp, source, greeks, session, cached_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(symbol) DO UPDATE SET
        price = excluded.price,
        previous_close = excluded.previous_close,
@@ -105,6 +107,7 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
        data_timestamp = excluded.data_timestamp,
        source = excluded.source,
        greeks = excluded.greeks,
+       session = excluded.session,
        cached_at = excluded.cached_at`;
 
   await db.transaction(async (tx) => {
@@ -119,6 +122,7 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
         quote.dataTimestamp,
         quote.source,
         quote.greeks ? JSON.stringify(quote.greeks) : null,
+        quote.session ? JSON.stringify(quote.session) : null,
         now.toISOString(),
       ]);
     }
@@ -234,6 +238,7 @@ export async function getQuotes(
           data_timestamp: quote.dataTimestamp,
           source: quote.source,
           greeks: quote.greeks ? JSON.stringify(quote.greeks) : null,
+          session: quote.session ? JSON.stringify(quote.session) : null,
           cached_at: now.toISOString(),
         });
       }

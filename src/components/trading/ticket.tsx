@@ -18,9 +18,29 @@ type Tif = "day" | "gtc";
 type Quote = {
   symbol: string;
   price: number;
+  previousClose?: number;
   changePercent: number;
   name?: string;
+  greeks?: {
+    impliedVolatility?: number;
+    delta?: number;
+    gamma?: number;
+    theta?: number;
+    vega?: number;
+    openInterest?: number;
+  };
+  session?: {
+    open?: number;
+    high?: number;
+    low?: number;
+    volume?: number;
+  };
 };
+
+function compact(value: number): string {
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })
+    .format(value);
+}
 
 /** Options are quoted per share and trade in hundreds. */
 function contractSize(symbol: string): number {
@@ -274,17 +294,91 @@ export function Ticket({
           </div>
 
           {quote ? (
-            <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
-              <span className="font-medium">{quote.symbol}</span>
-              <span className="tabular">{money(quote.price)}</span>
-              <span className={cn("tabular text-xs", signClass(quote.changePercent))}>
-                {quote.changePercent >= 0 ? "+" : ""}
-                {quote.changePercent.toFixed(2)}%
-              </span>
-              {quote.name && (
-                <span className="text-xs text-muted-foreground">{quote.name}</span>
+            <div className="space-y-1">
+              <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
+                <span className="font-medium">{quote.symbol}</span>
+                <span className="tabular">{money(quote.price)}</span>
+                <span className={cn("tabular text-xs", signClass(quote.changePercent))}>
+                  {quote.changePercent >= 0 ? "+" : ""}
+                  {quote.changePercent.toFixed(2)}%
+                </span>
+                {quote.name && (
+                  <span className="text-xs text-muted-foreground">{quote.name}</span>
+                )}
+              </p>
+
+              {/* The day's shape. A price on its own is the least informative
+                  number on a trading screen: "212.40" says nothing about
+                  whether that is the high of the day or the low of it, and
+                  the answer is what decides where a limit belongs. */}
+              {quote.session && (
+                <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                  {quote.session.open !== undefined && (
+                    <span>
+                      {t.trade.dayOpen} <span className="tabular">{money(quote.session.open)}</span>
+                    </span>
+                  )}
+                  {quote.session.high !== undefined && quote.session.low !== undefined && (
+                    <span>
+                      {t.trade.dayRange}{" "}
+                      <span className="tabular">
+                        {money(quote.session.low)} – {money(quote.session.high)}
+                      </span>
+                    </span>
+                  )}
+                  {quote.session.volume !== undefined && (
+                    <span>
+                      {t.trade.dayVolume}{" "}
+                      <span className="tabular">{compact(quote.session.volume)}</span>
+                    </span>
+                  )}
+                  {quote.previousClose !== undefined && (
+                    <span>
+                      {t.trade.previousClose}{" "}
+                      <span className="tabular">{money(quote.previousClose)}</span>
+                    </span>
+                  )}
+                </p>
               )}
-            </p>
+
+              {/* An option's risk figures, straight from the broker. Buying a
+                  contract without seeing its delta and its daily decay is the
+                  difference between a trade and a guess. */}
+              {quote.greeks && (
+                <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                  {quote.greeks.impliedVolatility !== undefined && (
+                    <span>
+                      {t.trade.volatility}{" "}
+                      <span className="tabular">
+                        {(quote.greeks.impliedVolatility * 100).toFixed(1)}%
+                      </span>
+                    </span>
+                  )}
+                  {quote.greeks.delta !== undefined && (
+                    <span>
+                      {t.trade.delta}{" "}
+                      <span className="tabular">{quote.greeks.delta.toFixed(3)}</span>
+                    </span>
+                  )}
+                  {quote.greeks.theta !== undefined && (
+                    <span>
+                      {t.trade.theta}{" "}
+                      <span className="tabular">{quote.greeks.theta.toFixed(3)}</span>
+                    </span>
+                  )}
+                  {quote.greeks.openInterest !== undefined && (
+                    <span>
+                      {t.trade.openInterest}{" "}
+                      <span className="tabular">{compact(quote.greeks.openInterest)}</span>
+                    </span>
+                  )}
+                </p>
+              )}
+
+              {contractSize(ticker) === 100 && (
+                <p className="text-xs text-muted-foreground">{t.trade.perContract}</p>
+              )}
+            </div>
           ) : ticker.length > 0 ? (
             <p className="text-xs text-muted-foreground">{t.trade.quoteUnavailable}</p>
           ) : null}
