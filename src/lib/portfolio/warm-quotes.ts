@@ -44,11 +44,15 @@ export async function warmQuotes(now: Date = new Date()): Promise<{
 
   // Everything anybody holds, plus the underlying of every option, plus every
   // symbol with an order resting on it — the union across all accounts.
+  // Watched names too: a watchlist is only worth opening if its prices are
+  // current, and it should not have to fetch them itself on every visit.
   const rows = await db.all<{ symbol: string; underlying_symbol: string | null }>(
     `SELECT DISTINCT symbol, underlying_symbol FROM positions
       WHERE instrument_type <> 'cash'
      UNION
-     SELECT DISTINCT symbol, NULL FROM orders WHERE status = 'open'`,
+     SELECT DISTINCT symbol, NULL FROM orders WHERE status = 'open'
+     UNION
+     SELECT DISTINCT symbol, NULL FROM watch_items`,
   );
 
   const symbols = [

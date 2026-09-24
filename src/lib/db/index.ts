@@ -402,6 +402,21 @@ ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS raw TEXT;
 -- none and are not asked for one.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hint TEXT;
 
+-- Each person's own watchlist.
+--
+-- The old table was one list for the whole family, with a single row per
+-- symbol — so nobody could watch something without it appearing for
+-- everybody, and removing it removed it for everybody too. Watching is
+-- personal, so the key is the pair. The old table is left where it is; it
+-- holds history and nothing reads it any more.
+CREATE TABLE IF NOT EXISTS watch_items (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  symbol     TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_watch_items_symbol ON watch_items(symbol);
+
 -- Following somebody. One row per direction, so following is not mutual
 -- unless both sides ask for it, and the pair is unique so pressing the
 -- button twice does nothing.
