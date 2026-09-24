@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { forbidden, requireUser, unauthorized, getCurrentUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth/session";
-import { canRead, defaultFor, findBySlug, type Portfolio } from "@/lib/portfolios";
+import { canRead, findBySlug, type Portfolio } from "@/lib/portfolios";
+import { lastViewedOr, rememberViewing } from "./last-viewed";
 
 export type PortfolioContext = { user: AuthUser; portfolio: Portfolio };
 
@@ -29,15 +30,20 @@ async function resolve(user: AuthUser, slug: string | undefined): Promise<Resolu
   const db = await getDb();
 
   if (!slug) {
-    const own = await defaultFor(db, user);
+    // No portfolio named: whoever they were last reading, if they still may.
+    const own = await lastViewedOr(db, user);
     return own ? { kind: "ok", portfolio: own } : { kind: "missing" };
   }
 
   const portfolio = await findBySlug(db, slug);
   if (!portfolio) return { kind: "missing" };
-  return (await canRead(db, user, portfolio.id))
-    ? { kind: "ok", portfolio }
-    : { kind: "locked", portfolio };
+  if (!(await canRead(db, user, portfolio.id))) return { kind: "locked", portfolio };
+
+  // Naming a portfolio in the address is the act of choosing one, so that is
+  // what gets remembered — not a click on a switcher, which would miss every
+  // other way of arriving.
+  await rememberViewing(portfolio.slug);
+  return { kind: "ok", portfolio };
 }
 
 /**

@@ -1,6 +1,7 @@
 import { isOpenAccess, requireUser } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
-import { defaultFor, visibleTo } from "@/lib/portfolios";
+import { visibleTo } from "@/lib/portfolios";
+import { lastViewedOr } from "@/lib/portfolios/last-viewed";
 import { unreadCount } from "@/lib/notifications";
 import { NotificationBell } from "@/components/layout/notifications";
 import { serverDictionary } from "@/lib/i18n/server";
@@ -29,7 +30,11 @@ export default async function AppLayout({
     displayName: portfolio.displayName,
     kind: portfolio.kind,
   }));
-  const defaultSlug = (await defaultFor(db, user))?.slug ?? "";
+  // What the navigation assumes when the address carries no portfolio — the
+  // last one this person opened, so leaving for the playground and coming
+  // back returns them to where they were rather than to a rule's idea of
+  // where they belong.
+  const defaultSlug = (await lastViewedOr(db, user))?.slug ?? "";
   const unread = isOpenAccess() ? 0 : await unreadCount(db, user.id);
 
   return (
