@@ -320,43 +320,69 @@ async function pricedPositions(portfolioId: string, now: Date): Promise<{
 }
 
 /**
- * The same answer for everybody looking at the same account.
+ * Computed once per version of the data, however many people are looking.
  *
- * Thirty people with the dashboard open is thirty requests every five
- * seconds, and every one of them was recomputing the identical portfolio
- * from scratch — the same rows, the same prices, the same arithmetic. They
- * are all looking at the same account, so there is no reason for more than
- * one of them to do the work.
+ * This was a two-second timer, which was arbitrary: it recomputed on a clock
+ * rather than when anything had changed. Keyed on the data instead, it
+ * recomputes exactly when the data moves — when a price is refreshed, when
+ * holdings are re-synced, when a trade lands — and until then every reader
+ * gets the same answer for free.
  *
- * Two seconds, deliberately shorter than the five-second poll, so nobody
- * ever sees a figure older than they would have seen anyway. What this
- * removes is duplicated effort, not freshness.
+ * So thirty people watching one account cost one calculation per price
+ * refresh, not thirty per refresh and not one every two seconds. Nobody sees
+ * anything staler than the data itself, because the key *is* the data.
+ *
+ * The fingerprint is four aggregates over indexed columns. It costs a
+ * millisecond and saves the whole computation behind it.
  */
-const RECOMPUTE_WINDOW_MS = 2_000;
+type Cached = { key: string; data: Promise<PortfolioData> };
 
-const recent = new Map<string, { at: number; data: Promise<PortfolioData> }>();
+const computed = new Map<string, Cached>();
+
+async function dataVersion(db: DB, portfolioId: string, now: Date): Promise<string> {
+  const row = await db.get<{
+    quotes: string | null;
+    positions: string | null;
+    trades: string | null;
+    n: number;
+  }>(
+    `SELECT (SELECT MAX(cached_at) FROM quote_cache) AS quotes,
+            (SELECT MAX(synced_at) FROM positions WHERE portfolio_id = ?) AS positions,
+            (SELECT MAX(traded_at) FROM transactions WHERE portfolio_id = ?) AS trades,
+            (SELECT COUNT(*)::int FROM transactions WHERE portfolio_id = ?) AS n`,
+    [portfolioId, portfolioId, portfolioId],
+  );
+
+  // The market session is part of the version too: "today" changes meaning at
+  // the open and the close even when no row has moved.
+  return [
+    row?.quotes ?? "",
+    row?.positions ?? "",
+    row?.trades ?? "",
+    row?.n ?? 0,
+    marketDateString(now),
+    marketSession(now),
+  ].join("|");
+}
 
 export async function loadPortfolio(
   portfolioId: string,
   now: Date = new Date(),
 ): Promise<PortfolioData> {
-  const cached = recent.get(portfolioId);
-  if (cached && Date.now() - cached.at < RECOMPUTE_WINDOW_MS) return cached.data;
+  const db = await getDb();
+  const key = await dataVersion(db, portfolioId, now);
+
+  const hit = computed.get(portfolioId);
+  if (hit && hit.key === key) return hit.data;
 
   const data = observe("portfolio.load", null, () => loadPortfolioInner(portfolioId, now));
-  recent.set(portfolioId, { at: Date.now(), data });
+  computed.set(portfolioId, { key, data });
 
-  // A failure must not be remembered, or one bad moment becomes two seconds
-  // of everybody being handed the same error.
-  data.catch(() => recent.delete(portfolioId));
-
-  // Keyed by portfolio, and there are only ever a handful — but a long-lived
-  // instance should not hold results forever.
-  if (recent.size > 50) {
-    for (const [key, value] of recent) {
-      if (Date.now() - value.at > RECOMPUTE_WINDOW_MS) recent.delete(key);
-    }
-  }
+  // A failure is never remembered, or one bad moment would be handed to
+  // everybody who asked until the data happened to change.
+  data.catch(() => {
+    if (computed.get(portfolioId)?.data === data) computed.delete(portfolioId);
+  });
 
   return data;
 }
