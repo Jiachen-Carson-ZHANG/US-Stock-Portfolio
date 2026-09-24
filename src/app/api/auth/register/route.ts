@@ -7,14 +7,32 @@ import { RegistrationError, register } from "@/lib/accounts";
 import { registerSchema } from "@/lib/schemas";
 
 /**
- * Open signup, approval-gated.
+ * Open signup, approval-gated, counted per source.
  *
- * Counted against one shared bucket rather than per username, because the
- * abuse here is volume from one source rather than guessing at one account.
- * Five in fifteen minutes is generous for a family site and useless for
- * filling the pending queue.
+ * The abuse here is volume from one place rather than guessing at one
+ * account: somebody filling the pending queue with ten sign-ups, each of
+ * which rings a bell and, once approved, gets an account of its own.
+ *
+ * It used to be one shared bucket for everybody, which stopped that — and
+ * also stopped the fourth real person signing up in an evening. Counting per
+ * source instead keeps the limit tight on one person and invisible to a room
+ * full of them. Five in fifteen minutes is generous for one human and useless
+ * for filling a queue.
+ *
+ * The address is the best identifier available and it is not a strong one:
+ * a phone changing network gets a new one, and a household shares one. Which
+ * is the right trade — this only delays a sign-up, and approval is still the
+ * thing that decides.
  */
-const REGISTER_BUCKET = "__register__";
+function bucketFor(request: Request): string {
+  // Behind a proxy the first entry is the client; the rest are the hops.
+  const forwarded = request.headers.get("x-forwarded-for") ?? "";
+  const source =
+    forwarded.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    "unknown";
+  return `__register__:${source}`;
+}
 
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
@@ -44,7 +62,8 @@ export async function POST(request: Request) {
 
   const db = await getDb();
 
-  const limit = await checkRateLimit(db, REGISTER_BUCKET);
+  const bucket = bucketFor(request);
+  const limit = await checkRateLimit(db, bucket);
   if (limit.blocked) {
     logger.warn("auth.register.rate_limited");
     return Response.json(
@@ -57,12 +76,12 @@ export async function POST(request: Request) {
     await register(db, parsed.data);
     // Counted whether or not it succeeded: the cost being limited is the
     // attempt, not the outcome.
-    await recordFailedAttempt(db, REGISTER_BUCKET);
+    await recordFailedAttempt(db, bucket);
     logger.info("auth.register.requested", { username: parsed.data.username });
 
     return Response.json({ ok: true, pending: true }, { status: 201 });
   } catch (error) {
-    await recordFailedAttempt(db, REGISTER_BUCKET);
+    await recordFailedAttempt(db, bucket);
     if (error instanceof RegistrationError) {
       return Response.json({ error: error.message }, { status: 409 });
     }

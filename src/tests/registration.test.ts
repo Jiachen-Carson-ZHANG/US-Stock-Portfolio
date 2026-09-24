@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/lib/db/testing";
 import { RegistrationError, decideAccount, pendingAccounts, register } from "@/lib/accounts";
 import { createSession, validateSession } from "@/lib/auth/session";
-import { canRead, findBySlug, visibleTo } from "@/lib/portfolios";
+import { canRead, createPortfolio, findBySlug, visibleTo } from "@/lib/portfolios";
 import { notificationsFor } from "@/lib/notifications";
 
 let db: TestDb;
@@ -106,7 +106,7 @@ describe("approving an account", () => {
 
     const mine = await findBySlug(db, "jane-mock");
     expect(mine?.kind).toBe("mock");
-    expect(mine?.openingCash).toBe("10000");
+    expect(mine?.openingCash).toBe("50000");
     expect(mine?.ownerUserId).toBe(id);
 
     expect((await visibleTo(db, user!)).map((p) => p.slug).sort()).toEqual([
@@ -237,5 +237,74 @@ describe("what they are asked at sign-up", () => {
     const [waiting] = await pendingAccounts(db);
     expect(waiting.reason).toBeNull();
     expect(waiting.username).toBe("jane");
+  });
+});
+
+describe("one practice account each", () => {
+  it("does not hand out a second one when approval happens twice", async () => {
+    const owner = await addOwner();
+    const { id } = await register(db, {
+      username: "greedy",
+      displayName: "Greedy",
+      password: "correct horse battery",
+      reason: "two please",
+    });
+
+    await decideAccount(db, { userId: id, deciderId: owner, approve: true });
+    await decideAccount(db, { userId: id, deciderId: owner, approve: true });
+
+    const mine = await db.all<{ slug: string }>(
+      `SELECT slug FROM portfolios WHERE owner_user_id = ? AND kind = 'mock'`,
+      [id],
+    );
+    expect(mine).toHaveLength(1);
+  });
+
+  it("does not add another when one already exists under a different name", async () => {
+    const owner = await addOwner();
+    const { id } = await register(db, {
+      username: "renamed",
+      displayName: "Renamed",
+      password: "correct horse battery",
+      reason: "already have one",
+    });
+
+    // An owner made them one by hand, at an address that is not
+    // <username>-mock. Checking the address would miss this; checking the
+    // person does not.
+    await createPortfolio(db, {
+      slug: "something-else",
+      displayName: "Theirs",
+      ownerUserId: id,
+      kind: "mock",
+      openingCash: "50000",
+    });
+
+    await decideAccount(db, { userId: id, deciderId: owner, approve: true });
+
+    const mine = await db.all<{ slug: string }>(
+      `SELECT slug FROM portfolios WHERE owner_user_id = ? AND kind = 'mock'`,
+      [id],
+    );
+    expect(mine.map((p) => p.slug)).toEqual(["something-else"]);
+  });
+
+  it("starts them with enough to buy an option contract", async () => {
+    const owner = await addOwner();
+    const { id } = await register(db, {
+      username: "newcomer",
+      displayName: "Newcomer",
+      password: "correct horse battery",
+      reason: "hello",
+    });
+    await decideAccount(db, { userId: id, deciderId: owner, approve: true });
+
+    const mine = await db.get<{ opening_cash: string }>(
+      `SELECT opening_cash FROM portfolios WHERE owner_user_id = ? AND kind = 'mock'`,
+      [id],
+    );
+    // A single contract on a $300 name is $30,000, which ten thousand could
+    // never have covered.
+    expect(Number(mine?.opening_cash)).toBeGreaterThanOrEqual(50_000);
   });
 });

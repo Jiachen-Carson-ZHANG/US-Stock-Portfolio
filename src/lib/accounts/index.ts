@@ -21,8 +21,14 @@ export type PendingAccount = {
   createdAt: string;
 };
 
-/** What a new person starts with, so they can take part on day one. */
-export const OPENING_MOCK_CASH = "10000";
+/**
+ * What a new person starts with, so they can take part on day one.
+ *
+ * Fifty thousand rather than ten. A single option contract on a name worth a
+ * few hundred dollars is most of ten thousand, so the smaller balance quietly
+ * ruled out the instrument the site spends most of its screen explaining.
+ */
+export const OPENING_MOCK_CASH = "50000";
 
 export class RegistrationError extends Error {}
 
@@ -174,11 +180,21 @@ export async function decideAccount(
   const family = await findBySlug(db, DEFAULT_SLUG);
   if (family) await grantAccess(db, family.id, input.userId, now);
 
-  // A clash is possible if somebody already created a portfolio at this
-  // address by hand. The account is still approved; they simply start
-  // without a mock one and an owner can make it later.
+  // One practice account each, and only one.
+  //
+  // Approving somebody twice — which happens, because approving is a button
+  // and buttons get pressed twice — used to try to make them a second one.
+  // Checking the address caught the common case and missed the rest: a
+  // portfolio created by hand under a different name left them able to
+  // collect more. The question being asked is "does this person already have
+  // a practice account", so that is the question to ask.
+  const already = await db.get<{ id: string }>(
+    `SELECT id FROM portfolios WHERE owner_user_id = ? AND kind = 'mock' LIMIT 1`,
+    [input.userId],
+  );
+
   const slug = `${user.username}-mock`;
-  if (!(await findBySlug(db, slug))) {
+  if (!already && !(await findBySlug(db, slug))) {
     try {
       await createPortfolio(
         db,
