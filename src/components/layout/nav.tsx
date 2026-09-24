@@ -84,14 +84,16 @@ function isActive(pathname: string, href: string, exact = false) {
  * Only rendered when there is more than one, so a family with a single
  * account never sees a control that does nothing.
  */
-function PortfolioSwitcher({
+export function PortfolioSwitcher({
   portfolios,
   current,
   pathname,
+  className,
 }: {
   portfolios: NavPortfolio[];
   current: string;
   pathname: string;
+  className?: string;
 }) {
   const router = useRouter();
   const suffix = pathname.startsWith(`/${current}`)
@@ -104,7 +106,10 @@ function PortfolioSwitcher({
       <select
         value={current}
         onChange={(event) => router.push(`/${event.target.value}${suffix}`)}
-        className="min-h-9 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+        className={cn(
+          "min-h-9 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground",
+          className,
+        )}
       >
         {portfolios.map((portfolio) => (
           <option key={portfolio.slug} value={portfolio.slug}>
@@ -237,6 +242,36 @@ export function Sidebar({
         {canSignOut && <SignOutButton />}
       </div>
     </aside>
+  );
+}
+
+/**
+ * Changing account on a phone.
+ *
+ * The switcher lived only in the sidebar, which a phone does not have — so on
+ * a phone there was no way to move between accounts at all, short of typing
+ * an address. This is the same control, in the one place a phone has room
+ * for it.
+ */
+export function MobilePortfolioSwitcher({
+  portfolios,
+  defaultSlug,
+}: {
+  portfolios: NavPortfolio[];
+  defaultSlug: string;
+}) {
+  const pathname = usePathname();
+  const slug = useCurrentSlug(portfolios, defaultSlug);
+
+  if (portfolios.length < 2) return null;
+
+  return (
+    <PortfolioSwitcher
+      portfolios={portfolios}
+      current={slug}
+      pathname={pathname}
+      className="max-w-[9rem] truncate"
+    />
   );
 }
 

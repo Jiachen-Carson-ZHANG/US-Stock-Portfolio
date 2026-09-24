@@ -8,6 +8,7 @@ import { LocaleProvider } from "@/lib/i18n/context";
 import {
   BottomNav,
   LanguageToggle,
+  MobilePortfolioSwitcher,
   Sidebar,
   SignOutButton,
 } from "@/components/layout/nav";
@@ -43,9 +44,17 @@ export default async function AppLayout({
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2 md:hidden">
-            <p className="truncate text-sm font-semibold tracking-tight">
-              {t.appName}
+          {/* The phone header. The account name replaces the app name, because
+              on a phone this is the only place to change account and knowing
+              which one you are looking at matters more than being told what
+              the site is called. */}
+          <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2 md:hidden">
+            <MobilePortfolioSwitcher
+              portfolios={portfolios}
+              defaultSlug={defaultSlug}
+            />
+            <p className="truncate text-sm font-semibold tracking-tight md:hidden">
+              {portfolios.length < 2 ? t.appName : ""}
             </p>
             <div className="flex shrink-0 items-center gap-1">
               <LanguageToggle />

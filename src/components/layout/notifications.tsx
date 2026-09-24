@@ -118,7 +118,12 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-80 rounded-xl border border-border bg-surface p-2 shadow-lg">
+        // On a phone the panel was a fixed 80 units wide, anchored to the
+        // right of a button near the screen edge, so it ran off it — the
+        // longest lines, which are the ones that say what somebody wants, were
+        // the first to go. Below the small breakpoint it spans the screen with
+        // a gutter instead, and only becomes a panel when there is room.
+        <div className="fixed inset-x-3 top-14 z-30 rounded-xl border border-border bg-surface p-2 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-80">
           <div className="flex items-center justify-between px-2 py-1">
             <p className="text-xs font-medium">{t.notifications.title}</p>
             {unread > 0 && (
@@ -137,7 +142,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
           ) : items.length === 0 ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">{t.notifications.empty}</p>
           ) : (
-            <ul className="max-h-80 overflow-y-auto">
+            <ul className="max-h-[70vh] overflow-y-auto sm:max-h-80">
               {items.map((item) => {
                 const content = (
                   <div
