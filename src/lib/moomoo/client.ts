@@ -5,6 +5,18 @@ import { logger } from "@/lib/logger";
 import { MOOMOO_API_BASE, refreshAccessToken, assertReadOnlyScope } from "./oauth";
 import { markRefreshed, markStatus, readConnection } from "./tokens";
 
+/** moomoo's code for "none of the symbols you asked about exist". */
+const UNKNOWN_SYMBOLS = -7;
+
+/**
+ * Asked about symbols that do not exist — which is an answer, not a failure.
+ *
+ * Its own type so callers can tell "your list was wrong" apart from "the feed
+ * is down", because those want opposite responses: drop the symbols and carry
+ * on, versus keep the last known prices and say so.
+ */
+export class UnknownSymbolsError extends Error {}
+
 /** Trading endpoints answer with {s,d}; quote endpoints with {ret_code,data}. */
 type Envelope<T> =
   | { s: "ok"; d: T }
@@ -173,6 +185,15 @@ export async function moomooRequest<T>(
   }
 
   if (body.ret_code !== 0) {
+    // "All input symbols invalid" is not a failure of the feed, it is an
+    // answer about the symbols — and moomoo rejects the whole batch rather
+    // than the offending members of it. Treated as an error it did two bad
+    // things: somebody typing "NV" on their way to "NVDA" filled the error
+    // log with incidents, and one delisted or unknown holding anywhere on the
+    // site would have blanked the price of everything else in the same batch.
+    if (body.ret_code === UNKNOWN_SYMBOLS) {
+      throw new UnknownSymbolsError(`moomoo ${path}: ${body.ret_msg}`);
+    }
     throw new Error(`moomoo ${path} error ${body.ret_code}: ${body.ret_msg}`);
   }
   return body.data;

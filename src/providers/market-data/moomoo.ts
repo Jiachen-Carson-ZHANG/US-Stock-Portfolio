@@ -1,6 +1,6 @@
 import type { DateRange, HistoricalPrice, Quote } from "@/types/market";
 import type { MarketDataProvider } from "./types";
-import { moomooGet, moomooPost } from "@/lib/moomoo/client";
+import { moomooGet, moomooPost, UnknownSymbolsError } from "@/lib/moomoo/client";
 import { marketSession } from "@/lib/market-hours";
 
 /**
@@ -116,11 +116,20 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
     const quotes: Quote[] = [];
 
     for (const batch of chunk(tradable, SNAPSHOT_BATCH)) {
-      const data = await moomooPost<{ snapshot_list: Snapshot[] }>(
-      this.portfolioId,
-        "/api/v1.0/quote/snapshot",
-        { code_list: batch.map(toMoomooCode) },
-      );
+      let data: { snapshot_list: Snapshot[] };
+      try {
+        data = await moomooPost<{ snapshot_list: Snapshot[] }>(
+          this.portfolioId,
+          "/api/v1.0/quote/snapshot",
+          { code_list: batch.map(toMoomooCode) },
+        );
+      } catch (error) {
+        // Nothing in this batch is a symbol moomoo knows. That is a fact
+        // about the symbols, not about the connection, so the other batches
+        // continue and the caller simply gets no price for these.
+        if (error instanceof UnknownSymbolsError) continue;
+        throw error;
+      }
 
       for (const snapshot of data.snapshot_list ?? []) {
         const change = snapshot.last_price - snapshot.prev_close_price;
