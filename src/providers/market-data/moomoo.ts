@@ -60,21 +60,45 @@ function sessionFrom(snapshot: Snapshot): Quote["session"] {
   return Object.values(shape).some((value) => value !== undefined) ? shape : undefined;
 }
 
-function greeksFrom(data: OptionExData | undefined): Quote["greeks"] {
-  if (!data) return undefined;
+/**
+ * An option's figures, wherever in the snapshot they turn up.
+ *
+ * The first version looked for them nested under option_ex_data and found
+ * nothing — every contract came back with no greeks at all. The fields that
+ * *are* read successfully (open_price, high_price, volume…) follow moomoo's
+ * flat snapshot naming, and in that naming the option figures are flat too:
+ * option_delta, option_implied_volatility. Both shapes are read now, flat
+ * first, so the next change of shape costs nothing rather than silently
+ * blanking every delta on the site.
+ */
+function greeksFrom(snapshot: Snapshot): Quote["greeks"] {
+  const flat = snapshot as unknown as Record<string, number | string | undefined>;
+  const nested = (snapshot.option_ex_data ?? {}) as Record<string, number | string | undefined>;
 
-  const raw = toNumber(data.implied_volatility);
+  const pick = (...names: string[]) => {
+    for (const name of names) {
+      const value = toNumber(flat[name] ?? nested[name]);
+      if (value !== undefined) return value;
+    }
+    return undefined;
+  };
+
+  // Quoted as a percentage (42.5), wanted as a fraction (0.425). Anything
+  // already below 5 is taken to be a fraction: no equity option trades at
+  // 500% volatility, and a feed that changes units should not silently draw
+  // a curve a hundred times wrong.
+  const rawVol = pick("option_implied_volatility", "implied_volatility");
   const impliedVolatility =
-    raw === undefined ? undefined : raw > 5 ? raw / 100 : raw;
+    rawVol === undefined ? undefined : rawVol > 5 ? rawVol / 100 : rawVol;
 
   const greeks = {
     impliedVolatility,
-    delta: toNumber(data.delta),
-    gamma: toNumber(data.gamma),
-    theta: toNumber(data.theta),
-    vega: toNumber(data.vega),
-    rho: toNumber(data.rho),
-    openInterest: toNumber(data.open_interest),
+    delta: pick("option_delta", "delta"),
+    gamma: pick("option_gamma", "gamma"),
+    theta: pick("option_theta", "theta"),
+    vega: pick("option_vega", "vega"),
+    rho: pick("option_rho", "rho"),
+    openInterest: pick("option_open_interest", "open_interest"),
   };
 
   return Object.values(greeks).some((value) => value !== undefined)
@@ -163,7 +187,11 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
           marketStatus: status,
           dataTimestamp: new Date(snapshot.update_time).toISOString(),
           source: "moomoo",
-          greeks: greeksFrom(snapshot.option_ex_data),
+          greeks: greeksFrom(snapshot),
+          // Everything moomoo sent, kept whole. Public market data, and the
+          // only way to show what the broker shows without guessing which
+          // fields exist before being told.
+          raw: snapshot as unknown as Record<string, unknown>,
           session: sessionFrom(snapshot),
         });
       }

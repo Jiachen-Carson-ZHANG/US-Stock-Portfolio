@@ -46,6 +46,8 @@ export type Quote = {
     volume?: number;
     turnover?: number;
   };
+  /** The broker's snapshot as it arrived, for the detail panels to draw from. */
+  raw?: Record<string, unknown>;
 };
 
 export type HistoricalPrice = {

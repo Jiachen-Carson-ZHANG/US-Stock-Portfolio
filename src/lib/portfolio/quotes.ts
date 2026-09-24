@@ -16,6 +16,7 @@ type QuoteRow = {
   source: string;
   greeks: string | null;
   session: string | null;
+  raw: string | null;
   cached_at: string;
 };
 
@@ -62,6 +63,7 @@ function toQuote(row: QuoteRow): Quote {
     source: row.source,
     greeks: parseJson<Quote["greeks"]>(row.greeks),
     session: parseJson<Quote["session"]>(row.session),
+    raw: parseJson<Record<string, unknown>>(row.raw),
   };
 }
 
@@ -96,8 +98,8 @@ async function readCache(db: DB, symbols: string[]): Promise<Map<string, QuoteRo
 async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
   const sql = `INSERT INTO quote_cache
        (symbol, price, previous_close, change, change_percent,
-        market_status, data_timestamp, source, greeks, session, cached_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        market_status, data_timestamp, source, greeks, session, raw, cached_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(symbol) DO UPDATE SET
        price = excluded.price,
        previous_close = excluded.previous_close,
@@ -108,6 +110,7 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
        source = excluded.source,
        greeks = excluded.greeks,
        session = excluded.session,
+       raw = excluded.raw,
        cached_at = excluded.cached_at`;
 
   await db.transaction(async (tx) => {
@@ -123,6 +126,7 @@ async function writeCache(db: DB, quotes: Quote[], now: Date): Promise<void> {
         quote.source,
         quote.greeks ? JSON.stringify(quote.greeks) : null,
         quote.session ? JSON.stringify(quote.session) : null,
+        quote.raw ? JSON.stringify(quote.raw) : null,
         now.toISOString(),
       ]);
     }
@@ -239,6 +243,7 @@ export async function getQuotes(
           source: quote.source,
           greeks: quote.greeks ? JSON.stringify(quote.greeks) : null,
           session: quote.session ? JSON.stringify(quote.session) : null,
+          raw: quote.raw ? JSON.stringify(quote.raw) : null,
           cached_at: now.toISOString(),
         });
       }

@@ -392,6 +392,11 @@ ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS greeks TEXT;
 -- and a feed that adds a field should not need a migration.
 ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS session TEXT;
 
+-- The whole snapshot as the broker sent it. Public market data, kept so the
+-- detail panels can show whatever moomoo provides without a migration for
+-- every field somebody asks to see.
+ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS raw TEXT;
+
 -- Following somebody. One row per direction, so following is not mutual
 -- unless both sides ask for it, and the pair is unique so pressing the
 -- button twice does nothing.

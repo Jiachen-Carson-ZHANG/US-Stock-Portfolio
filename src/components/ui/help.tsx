@@ -57,21 +57,40 @@ export function Help({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label={title}
-        className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-5"
       >
         <HelpCircle className="size-3.5" aria-hidden="true" />
       </button>
 
       {open && (
+        // On a phone this is a panel across the bottom of the screen rather
+        // than a bubble beside the icon. A fixed-width bubble anchored to an
+        // icon near either edge ran off the screen, so the explanation — the
+        // whole point of the question mark — was cut off mid-sentence, and
+        // which edge depended on where the icon happened to sit. Pinned to the
+        // viewport it is always fully readable, and sits above the bottom
+        // navigation rather than under it.
         <span
           role="note"
           className={cn(
-            "absolute top-6 z-40 w-64 rounded-xl border border-border bg-surface p-3 text-left shadow-lg",
-            align === "right" ? "right-0" : "left-0",
+            "fixed inset-x-3 bottom-20 z-50 max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-surface p-4 text-left shadow-xl",
+            "sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-6 sm:max-h-none sm:w-72 sm:p-3 sm:shadow-lg",
+            align === "right" ? "sm:right-0" : "sm:left-0",
           )}
         >
-          <span className="block text-xs font-medium">{title}</span>
-          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+          <span className="flex items-start justify-between gap-3">
+            <span className="block text-sm font-medium sm:text-xs">{title}</span>
+            {/* A close control a thumb can find; tapping outside also works. */}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="-mr-1 -mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted sm:hidden"
+            >
+              ×
+            </button>
+          </span>
+          <span className="mt-1.5 block text-sm leading-relaxed text-muted-foreground sm:mt-1 sm:text-xs">
             {children}
           </span>
         </span>
