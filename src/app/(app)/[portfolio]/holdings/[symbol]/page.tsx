@@ -13,6 +13,10 @@ import { symbolSchema } from "@/lib/schemas";
 import { ValueLine } from "@/components/charts/value-line";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/misc";
+import { QuoteDetailPanel } from "@/components/market/quote-detail";
+import { quoteDetail } from "@/lib/market/detail";
+import { getQuotes } from "@/lib/portfolio/quotes";
+import { getDb } from "@/lib/db";
 import type { PositionView } from "@/types/portfolio";
 
 export const dynamic = "force-dynamic";
@@ -80,12 +84,24 @@ export default async function PositionDetailPage({
 
   const to = new Date();
   const from = new Date(to.getTime() - HISTORY_DAYS * 86_400_000);
-  const prices = await (
-    await getMarketDataProvider(portfolio.id)
-  ).getHistoricalPrices(position.symbol, {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  });
+  const provider = await getMarketDataProvider(portfolio.id);
+
+  // Both asked for together, and neither is allowed to take the page down.
+  // The history call used to be bare: one slow minute at the broker and the
+  // whole holding page failed, facts and all, for want of a chart.
+  const [prices, market] = await Promise.all([
+    provider
+      .getHistoricalPrices(position.symbol, {
+        from: from.toISOString().slice(0, 10),
+        to: to.toISOString().slice(0, 10),
+      })
+      .catch(() => []),
+    getDb()
+      .then((db) => getQuotes(db, [position.symbol], provider, to))
+      .then(({ quotes }) => quotes.get(position.symbol))
+      .catch(() => undefined),
+  ]);
+  const detail = quoteDetail(position.symbol, market?.raw);
 
   const multiplier =
     position.instrumentType === "option" ? position.contractMultiplier ?? 100 : 1;
@@ -159,7 +175,16 @@ export default async function PositionDetailPage({
         <Facts position={position} />
       </section>
 
-      <Link className="inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted" href={`/family?symbol=${encodeURIComponent(position.symbol)}`}>{zh ? "在家庭空间讨论这项持仓" : "Discuss this holding in the Family Room"}</Link>
+      {/* What the market is doing with it, as the broker reports it — the
+          same panel the watchlist and the trade ticket use. */}
+      <section className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {zh ? "行情" : "Market"}
+        </h2>
+        <QuoteDetailPanel detail={detail} />
+      </section>
+
+      <Link className="inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted" href="/playground">{zh ? "去讨论区聊聊这只股票" : "Talk about it in the playground"}</Link>
       <PayoffExplorer positions={[position]} />
       <ValueLine
         title="Price history"

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
 import { Help } from "@/components/ui/help";
+import { QuoteDetailPanel } from "@/components/market/quote-detail";
+import { quoteDetail } from "@/lib/market/detail";
 import { marketSession, quotePollIntervalMs } from "@/lib/market-hours";
 import { formatMoney } from "@/lib/money";
 import { cn, signClass } from "@/lib/utils";
@@ -35,12 +37,9 @@ type Quote = {
     low?: number;
     volume?: number;
   };
+  raw?: Record<string, unknown>;
 };
 
-function compact(value: number): string {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })
-    .format(value);
-}
 
 /** Options are quoted per share and trade in hundreds. */
 function contractSize(symbol: string): number {
@@ -307,73 +306,12 @@ export function Ticket({
                 )}
               </p>
 
-              {/* The day's shape. A price on its own is the least informative
-                  number on a trading screen: "212.40" says nothing about
-                  whether that is the high of the day or the low of it, and
-                  the answer is what decides where a limit belongs. */}
-              {quote.session && (
-                <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  {quote.session.open !== undefined && (
-                    <span>
-                      {t.trade.dayOpen} <span className="tabular">{money(quote.session.open)}</span>
-                    </span>
-                  )}
-                  {quote.session.high !== undefined && quote.session.low !== undefined && (
-                    <span>
-                      {t.trade.dayRange}{" "}
-                      <span className="tabular">
-                        {money(quote.session.low)} – {money(quote.session.high)}
-                      </span>
-                    </span>
-                  )}
-                  {quote.session.volume !== undefined && (
-                    <span>
-                      {t.trade.dayVolume}{" "}
-                      <span className="tabular">{compact(quote.session.volume)}</span>
-                    </span>
-                  )}
-                  {quote.previousClose !== undefined && (
-                    <span>
-                      {t.trade.previousClose}{" "}
-                      <span className="tabular">{money(quote.previousClose)}</span>
-                    </span>
-                  )}
-                </p>
-              )}
-
-              {/* An option's risk figures, straight from the broker. Buying a
-                  contract without seeing its delta and its daily decay is the
-                  difference between a trade and a guess. */}
-              {quote.greeks && (
-                <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  {quote.greeks.impliedVolatility !== undefined && (
-                    <span>
-                      {t.trade.volatility}{" "}
-                      <span className="tabular">
-                        {(quote.greeks.impliedVolatility * 100).toFixed(1)}%
-                      </span>
-                    </span>
-                  )}
-                  {quote.greeks.delta !== undefined && (
-                    <span>
-                      {t.trade.delta}{" "}
-                      <span className="tabular">{quote.greeks.delta.toFixed(3)}</span>
-                    </span>
-                  )}
-                  {quote.greeks.theta !== undefined && (
-                    <span>
-                      {t.trade.theta}{" "}
-                      <span className="tabular">{quote.greeks.theta.toFixed(3)}</span>
-                    </span>
-                  )}
-                  {quote.greeks.openInterest !== undefined && (
-                    <span>
-                      {t.trade.openInterest}{" "}
-                      <span className="tabular">{compact(quote.greeks.openInterest)}</span>
-                    </span>
-                  )}
-                </p>
-              )}
+              {/* Everything the broker publishes about this symbol: the day's
+                  range, bid and ask, and for an option its greeks, strike and
+                  days to expiry. A price on its own is the least informative
+                  number on a trading screen, and buying a contract without
+                  seeing its delta and daily decay is a guess, not a trade. */}
+              <QuoteDetailPanel detail={quoteDetail(quote.symbol, quote.raw)} compactView />
 
               {contractSize(ticker) === 100 && (
                 <p className="text-xs text-muted-foreground">{t.trade.perContract}</p>

@@ -33,10 +33,6 @@ const SAME_BY_DESIGN = new Set([
   "ai.provider",
   // "ETF" is written the same way in Chinese.
   "instrument.etf",
-  // Delta and Theta are written as the Greek letters on Chinese trading
-  // screens too. Translating them would be less recognisable, not more.
-  "trade.delta",
-  "trade.theta",
 ]);
 
 describe("the two dictionaries", () => {
