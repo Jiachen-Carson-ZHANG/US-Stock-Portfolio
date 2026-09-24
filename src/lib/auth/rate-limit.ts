@@ -3,6 +3,16 @@ import type { DB } from "@/lib/db";
 export const MAX_FAILED_ATTEMPTS = 5;
 export const COOLDOWN_MINUTES = 15;
 
+/**
+ * Sign-ups get their own, looser limit.
+ *
+ * A wrong password five times is somebody guessing. Five sign-ups is a
+ * household getting set up on a Sunday afternoon, and stopping them mid-way
+ * is worse than the abuse it prevents — every account still waits for
+ * approval, so the cost of one extra is a line in a queue.
+ */
+export const MAX_REGISTRATIONS = 10;
+
 export type RateLimitState = {
   blocked: boolean;
   retryAfterSeconds: number;
@@ -16,6 +26,7 @@ export async function checkRateLimit(
   db: DB,
   username: string,
   now: Date = new Date(),
+  limit: number = MAX_FAILED_ATTEMPTS,
 ): Promise<RateLimitState> {
   const rows = await db.all<{ attempted_at: string }>(
     `SELECT attempted_at FROM login_attempts
@@ -24,7 +35,7 @@ export async function checkRateLimit(
     [username, windowStart(now)],
   );
 
-  if (rows.length < MAX_FAILED_ATTEMPTS) {
+  if (rows.length < limit) {
     return { blocked: false, retryAfterSeconds: 0 };
   }
 

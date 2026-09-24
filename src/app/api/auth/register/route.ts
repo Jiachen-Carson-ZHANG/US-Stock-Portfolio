@@ -2,7 +2,11 @@ import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { isOpenAccess } from "@/lib/auth/guards";
-import { checkRateLimit, recordFailedAttempt } from "@/lib/auth/rate-limit";
+import {
+  MAX_REGISTRATIONS,
+  checkRateLimit,
+  recordFailedAttempt,
+} from "@/lib/auth/rate-limit";
 import { RegistrationError, register } from "@/lib/accounts";
 import { registerSchema } from "@/lib/schemas";
 
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
   const db = await getDb();
 
   const bucket = bucketFor(request);
-  const limit = await checkRateLimit(db, bucket);
+  const limit = await checkRateLimit(db, bucket, new Date(), MAX_REGISTRATIONS);
   if (limit.blocked) {
     logger.warn("auth.register.rate_limited");
     return Response.json(
