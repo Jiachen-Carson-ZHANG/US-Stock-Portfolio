@@ -9,21 +9,25 @@ export const maxDuration = 60;
 /**
  * Refreshes the price cache on a schedule, so no page load ever has to.
  *
- * Call it every minute; it decides for itself whether there is anything to
- * do. During the regular session it refreshes at most once a minute, and in
- * pre-market and after-hours at most once every half hour — those sessions
- * trade thinly enough that a half-hourly price is honest, and it keeps the
- * broker's rate limit for the hours that matter.
+ * A scheduler cannot be asked to call more often than once a minute — that is
+ * the floor on every free one — so the handler does the rest itself: it wakes
+ * up, and for the next minute it refreshes every ten seconds, then returns.
+ * One job on the outside, six refreshes on the inside.
  *
- * Guarding the cadence here rather than trusting the scheduler means a
- * misconfigured pinger calling every second costs one cheap query, not a
- * rate-limit ban.
+ * Ten seconds during the regular session, and once per invocation in
+ * pre-market and after hours, which trade thinly enough that more would spend
+ * the broker's rate limit for nothing.
+ *
+ * It runs all day, not only when the market is open. With the market shut it
+ * fetches nothing but still touches the database, and that alone is the point:
+ * the hosting tier suspends the database after a few minutes idle and takes
+ * around twenty-six seconds to wake it, which was the single biggest source
+ * of errors on this site. One cheap query a minute keeps it awake.
  */
-const MIN_GAP_MS: Record<string, number> = {
-  regular: 55_000,
-  "pre-market": 29 * 60_000,
-  "after-hours": 29 * 60_000,
-};
+const EVERY_MS = 10_000;
+
+/** Stop in time to answer before the platform cuts the function off. */
+const BUDGET_MS = 50_000;
 
 export async function GET(request: Request) {
   const secret = process.env.SNAPSHOT_CRON_SECRET;
@@ -41,29 +45,48 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
-  const session = marketSession(now);
-  const gap = MIN_GAP_MS[session];
-  if (gap === undefined) {
-    return Response.json({ warmed: false, reason: "Market closed" });
-  }
+  const started = Date.now();
 
-  // How long since anything was last priced. One row, one index.
+  // The keep-awake, and the cheapest possible one. It happens whatever the
+  // market is doing.
   const db = await getDb();
-  const latest = await db.get<{ cached_at: string | null }>(
-    `SELECT MAX(cached_at) AS cached_at FROM quote_cache`,
-  );
-  const age = latest?.cached_at
-    ? now.getTime() - new Date(latest.cached_at).getTime()
-    : Infinity;
+  await db.get(`SELECT 1 AS awake`);
 
-  if (age < gap) {
-    return Response.json({
-      warmed: false,
-      reason: "Already fresh",
-      ageSeconds: Math.round(age / 1000),
-    });
+  const session = marketSession(new Date());
+  if (session === "closed") {
+    return Response.json({ awake: true, warmed: false, reason: "Market closed" });
   }
 
-  return Response.json(await warmQuotes(now));
+  // Extended hours: once, and let the next invocation handle the next half
+  // hour. Anything faster is spending a rate limit on a price that has not
+  // moved.
+  if (session !== "regular") {
+    const latest = await db.get<{ cached_at: string | null }>(
+      `SELECT MAX(cached_at) AS cached_at FROM quote_cache`,
+    );
+    const age = latest?.cached_at
+      ? Date.now() - new Date(latest.cached_at).getTime()
+      : Infinity;
+
+    if (age < 29 * 60_000) {
+      return Response.json({ awake: true, warmed: false, reason: "Already fresh" });
+    }
+    return Response.json({ awake: true, ...(await warmQuotes(new Date())) });
+  }
+
+  let rounds = 0;
+  let symbols = 0;
+
+  while (Date.now() - started < BUDGET_MS) {
+    const result = await warmQuotes(new Date());
+    rounds += 1;
+    symbols = result.symbols;
+
+    const elapsed = Date.now() - started;
+    const wait = EVERY_MS - (elapsed % EVERY_MS);
+    if (elapsed + wait >= BUDGET_MS) break;
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+
+  return Response.json({ awake: true, warmed: rounds > 0, rounds, symbols });
 }

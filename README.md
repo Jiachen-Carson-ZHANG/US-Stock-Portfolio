@@ -407,7 +407,7 @@ balance. That is enforced by the data type, not by the template.
 | `POST /api/cron/snapshot` | daily, after the close | records the day for every portfolio |
 | `POST /api/cron/reconstruct` | monthly | rebuilds all history from fills; the backstop for days nobody was there to capture |
 | `GET /api/cron/orders` | every minute while the market is open | fills resting orders on the practice accounts |
-| `GET /api/cron/quotes` | every minute | refreshes the shared price cache so no page load has to |
+| `GET /api/cron/quotes` | every minute, all day | keeps the database awake, and refreshes prices every ten seconds while the market is open |
 
 All three take `Authorization: Bearer $SNAPSHOT_CRON_SECRET`. The first two
 are not required for correctness — history can always be re-derived — but
@@ -435,12 +435,23 @@ does; the whole setup is five fields:
    header is wrong; `503` means `SNAPSHOT_CRON_SECRET` is not set on the
    deployment.
 
-Add a second job the same way for `/api/cron/quotes`, also every minute. It
-decides for itself whether there is anything to do: at most once a minute
-during the regular session, at most once every half hour in pre-market and
-after hours, and nothing at all when the market is shut. Guarding the cadence
-in the endpoint rather than trusting the scheduler means a misconfigured
-pinger costs one cheap query rather than a rate-limit ban.
+Add a second job the same way for `/api/cron/quotes`, also every minute, and
+leave it running around the clock.
+
+A scheduler cannot be asked for less than a minute — that is the floor on
+every free one — so the handler does the rest itself. Woken once, it refreshes
+every ten seconds for the following minute and then returns: one job outside,
+six refreshes inside. In pre-market and after hours it refreshes once every
+half hour instead, since those sessions trade too thinly for more to be worth
+a rate limit.
+
+**Run it when the market is shut as well.** With nothing to fetch it still
+touches the database, and that alone is the point: the hosting tier suspends
+the database after a few minutes idle and takes about twenty-six seconds to
+wake it. That cold start was the single biggest source of errors on this
+site — a page would ask, wait, and be killed before an answer came, leaving
+nothing in the log to explain it. One cheap query a minute keeps it awake and
+the problem cannot occur.
 
 It fetches one price per name across every account, not one per portfolio:
 ten people holding NVDA cost one NVDA quote. Holdings are deliberately not

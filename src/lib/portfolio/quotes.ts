@@ -38,8 +38,15 @@ export type QuoteResult = {
   dataTimestamp: string | null;
 };
 
+/**
+ * How old a cached price may be before it is worth asking again.
+ *
+ * Matched to the scheduler, which refreshes every ten seconds during the
+ * session. Shorter than that and a page load would fetch a price the warmer
+ * was about to fetch anyway.
+ */
 function cacheTtlSeconds(): number {
-  return Number(process.env.QUOTE_CACHE_SECONDS ?? 5);
+  return Number(process.env.QUOTE_CACHE_SECONDS ?? 10);
 }
 
 function toQuote(row: QuoteRow): Quote {
