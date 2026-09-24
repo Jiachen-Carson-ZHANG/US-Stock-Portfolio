@@ -38,11 +38,11 @@ export function QuoteDetailPanel({ detail, compactView = false }: { detail: Quot
     const shown = cells.filter((cell) => cell.value !== undefined);
     if (shown.length === 0) return null;
     return (
-      <dl className="grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-x-3 sm:gap-y-2">
         {shown.map((cell) => (
-          <div key={cell.label} className="min-w-0">
-            <dt className="truncate text-[11px] text-muted-foreground">{cell.label}</dt>
-            <dd className={cn("tabular truncate text-xs font-medium", cell.tone)}>{cell.value}</dd>
+          <div key={cell.label} className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5 sm:rounded-none sm:bg-transparent sm:p-0">
+            <dt className="text-[11px] text-muted-foreground sm:truncate">{cell.label}</dt>
+            <dd className={cn("tabular mt-1 break-words text-sm font-medium sm:mt-0 sm:truncate sm:text-xs", cell.tone)}>{cell.value}</dd>
           </div>
         ))}
       </dl>
@@ -51,10 +51,10 @@ export function QuoteDetailPanel({ detail, compactView = false }: { detail: Quot
 
   const session = (label: string, value: ExtendedSession | undefined) =>
     value && (
-      <span className="inline-flex items-baseline gap-1.5 text-xs">
+      <span className="grid grid-cols-[minmax(0,1fr)_auto_4.5rem] items-baseline gap-2 py-2 text-xs sm:inline-flex sm:gap-1.5 sm:py-0">
         <span className="text-muted-foreground">{label}</span>
         <span className="tabular font-medium">{money(value.price)}</span>
-        <span className={cn("tabular", signClass(value.changePercent))}>
+        <span className={cn("tabular text-right sm:text-left", signClass(value.changePercent))}>
           {pct(value.changePercent, true)}
         </span>
       </span>
@@ -67,7 +67,7 @@ export function QuoteDetailPanel({ detail, compactView = false }: { detail: Quot
       {/* Outside the regular session, what it has done since — the number
           people most often go looking for first thing in the morning. */}
       {(detail.preMarket || detail.afterHours || detail.overnight) && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <div className="divide-y divide-border rounded-lg border border-border px-3 sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-1 sm:divide-y-0 sm:rounded-none sm:border-0 sm:px-0">
           {session(say("Pre-market", "盘前"), detail.preMarket)}
           {session(say("After hours", "盘后"), detail.afterHours)}
           {session(say("Overnight", "夜盘"), detail.overnight)}

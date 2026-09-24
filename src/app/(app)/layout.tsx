@@ -64,7 +64,7 @@ export default async function AppLayout({
             <div className="flex shrink-0 items-center gap-1">
               <LanguageToggle />
               {canSignOut && <NotificationBell initialUnread={unread} />}
-              {canSignOut && <SignOutButton className="w-auto px-2 py-1" />}
+              {canSignOut && <SignOutButton phoneIcon className="flex min-h-10 w-auto items-center justify-center px-2 py-1 sm:min-h-0" />}
             </div>
           </header>
 

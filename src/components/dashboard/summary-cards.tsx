@@ -32,6 +32,7 @@ function Stat({
   period,
   help,
   children,
+  compactOnPhone = false,
 }: {
   label: string;
   value: string;
@@ -41,6 +42,7 @@ function Stat({
   /** What this figure actually means, for anyone who has not met it before. */
   help?: { title: string; body: string };
   children?: React.ReactNode;
+  compactOnPhone?: boolean;
 }) {
   return (
     <Card>
@@ -55,15 +57,17 @@ function Stat({
         >
           {value}
         </p>
-        {sub && (
-          <p className={`mt-0.5 text-xs sm:text-sm ${tone ?? "text-muted-foreground"}`}>{sub}</p>
-        )}
-        {children}
-        {period && (
-          <p className="mt-1.5 text-[10px] text-muted-foreground sm:mt-2 sm:text-[11px]">
-            {period}
-          </p>
-        )}
+        <div className={compactOnPhone ? "hidden sm:contents" : "contents"}>
+          {sub && (
+            <p className={`mt-0.5 text-xs sm:text-sm ${tone ?? "text-muted-foreground"}`}>{sub}</p>
+          )}
+          {children}
+          {period && (
+            <p className="mt-1.5 text-[10px] text-muted-foreground sm:mt-2 sm:text-[11px]">
+              {period}
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -139,6 +143,7 @@ export function SummaryCards({
           22,100?" is the first thing anyone asks. */}
       <Stat
         label={t.summary.totalInvested}
+        compactOnPhone
         help={{ title: t.help.totalInvested, body: t.help.totalInvestedBody }}
         value={formatMoney(summary.netDeposits ?? totalInvested)}
         sub={summary.netDeposits ? t.summary.paidIn : undefined}

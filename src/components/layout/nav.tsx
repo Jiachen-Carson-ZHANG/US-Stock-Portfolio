@@ -13,6 +13,7 @@ import {
   Star,
   Table2,
   MessagesSquare,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -318,7 +319,7 @@ export function BottomNav({
   );
 }
 
-export function SignOutButton({ className }: { className?: string }) {
+export function SignOutButton({ className, phoneIcon = false }: { className?: string; phoneIcon?: boolean }) {
   const router = useRouter();
   const t = useT();
 
@@ -332,12 +333,15 @@ export function SignOutButton({ className }: { className?: string }) {
     <button
       type="button"
       onClick={signOut}
+      aria-label={t.nav.signOut}
+      title={t.nav.signOut}
       className={cn(
         "w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
         className,
       )}
     >
-      {t.nav.signOut}
+      {phoneIcon && <LogOut aria-hidden="true" className="size-4 sm:hidden" />}
+      <span className={phoneIcon ? "hidden sm:inline" : undefined}>{t.nav.signOut}</span>
     </button>
   );
 }

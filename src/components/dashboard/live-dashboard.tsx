@@ -66,17 +66,25 @@ export function LiveDashboard({
                 : t.mockTrade.onlyOwnerCanTradeGeneric}
             </p>
           )}
-          {canWrite && !isMock && (
+          {!isMock && <div className="flex w-full flex-wrap gap-2 sm:contents">
+            <Link
+              href={`/${portfolioSlug}/connection`}
+              className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-xs text-muted-foreground hover:text-foreground sm:hidden"
+            >
+              {t.connection.title}
+            </Link>
+          {canWrite && (
             // The form itself moved to the records screen. A dashboard is for
             // reading; typing bank transfers into it was always the odd one
             // out, and it is the same two clicks from here.
             <Link
               href={`/${portfolioSlug}/records`}
-              className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:text-foreground sm:min-h-9 sm:text-sm"
             >
               {t.records.transfer}
             </Link>
           )}
+          </div>}
         </div>
         <MarketStatus
           summary={data.summary}

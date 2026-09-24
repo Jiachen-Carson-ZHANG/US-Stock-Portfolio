@@ -55,11 +55,11 @@ function Facts({ position }: { position: PositionView }) {
       : [{ label: "Sector", value: position.sector ?? "—" }];
 
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-4 lg:grid-cols-4">
       {[...shared, ...optionFacts].map((fact) => (
-        <div key={fact.label}>
+        <div key={fact.label} className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5 sm:rounded-none sm:bg-transparent sm:p-0">
           <dt className="text-xs text-muted-foreground">{fact.label}</dt>
-          <dd className="tabular mt-1 text-sm font-medium">{fact.value}</dd>
+          <dd className="tabular mt-1 break-words text-sm font-medium sm:break-normal">{fact.value}</dd>
         </div>
       ))}
     </dl>

@@ -51,7 +51,7 @@ export function MarketStatus({
   }[summary.marketStatus];
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+    <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:flex sm:flex-wrap">
       <span className="inline-flex items-center gap-1.5">
         <span
           aria-hidden="true"
@@ -61,9 +61,9 @@ export function MarketStatus({
         {sessionLabel}
       </span>
 
-      <span aria-hidden="true">·</span>
+      <span aria-hidden="true" className="hidden sm:inline">·</span>
 
-      <span>
+      <span className="col-span-2 row-start-2 sm:order-none">
         {t.market.lastUpdated}:{" "}
         <span className="tabular">{clockTime(summary.dataTimestamp)}</span>
       </span>
@@ -73,7 +73,7 @@ export function MarketStatus({
           type="button"
           onClick={onRefresh}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+          className="col-start-2 row-start-1 inline-flex min-h-10 items-center justify-end gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60 sm:min-h-0"
         >
           <RefreshCw
             aria-hidden="true"
@@ -88,12 +88,12 @@ export function MarketStatus({
           are trying less often now rather than hammering something that is
           already struggling. Merely being a bit behind is not an alarm. */}
       {failures > 0 ? (
-        <span className="w-full text-negative sm:w-auto">
+        <span className="col-span-2 w-full text-negative sm:w-auto">
           {failures === 1 ? t.market.retrying : t.market.backingOff}
         </span>
       ) : (
         summary.isStale && (
-          <span className="w-full text-muted-foreground sm:w-auto">
+          <span className="col-span-2 w-full text-muted-foreground sm:w-auto">
             {t.market.stale}
           </span>
         )

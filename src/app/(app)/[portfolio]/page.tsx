@@ -63,7 +63,7 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-4">
-    {portfolio.kind === "broker" && <Link className="text-sm underline" href={`/${portfolio.slug}/connection`}>Broker connection and refresh</Link>}
+    {portfolio.kind === "broker" && <Link className="hidden text-sm underline sm:inline" href={`/${portfolio.slug}/connection`}>Broker connection and refresh</Link>}
     <LiveDashboard
       portfolioSlug={portfolio.slug}
       portfolioName={portfolio.displayName}
