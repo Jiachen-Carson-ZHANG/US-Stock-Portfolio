@@ -21,6 +21,7 @@ export type ActivityKind =
   | "account_approve"
   | "account_decline"
   | "account_remove"
+  | "password_reset"
   | "playground_post"
   | "playground_reply";
 

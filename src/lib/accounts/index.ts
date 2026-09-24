@@ -50,10 +50,19 @@ export async function register(
     referredBy?: string;
     reason?: string;
     email?: string;
+    passwordHint?: string;
   },
   now: Date = new Date(),
 ): Promise<{ id: string }> {
   const username = input.username.trim().toLowerCase();
+
+  // A hint that contains the password is not a hint, it is the password
+  // written down beside the lock — and it is shown to anybody who types the
+  // username on the forgotten-password screen.
+  const hint = input.passwordHint?.trim() || null;
+  if (hint && input.password && hint.toLowerCase().includes(input.password.toLowerCase())) {
+    throw new RegistrationError("The hint gives the password away. Write something only you would understand.");
+  }
 
   // The username becomes a portfolio address on approval, so it has to be
   // usable in a URL from the start rather than discovered to be unusable
@@ -74,8 +83,8 @@ export async function register(
   await db.run(
     `INSERT INTO users
        (id, username, display_name, password_hash, role, created_at, status,
-        referred_by, intro, email)
-     VALUES (?, ?, ?, ?, 'viewer', ?, 'pending', ?, ?, ?)`,
+        referred_by, intro, email, password_hint)
+     VALUES (?, ?, ?, ?, 'viewer', ?, 'pending', ?, ?, ?, ?)`,
     [
       id,
       username,
@@ -85,6 +94,7 @@ export async function register(
       input.referredBy?.trim() || null,
       input.reason?.trim() || null,
       input.email?.trim() || null,
+      hint,
     ],
   );
 

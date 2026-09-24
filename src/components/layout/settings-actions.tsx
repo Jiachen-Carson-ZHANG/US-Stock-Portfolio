@@ -106,6 +106,36 @@ export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
    * Confirmed here and refused again on the server for an owner, for yourself,
    * and for anyone holding a portfolio that follows a real brokerage account.
    */
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
+
+  /**
+   * Issuing a temporary password.
+   *
+   * Shown once, here, so it can be passed on — it is not stored anywhere it
+   * could be read again, and the person changes it as soon as they are in.
+   */
+  async function reset(user: AdminUser) {
+    if (
+      !window.confirm(
+        `Reset the password for @${user.username}? They will be signed out everywhere and get a temporary password to sign in with.`,
+      )
+    )
+      return;
+
+    setBusy(user.id);
+    const response = await fetch(`/api/admin/users/${user.id}/reset-password`, {
+      method: "POST",
+    });
+    const data = await response.json().catch(() => ({}));
+    setBusy(null);
+
+    if (!response.ok) {
+      setDone((current) => ({ ...current, [user.id]: data.error ?? "Could not reset." }));
+      return;
+    }
+    setIssued({ username: data.username, password: data.temporaryPassword });
+  }
+
   async function remove(user: AdminUser) {
     if (
       !window.confirm(
@@ -146,6 +176,32 @@ export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
   }
 
   return (
+    <>
+      {issued && (
+        // Shown once. Closing it is the last time anybody sees this value.
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-border bg-muted/40 p-4"
+        >
+          <p className="text-sm">
+            Temporary password for <span className="font-medium">@{issued.username}</span>
+          </p>
+          <p className="tabular mt-2 select-all rounded-md bg-background px-3 py-2 font-mono text-base tracking-wide">
+            {issued.password}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Pass this on privately. It is not stored anywhere it can be read again, so copy it
+            now. They sign in with it and change it on their Account page.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIssued(null)}
+            className="mt-3 text-xs underline underline-offset-4"
+          >
+            I have passed it on
+          </button>
+        </div>
+      )}
     <ul className="divide-y divide-border">
       {users.map((user) => (
         <li
@@ -175,6 +231,17 @@ export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
             {busy === user.id ? "Revoking…" : "Revoke sessions"}
           </Button>
 
+          {user.role !== "owner" && (
+            <button
+              type="button"
+              onClick={() => void reset(user)}
+              disabled={busy === user.id}
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              Reset password
+            </button>
+          )}
+
           {user.role !== "owner" && user.id !== me && (
             <button
               type="button"
@@ -188,6 +255,7 @@ export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

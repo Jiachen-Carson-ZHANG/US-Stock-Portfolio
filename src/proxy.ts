@@ -8,6 +8,9 @@ const PUBLIC_PATHS = new Set([
   // Signing up necessarily happens before there is a session to check.
   "/register",
   "/api/auth/register",
+  // Forgetting a password happens, by definition, without a session.
+  "/forgot",
+  "/api/auth/hint",
   // Scheduled jobs and the keep-warm ping carry their own credentials, or
   // none because they reveal nothing.
   "/api/cron/snapshot",

@@ -308,3 +308,48 @@ describe("one practice account each", () => {
     expect(Number(mine?.opening_cash)).toBeGreaterThanOrEqual(50_000);
   });
 });
+
+describe("the password hint", () => {
+  it("is stored for somebody who signs up with one", async () => {
+    const { id } = await register(db, {
+      username: "hinted",
+      displayName: "Hinted",
+      password: "correct horse battery",
+      reason: "hello there",
+      passwordHint: "the comic about a horse",
+    });
+
+    const row = await db.get<{ password_hint: string | null }>(
+      `SELECT password_hint FROM users WHERE id = ?`,
+      [id],
+    );
+    expect(row?.password_hint).toBe("the comic about a horse");
+  });
+
+  it("refuses a hint that gives the password away", async () => {
+    await expect(
+      register(db, {
+        username: "careless",
+        displayName: "Careless",
+        password: "sunflower2026",
+        reason: "hello there",
+        passwordHint: "it is Sunflower2026 obviously",
+      }),
+    ).rejects.toBeInstanceOf(RegistrationError);
+  });
+
+  it("leaves an account made without one with nothing, rather than inventing one", async () => {
+    const { id } = await register(db, {
+      username: "older",
+      displayName: "Older",
+      password: "correct horse battery",
+      reason: "hello there",
+    });
+
+    const row = await db.get<{ password_hint: string | null }>(
+      `SELECT password_hint FROM users WHERE id = ?`,
+      [id],
+    );
+    expect(row?.password_hint).toBeNull();
+  });
+});

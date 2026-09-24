@@ -118,11 +118,23 @@ export const registerSchema = z.object({
     .max(160)
     .optional()
     .or(z.literal("")),
+  // Required for anybody signing up from now on. It is the only thing the
+  // forgotten-password screen can offer without an owner stepping in.
+  passwordHint: z
+    .string()
+    .trim()
+    .min(2, "Write a hint that will remind you of your password")
+    .max(100, "Keep the hint under a hundred characters"),
 });
 
 export const accountDecisionSchema = z.object({
   userId: z.string().uuid(),
   approve: z.boolean(),
+});
+
+/** Asking for the reminder written at sign-up. */
+export const hintRequestSchema = z.object({
+  username: z.string().trim().toLowerCase().min(1).max(40),
 });
 
 /** The name you are shown under. Not the username, which is the address. */

@@ -33,6 +33,7 @@ export function RegisterForm() {
         referredBy: String(data.get("referredBy") ?? ""),
         reason: String(data.get("reason") ?? ""),
         email: String(data.get("email") ?? ""),
+        passwordHint: String(data.get("passwordHint") ?? ""),
       }),
     });
     const body = await response.json().catch(() => ({}));
@@ -99,6 +100,17 @@ export function RegisterForm() {
             required
           />
           <p className="text-xs text-muted-foreground">{t.register.passwordHint}</p>
+        </div>
+
+        {/* The one thing the forgotten-password screen can offer without an
+            owner stepping in. Required, and refused if it gives the password
+            away. */}
+        <div className="space-y-2">
+          <Label htmlFor="passwordHint" className="text-xs text-muted-foreground">
+            {t.register.hint}
+          </Label>
+          <Input id="passwordHint" name="passwordHint" autoComplete="off" maxLength={100} required />
+          <p className="text-xs text-muted-foreground">{t.register.hintHelp}</p>
         </div>
 
         <div className="space-y-2">

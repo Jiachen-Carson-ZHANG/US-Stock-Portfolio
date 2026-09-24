@@ -21,6 +21,19 @@ const en = {
     language: "中文",
   },
 
+  forgot: {
+    link: "Forgot your password?",
+    title: "Forgotten your password",
+    subtitle: "Type your username to see the hint you wrote when you signed up.",
+    username: "Username",
+    show: "Show my hint",
+    yourHint: "Your hint",
+    noHint: "There is no hint on file for that name.",
+    askOwner: "Still stuck? Ask {owner} to reset your password — you will get a temporary one to sign in with, and can change it straight after.",
+    back: "Back to sign in",
+    tooMany: "Too many tries. Wait a few minutes and try again.",
+  },
+
   login: {
     title: "Family Portfolio",
     subtitle: "Private. Sign in to continue.",
@@ -345,6 +358,8 @@ const en = {
   },
 
   register: {
+    hint: "Password hint",
+    hintHelp: "A reminder only you would understand, shown if you forget your password. It must not contain the password itself.",
     title: "Create an account",
     subtitle: "Someone has to approve it before you can sign in.",
     username: "Username",
@@ -742,6 +757,19 @@ const zh: Dictionary = {
     language: "English",
   },
 
+  forgot: {
+    link: "忘记密码？",
+    title: "忘记密码",
+    subtitle: "输入用户名，查看你注册时写下的密码提示。",
+    username: "用户名",
+    show: "查看提示",
+    yourHint: "你的提示",
+    noHint: "这个用户名没有设置提示。",
+    askOwner: "还是想不起来？请联系 {owner} 重置密码——你会拿到一个临时密码用于登录，登录后可以马上修改。",
+    back: "返回登录",
+    tooMany: "尝试次数过多，请几分钟后再试。",
+  },
+
   login: {
     title: "家庭投资组合",
     subtitle: "私密页面，请登录后查看。",
@@ -1062,6 +1090,8 @@ const zh: Dictionary = {
   },
 
   register: {
+    hint: "密码提示",
+    hintHelp: "一句只有你自己看得懂的提示，忘记密码时会显示给你。不能包含密码本身。",
     title: "创建账户",
     subtitle: "需要有人通过后才能登录。",
     username: "用户名",

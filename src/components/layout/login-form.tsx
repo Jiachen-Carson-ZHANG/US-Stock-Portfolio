@@ -66,6 +66,12 @@ export function LoginForm() {
         <SubmitButton />
       </form>
 
+      <p className="mt-4 text-center text-xs">
+        <Link href="/forgot" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">
+          {t.forgot.link}
+        </Link>
+      </p>
+
       <p className="mt-5 text-center text-xs text-muted-foreground">
         {t.register.noAccount}{" "}
         <Link

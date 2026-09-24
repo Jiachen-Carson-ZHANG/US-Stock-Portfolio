@@ -397,6 +397,11 @@ ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS session TEXT;
 -- every field somebody asks to see.
 ALTER TABLE quote_cache ADD COLUMN IF NOT EXISTS raw TEXT;
 
+-- A reminder somebody writes for themselves at sign-up, shown back on the
+-- forgotten-password screen. Nullable: accounts made before it existed have
+-- none and are not asked for one.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hint TEXT;
+
 -- Following somebody. One row per direction, so following is not mutual
 -- unless both sides ask for it, and the pair is unique so pressing the
 -- button twice does nothing.
