@@ -28,9 +28,27 @@ export async function GET() {
 
   try {
     const db = await getDb();
-    await db.get(`SELECT 1 AS ok`);
+
+    // When the scheduler last called. Without it, "is the cron working?" can
+    // only be guessed at from whether prices look fresh — which says nothing
+    // when the market is shut, and the market is shut most of the time.
+    const beat = await db.get<{ fetched_at: string }>(
+      `SELECT fetched_at FROM series_cache WHERE key = 'cron:quotes'`,
+    );
+    const agoSeconds = beat
+      ? Math.round((Date.now() - new Date(beat.fetched_at).getTime()) / 1000)
+      : null;
+
     return Response.json(
-      { ok: true, db: "up", ms: Date.now() - started, commit },
+      {
+        ok: true,
+        db: "up",
+        ms: Date.now() - started,
+        commit,
+        // Seconds since the scheduler last called, or null if it never has.
+        // Anything much over 60 means it is not running.
+        cronAgo: agoSeconds,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {

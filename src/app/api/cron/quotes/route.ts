@@ -48,9 +48,16 @@ export async function GET(request: Request) {
   const started = Date.now();
 
   // The keep-awake, and the cheapest possible one. It happens whatever the
-  // market is doing.
+  // market is doing — and it leaves a mark, so "is my scheduler actually
+  // running?" has an answer instead of being inferred from whether prices
+  // look fresh, which says nothing at all when the market is shut.
   const db = await getDb();
-  await db.get(`SELECT 1 AS awake`);
+  await db.run(
+    `INSERT INTO series_cache (key, payload, fetched_at)
+     VALUES ('cron:quotes', '"ran"', ?)
+     ON CONFLICT(key) DO UPDATE SET fetched_at = excluded.fetched_at`,
+    [new Date().toISOString()],
+  );
 
   const session = marketSession(new Date());
   if (session === "closed") {

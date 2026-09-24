@@ -141,6 +141,30 @@ const CALL_IT_STALE_MS = 60_000;
  * Concurrent callers wanting the same symbols share one fetch, and a
  * moderately stale entry is served at once while that fetch happens.
  */
+/**
+ * Symbols the broker has already said it does not recognise.
+ *
+ * You are right that a match should come first. The trouble is that "is this
+ * a real ticker" can only be answered by asking — there is no local list, and
+ * inventing one would reject the next company to list. So it asks once, and
+ * then remembers the answer, which is the part that was missing.
+ *
+ * Typing NVDA sends N, NV and NVD on the way. Each is worth exactly one round
+ * trip to learn it is not a symbol; the second keystroke through the same
+ * prefix should cost nothing. Ten minutes, because a ticker that does not
+ * exist now might after the next listing, and this is only meant to absorb
+ * somebody's typing.
+ */
+const notSymbols = new Map<string, number>();
+const NOT_A_SYMBOL_MS = 10 * 60_000;
+
+function forgetStaleRejections(now: number): void {
+  if (notSymbols.size < 500) return;
+  for (const [symbol, at] of notSymbols) {
+    if (now - at > NOT_A_SYMBOL_MS) notSymbols.delete(symbol);
+  }
+}
+
 export async function getQuotes(
   db: DB,
   symbols: string[],
@@ -151,6 +175,12 @@ export async function getQuotes(
   const ttlMs = cacheTtlSeconds() * 1000;
 
   const expired = symbols.filter((symbol) => {
+    // Already asked, already told no. Not worth asking again yet.
+    const rejected = notSymbols.get(symbol);
+    if (rejected !== undefined && now.getTime() - rejected < NOT_A_SYMBOL_MS) {
+      return false;
+    }
+
     const row = cached.get(symbol);
     if (!row) return true;
     return now.getTime() - new Date(row.cached_at).getTime() > ttlMs;
@@ -185,6 +215,14 @@ export async function getQuotes(
         () => provider.getQuotes(expired),
       );
       await writeCache(db, fresh, now);
+
+      // Asked for, not returned: the broker does not know it. Remembered so
+      // the next keystroke through the same prefix costs nothing.
+      const answered = new Set(fresh.map((quote) => quote.symbol));
+      forgetStaleRejections(now.getTime());
+      for (const symbol of expired) {
+        if (!answered.has(symbol)) notSymbols.set(symbol, now.getTime());
+      }
       for (const quote of fresh) {
         cached.set(quote.symbol, {
           symbol: quote.symbol,
