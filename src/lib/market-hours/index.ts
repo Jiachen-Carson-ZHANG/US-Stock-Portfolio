@@ -121,6 +121,45 @@ export function currentSessionDate(now: Date = new Date()): string {
   return marketDateString(now);
 }
 
+/** The weekday before or after `date`, stepping over weekends. */
+function stepWeekday(date: string, step: 1 | -1): string {
+  // Noon in New York whatever the offset, so the UTC weekday is New York's.
+  const cursor = new Date(`${date}T16:00:00Z`);
+  do cursor.setUTCDate(cursor.getUTCDate() + step);
+  while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6);
+  return cursor.toISOString().slice(0, 10);
+}
+
+/**
+ * The regular session an order placed now is for.
+ *
+ * Today's until the 4pm close; after it, and at weekends, the next
+ * weekday's. An order sent on Friday evening is for Monday, as at any broker,
+ * and a day order lives until that session closes.
+ */
+export function orderSessionDate(now: Date = new Date()): string {
+  const { minutesOfDay, weekday } = marketClock(now);
+  const today = marketDateString(now);
+  if (weekday !== 0 && weekday !== 6 && minutesOfDay < REGULAR_CLOSE) return today;
+  return stepWeekday(today, 1);
+}
+
+/**
+ * The regular session a quote's price and previous close describe.
+ *
+ * The feed only moves on to a new day at the regular open. Before 9:30 its
+ * "last price" is still yesterday's close and its "previous close" the day
+ * before's — so a change measured in pre-market is yesterday's change, and
+ * anything bought since yesterday's open has to be measured from what was
+ * paid instead.
+ */
+export function quotedSessionDate(now: Date = new Date()): string {
+  const { minutesOfDay, weekday } = marketClock(now);
+  const today = marketDateString(now);
+  if (weekday !== 0 && weekday !== 6 && minutesOfDay >= REGULAR_OPEN) return today;
+  return stepWeekday(today, -1);
+}
+
 /** True once the regular session has ended for the day (§21 snapshot trigger). */
 export function isAfterMarketClose(now: Date = new Date()): boolean {
   const { minutesOfDay, weekday } = marketClock(now);

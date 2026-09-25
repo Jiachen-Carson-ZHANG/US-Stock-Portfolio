@@ -76,8 +76,14 @@ export async function POST(request: Request) {
     // provider directly meant an order was priced from a different request
     // than the one the screen had just shown, and a feed that was failing
     // showed a healthy price from cache while every order died.
+    //
+    // Waiting for a fresh one, though, rather than taking whatever is cached:
+    // an order that fills on the spot fills at this price, and a cached one
+    // can be seconds behind a market the person clicking is watching live.
     const provider = await getMarketDataProvider(context.portfolio.id);
-    const { quotes } = await getQuotes(db, [symbol], provider, new Date());
+    const { quotes } = await getQuotes(db, [symbol], provider, new Date(), {
+      waitForFresh: true,
+    });
     const quote = quotes.get(symbol);
     const result = await placeOrder(
       db,

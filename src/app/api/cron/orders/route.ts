@@ -32,10 +32,11 @@ export async function GET(request: Request) {
 
   const now = new Date();
 
-  // With the market shut the price cannot reach anything, so there is nothing
-  // to match and the quote requests would be wasted. Pre-market and after
-  // hours do count: they trade, thinly, and an order resting through them
-  // should fill on what actually printed.
+  // With the market shut there is nothing to do and the quote requests would
+  // be wasted. Pre-market and after hours still run, but only to expire day
+  // orders whose session has closed: nothing fills outside the regular
+  // session, because the feed's price there is the last close rather than
+  // anything tradable (see printedThisSession).
   if (marketSession(now) === "closed") {
     return Response.json({ matched: false, reason: "Market closed" });
   }

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import Decimal from "decimal.js";
 import type { DB } from "@/lib/db";
 import { parseSymbol } from "@/lib/moomoo/symbols";
-import { marketDateString } from "@/lib/market-hours";
+import { marketDateString, marketSession, orderSessionDate } from "@/lib/market-hours";
 import { mockState } from "@/lib/portfolio/mock";
 import type { Portfolio } from "@/lib/portfolios";
 import type { Quote } from "@/types/market";
@@ -137,6 +137,54 @@ async function reservedShares(
 }
 
 /**
+ * Whether a price printed during the regular session that is open now.
+ *
+ * Only those may fill anything. Outside the session the feed's price is the
+ * last close, not a price anybody can trade at: a buy sent at 4:53 in the
+ * morning filled at the previous day's close while the stock was trading
+ * about one percent higher, a profit that never existed. At a broker, market
+ * and stop orders wait for the open; here every order does.
+ *
+ * The same test catches the first moments after the open, before a symbol
+ * has traded: its price is still yesterday's until something prints today.
+ */
+function printedThisSession(quotedAt: number, now: Date): boolean {
+  const at = new Date(quotedAt);
+  return (
+    marketSession(now) === "regular" &&
+    marketSession(at) === "regular" &&
+    marketDateString(at) === marketDateString(now)
+  );
+}
+
+/**
+ * A stop already past its trigger, explained, or null when it is not.
+ *
+ * A stop is a trigger for a move that has not happened yet: a buy stop above
+ * the price, to buy a breakout; a sell stop below it, to cap a loss. One on
+ * the wrong side would go off the moment it was placed, and nobody who
+ * places one means that — "buy stop at 950" with the stock at 1,080 is
+ * somebody who wanted to buy the dip, which is a limit order. Brokers refuse
+ * it, and so does this.
+ */
+export function misplacedStop(
+  symbol: string,
+  side: OrderSide,
+  stopPrice: number,
+  price: number,
+): string | null {
+  const at = price.toFixed(2);
+  const stop = stopPrice.toFixed(2);
+  if (side === "buy" && price >= stopPrice) {
+    return `A buy stop waits for the price to rise to it. ${symbol} is at ${at}, already above ${stop}, so it would buy at once. To buy if it falls to ${stop}, use a limit order.`;
+  }
+  if (side === "sell" && price <= stopPrice) {
+    return `A sell stop waits for the price to fall to it. ${symbol} is at ${at}, already below ${stop}, so it would sell at once. To sell if it rises to ${stop}, use a limit order.`;
+  }
+  return null;
+}
+
+/**
  * Whether a resting order should fill at this price.
  *
  * Full fills only. Without an order book there is no honest way to decide
@@ -198,9 +246,17 @@ export async function placeOrder(
   if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
     throw new OrderError(`No usable price for ${symbol} right now.`);
   }
-  const quotedAt = quote.dataTimestamp ? Date.parse(quote.dataTimestamp) : now.getTime();
-  if (Number.isFinite(quotedAt) && now.getTime() - quotedAt > MAX_QUOTE_AGE_MS) {
+  const parsedAt = quote.dataTimestamp ? Date.parse(quote.dataTimestamp) : NaN;
+  const quotedAt = Number.isFinite(parsedAt) ? parsedAt : now.getTime();
+  // Only matters while an order can fill on the spot. Outside the session it
+  // waits for a fresh price anyway, and a weekend quote is Friday's by nature.
+  const regular = marketSession(now) === "regular";
+  if (regular && now.getTime() - quotedAt > MAX_QUOTE_AGE_MS) {
     throw new OrderError("That price is more than fifteen minutes old. Try again shortly.");
+  }
+  if (input.kind === "stop") {
+    const misplaced = misplacedStop(symbol, input.side, Number(input.stopPrice), quote.price);
+    if (misplaced) throw new OrderError(misplaced);
   }
 
   const { holdings } = await mockState(db, portfolio);
@@ -227,7 +283,7 @@ export async function placeOrder(
   }
 
   const id = randomUUID();
-  const marketable = fillsAt(
+  const marketable = printedThisSession(quotedAt, now) && fillsAt(
     {
       kind: input.kind,
       side: input.side,
@@ -387,14 +443,17 @@ export async function matchOpenOrders(
   let filled = 0;
   let expired = 0;
 
-  const today = marketDateString(now);
+  const session = orderSessionDate(now);
 
   for (const order of resting) {
-    // A day order dies at the end of the day it was placed, whether or not
-    // anybody was watching. Measured in the market's own day, not UTC: an
-    // order placed at 9am New York is placed on the same trading day as the
-    // 8pm after-hours session, though UTC has already turned over.
-    if (order.timeInForce === "day" && marketDateString(new Date(order.placedAt)) < today) {
+    // A day order dies when the session it was placed for closes, whether or
+    // not anybody was watching. That session is the market's, not UTC's:
+    // an order sent at 9pm New York is for tomorrow's session, though UTC
+    // has long since turned over — and one sent on a Saturday is for Monday.
+    if (
+      order.timeInForce === "day" &&
+      orderSessionDate(new Date(order.placedAt)) < session
+    ) {
       await db.run(
         `UPDATE orders SET status = 'expired', last_checked_at = ?, updated_at = ?
           WHERE id = ? AND status = 'open'`,
@@ -407,7 +466,7 @@ export async function matchOpenOrders(
     const quote = quotes.get(order.symbol);
     if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) continue;
 
-    // Two fairness rules, both about *which* price is allowed to fill an order.
+    // Three fairness rules, all about *which* price is allowed to fill an order.
     //
     // A price has to be recent. Left out, a limit order resting over a long
     // weekend fills on Friday's last print as if it were live.
@@ -417,12 +476,16 @@ export async function matchOpenOrders(
     // could fill on the 10:00:00 tick — buying at a price it already knew it
     // had missed. Anyone watching the number before clicking would win every
     // time, which is the opposite of a fair fill.
+    //
+    // And a price has to come from the regular session that is open now —
+    // see printedThisSession for the fill that taught us that.
     const quotedAt = quote.dataTimestamp ? Date.parse(quote.dataTimestamp) : NaN;
     if (Number.isFinite(quotedAt)) {
       if (now.getTime() - quotedAt > MAX_QUOTE_AGE_MS) continue;
       const placedAt = Date.parse(order.placedAt);
       if (Number.isFinite(placedAt) && quotedAt < placedAt) continue;
     }
+    if (!printedThisSession(Number.isFinite(quotedAt) ? quotedAt : now.getTime(), now)) continue;
 
     await db.run(`UPDATE orders SET last_checked_at = ? WHERE id = ?`, [
       now.toISOString(),

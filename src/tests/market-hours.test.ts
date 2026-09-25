@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  orderSessionDate,
+  quotedSessionDate,
   isAfterMarketClose,
   isMarketOpen,
   marketDateString,
@@ -60,5 +62,39 @@ describe("US market sessions", () => {
     expect(isAfterMarketClose(new Date("2026-09-18T19:00:00Z"))).toBe(false);
     expect(isAfterMarketClose(new Date("2026-09-18T20:30:00Z"))).toBe(true);
     expect(isAfterMarketClose(new Date("2026-09-19T20:30:00Z"))).toBe(false);
+  });
+});
+
+describe("which session an order is for", () => {
+  it("is today's until the close", () => {
+    // Thursday 24 September: 4:53am and 3:59pm in New York.
+    expect(orderSessionDate(new Date("2026-09-24T08:53:00Z"))).toBe("2026-09-24");
+    expect(orderSessionDate(new Date("2026-09-24T19:59:00Z"))).toBe("2026-09-24");
+  });
+
+  it("is the next weekday's after the close, though UTC has already moved on", () => {
+    // 9pm Thursday in New York is 1am Friday in UTC. Stepping from the UTC
+    // date would have skipped Friday entirely.
+    expect(orderSessionDate(new Date("2026-09-25T01:00:00Z"))).toBe("2026-09-25");
+    expect(orderSessionDate(new Date("2026-09-24T20:00:00Z"))).toBe("2026-09-25");
+  });
+
+  it("is Monday's from Friday evening through the weekend", () => {
+    expect(orderSessionDate(new Date("2026-09-25T21:00:00Z"))).toBe("2026-09-28");
+    expect(orderSessionDate(new Date("2026-09-26T15:00:00Z"))).toBe("2026-09-28");
+    expect(orderSessionDate(new Date("2026-09-27T23:00:00Z"))).toBe("2026-09-28");
+  });
+});
+
+describe("which session a quote describes", () => {
+  it("is the previous one until the regular open", () => {
+    // Friday 25 September, pre-market: the feed still shows Thursday.
+    expect(quotedSessionDate(new Date("2026-09-25T11:17:00Z"))).toBe("2026-09-24");
+    expect(quotedSessionDate(new Date("2026-09-25T13:30:00Z"))).toBe("2026-09-25");
+  });
+
+  it("is Friday's over the weekend and before Monday's open", () => {
+    expect(quotedSessionDate(new Date("2026-09-26T15:00:00Z"))).toBe("2026-09-25");
+    expect(quotedSessionDate(new Date("2026-09-28T12:00:00Z"))).toBe("2026-09-25");
   });
 });

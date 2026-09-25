@@ -1,6 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "@/lib/db";
 import { marketSession } from "@/lib/market-hours";
+import { logger } from "@/lib/logger";
+import { matchAllRestingOrders } from "@/lib/portfolio/service";
 import { warmQuotes } from "@/lib/portfolio/warm-quotes";
 
 export const dynamic = "force-dynamic";
@@ -88,6 +90,16 @@ export async function GET(request: Request) {
     const result = await warmQuotes(new Date());
     rounds += 1;
     symbols = result.symbols;
+
+    // Resting orders are checked on the prices just fetched — the warm-up
+    // includes every symbol an open order names — so a limit fills within
+    // seconds of the market reaching it, with nobody signed in. Before, that
+    // waited for somebody to open the account.
+    await matchAllRestingOrders(new Date()).catch((error: unknown) => {
+      logger.error("orders.match.failure", {
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    });
 
     const elapsed = Date.now() - started;
     const wait = EVERY_MS - (elapsed % EVERY_MS);

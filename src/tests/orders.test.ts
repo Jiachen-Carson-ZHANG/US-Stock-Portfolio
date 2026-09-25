@@ -354,6 +354,121 @@ describe("when a resting order fills", () => {
   });
 });
 
+/**
+ * Found on a real account. A buy stop at 950 was sent at 4:53 in the morning,
+ * New York time, on a stock at 1,080. It filled on the spot at 1,080.53 —
+ * the previous day's close, while the stock was trading near 1,092 before
+ * the open. Two things were wrong: the stop was on the wrong side of the
+ * market, and the price it filled at was not one anybody could trade at.
+ */
+describe("outside the regular session, and stops on the wrong side", () => {
+  const at = (symbol: string, price: number, iso: string): Quote => ({
+    ...quote(symbol, price),
+    dataTimestamp: iso,
+  });
+
+  it("refuses a buy stop below the market, and says what was probably meant", async () => {
+    await expect(
+      placeOrder(
+        db,
+        portfolio,
+        { symbol: "MU", side: "buy", kind: "stop", quantity: 1, stopPrice: 950 },
+        quote("MU", 1080.53),
+        null,
+        NOW,
+      ),
+    ).rejects.toThrow(/use a limit order/);
+    expect(await openOrders(db, portfolio.id)).toEqual([]);
+  });
+
+  it("refuses a sell stop above the market, and accepts one below it", async () => {
+    await placeOrder(
+      db,
+      portfolio,
+      { symbol: "NVDA", side: "buy", kind: "market", quantity: 10 },
+      quote("NVDA", 200),
+      null,
+      NOW,
+    );
+
+    await expect(
+      placeOrder(
+        db,
+        portfolio,
+        { symbol: "NVDA", side: "sell", kind: "stop", quantity: 10, stopPrice: 210 },
+        quote("NVDA", 200),
+        null,
+        NOW,
+      ),
+    ).rejects.toThrow(/use a limit order/);
+
+    const { order } = await placeOrder(
+      db,
+      portfolio,
+      { symbol: "NVDA", side: "sell", kind: "stop", quantity: 10, stopPrice: 190 },
+      quote("NVDA", 200),
+      null,
+      NOW,
+    );
+    expect(order.status).toBe("open");
+  });
+
+  it("does not fill before the open on the last close, and fills on the first price after it", async () => {
+    const early = "2026-09-22T08:53:46.000Z";
+    const result = await placeOrder(
+      db,
+      portfolio,
+      { symbol: "MU", side: "buy", kind: "market", quantity: 1 },
+      at("MU", 1080.53, early),
+      null,
+      new Date(early),
+    );
+    expect(result.filled).toBe(false);
+    expect(result.order.status).toBe("open");
+
+    // Still pre-market: nothing fills, whatever the price does.
+    await matchOpenOrders(
+      db,
+      portfolio,
+      new Map([["MU", at("MU", 1092, "2026-09-22T13:29:00.000Z")]]),
+      new Date("2026-09-22T13:29:30.000Z"),
+    );
+    expect(await openOrders(db, portfolio.id)).toHaveLength(1);
+
+    // Open, but the price on hand printed before the open. Not yet.
+    await matchOpenOrders(
+      db,
+      portfolio,
+      new Map([["MU", at("MU", 1092, "2026-09-22T13:29:00.000Z")]]),
+      new Date("2026-09-22T13:30:10.000Z"),
+    );
+    expect(await openOrders(db, portfolio.id)).toHaveLength(1);
+
+    // The first print of the session fills it, at that print.
+    await matchOpenOrders(
+      db,
+      portfolio,
+      new Map([["MU", at("MU", 1093.1, "2026-09-22T13:30:02.000Z")]]),
+      new Date("2026-09-22T13:30:10.000Z"),
+    );
+    expect(await openOrders(db, portfolio.id)).toEqual([]);
+    expect((await mockState(db, portfolio)).cash.toFixed(2)).toBe("8906.90");
+  });
+
+  it("takes orders at the weekend on a Friday price, and holds them for Monday", async () => {
+    const saturday = "2026-09-26T15:00:00.000Z";
+    const result = await placeOrder(
+      db,
+      portfolio,
+      { symbol: "NVDA", side: "buy", kind: "market", quantity: 1 },
+      at("NVDA", 200, "2026-09-25T20:00:00.000Z"),
+      null,
+      new Date(saturday),
+    );
+    expect(result.filled).toBe(false);
+  });
+});
+
 describe("when an order should fill", () => {
   const base = { id: "x", symbol: "NVDA", quantity: 1 } as unknown as Order;
 
@@ -434,20 +549,46 @@ describe("which price is allowed to fill an order", () => {
     expect((await openOrders(db, portfolio.id)).length).toBe(1);
   });
 
-  it("keeps a day order alive through the evening of the day it was placed", async () => {
-    // 9am in New York is 13:00 UTC; 8pm the same trading day is 00:00 UTC the
-    // next calendar day. Measured in UTC the order looks a day old and used
-    // to expire while the market it was placed for was still open.
-    const morning = new Date("2026-09-22T13:00:00.000Z");
-    await rest(180, morning);
+  it("keeps a day order until its session closes, and not a minute past", async () => {
+    await rest(180);
 
+    // 3:59 and 4:01 in the afternoon, New York.
+    await matchOpenOrders(db, portfolio, new Map(), new Date("2026-09-22T19:59:00.000Z"));
+    expect((await openOrders(db, portfolio.id)).length).toBe(1);
+
+    const result = await matchOpenOrders(
+      db,
+      portfolio,
+      new Map(),
+      new Date("2026-09-22T20:01:00.000Z"),
+    );
+    expect(result.expired).toBe(1);
+  });
+
+  it("gives a day order sent in the evening the next session", async () => {
+    // 8pm in New York is midnight UTC, a calendar day later. Measured in UTC
+    // the order looked a day old at once; measured in sessions it is for
+    // tomorrow's, as it would be at any broker.
     const evening = new Date("2026-09-23T00:00:00.000Z");
-    const fresh = {
-      ...quote("NVDA", 190),
-      dataTimestamp: new Date(evening.getTime() - 1_000).toISOString(),
-    };
-    await matchOpenOrders(db, portfolio, new Map([["NVDA", fresh]]), evening);
+    await rest(180, evening);
 
+    const nextMorning = new Date("2026-09-23T14:00:00.000Z");
+    const result = await matchOpenOrders(
+      db,
+      portfolio,
+      new Map([["NVDA", { ...quote("NVDA", 175), dataTimestamp: nextMorning.toISOString() }]]),
+      nextMorning,
+    );
+
+    expect(result).toEqual({ filled: 1, expired: 0 });
+  });
+
+  it("gives an order sent at the weekend Monday's session", async () => {
+    const saturday = new Date("2026-09-26T15:00:00.000Z");
+    await rest(180, saturday);
+
+    const monday = new Date("2026-09-28T14:00:00.000Z");
+    await matchOpenOrders(db, portfolio, new Map(), monday);
     expect((await openOrders(db, portfolio.id)).length).toBe(1);
   });
 

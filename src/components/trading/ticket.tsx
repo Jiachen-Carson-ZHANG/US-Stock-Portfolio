@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
@@ -12,6 +12,7 @@ import { marketSession, quotePollIntervalMs } from "@/lib/market-hours";
 import { formatMoney } from "@/lib/money";
 import { cn, signClass } from "@/lib/utils";
 import type { Order } from "@/lib/trading/orders";
+import type { MarketSession } from "@/types/market";
 
 type Side = "buy" | "sell";
 type Kind = "market" | "limit" | "stop";
@@ -40,6 +41,24 @@ type Quote = {
   raw?: Record<string, unknown>;
 };
 
+
+/**
+ * The market's session, re-read every minute.
+ *
+ * The server renders as if the market were open and the browser corrects it
+ * once it has hydrated, because the two clocks need not agree on which side
+ * of 9:30 it is — and a mismatch between them is an error, not a detail.
+ */
+function useMarketSession(): MarketSession {
+  return useSyncExternalStore(
+    (onChange) => {
+      const timer = setInterval(onChange, 60_000);
+      return () => clearInterval(timer);
+    },
+    () => marketSession(),
+    () => "regular",
+  );
+}
 
 /** Options are quoted per share and trade in hundreds. */
 function contractSize(symbol: string): number {
@@ -107,8 +126,18 @@ export function Ticket({
     };
   }, [symbol, portfolioSlug]);
 
+  const session = useMarketSession();
   const ticker = symbol.trim().toUpperCase();
   const shares = Number(quantity);
+  // A stop already past its trigger would go off the moment it was placed.
+  // The server refuses it; saying so here, while the numbers are still being
+  // typed, is kinder than a refusal after Review.
+  const stop = Number(stopPrice);
+  const stopTriggered =
+    kind === "stop" &&
+    quote !== null &&
+    stop > 0 &&
+    (side === "buy" ? quote.price >= stop : quote.price <= stop);
   const reference =
     kind === "market" ? (quote?.price ?? 0) : Number(kind === "limit" ? limitPrice : stopPrice);
   const estimate =
@@ -121,7 +150,7 @@ export function Ticket({
     Number.isInteger(shares) &&
     shares > 0 &&
     (kind !== "limit" || Number(limitPrice) > 0) &&
-    (kind !== "stop" || Number(stopPrice) > 0);
+    (kind !== "stop" || (Number(stopPrice) > 0 && !stopTriggered));
 
   async function place() {
     setBusy(true);
@@ -162,7 +191,9 @@ export function Ticket({
       tone: "ok",
       text: body.filled
         ? `${t.trade.filled} · ${formatMoney({ amount: String(body.order.fillPrice), currency })}`
-        : t.trade.resting,
+        : session === "regular"
+          ? t.trade.resting
+          : t.trade.restingUntilOpen,
     });
     setReviewing(false);
     setQuantity("");
@@ -228,7 +259,7 @@ export function Ticket({
             </div>
           </dl>
 
-          {kind !== "market" && (
+          {(kind !== "market" || session !== "regular") && (
             <p className="text-xs text-muted-foreground">{t.trade.restingNote}</p>
           )}
 
@@ -346,6 +377,9 @@ export function Ticket({
                   ? t.trade.limitHint
                   : t.trade.stopHint}
             </p>
+            {session !== "regular" && (
+              <p className="text-xs text-foreground">{t.trade.outsideHours}</p>
+            )}
           </div>
 
           {kind !== "market" && (
@@ -381,6 +415,15 @@ export function Ticket({
                 </select>
               </div>
             </div>
+          )}
+
+          {stopTriggered && quote && (
+            <p role="alert" className="text-xs text-negative">
+              {(side === "buy" ? t.trade.buyStopTriggered : t.trade.sellStopTriggered).replace(
+                "{price}",
+                money(quote.price),
+              )}
+            </p>
           )}
 
           {estimate > 0 && (

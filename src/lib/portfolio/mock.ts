@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Decimal from "decimal.js";
 import type { DB } from "@/lib/db";
+import { marketDateString, quotedSessionDate } from "@/lib/market-hours";
 import { parseSymbol } from "@/lib/moomoo/symbols";
 import type { Portfolio } from "@/lib/portfolios";
 import type { Quote } from "@/types/market";
@@ -64,6 +65,42 @@ export async function mockState(
 
 
 /**
+ * What each symbol has made today, measured from what was actually paid.
+ *
+ * "Today" for a share is its price against the previous close — right for a
+ * share held since then, and wrong for one bought this morning, which was
+ * never worth the previous close to its owner. Buying at 1,080.53 on a stock
+ * that closed the day before at 1,071.88 showed +8.65 "today" the moment it
+ * filled: a profit that belonged to whoever held it yesterday.
+ *
+ * So the day's trades are taken out: the value now, less what the shares
+ * carried over were worth at the previous close, less what was paid for
+ * today's buys, plus what today's sells brought in. For a share bought today
+ * that is simply its price less what it cost. Brokers compute it the same way.
+ *
+ * "Today" is the session the quote describes, which until the 9:30 open is
+ * still yesterday's (see quotedSessionDate).
+ */
+function todayBySymbol(
+  fills: { symbol: string; side: string; quantity: number; price: number; tradedAt: string }[],
+  now: Date,
+): Map<string, { quantity: Decimal; cash: Decimal }> {
+  const since = quotedSessionDate(now);
+  const today = new Map<string, { quantity: Decimal; cash: Decimal }>();
+
+  for (const fill of fills) {
+    if (marketDateString(new Date(fill.tradedAt)) < since) continue;
+    const entry = today.get(fill.symbol) ?? { quantity: new Decimal(0), cash: new Decimal(0) };
+    const signed = new Decimal(fill.quantity).times(fill.side === "buy" ? 1 : -1);
+    entry.quantity = entry.quantity.plus(signed);
+    entry.cash = entry.cash.minus(signed.times(fill.price).times(multiplierFor(fill.symbol)));
+    today.set(fill.symbol, entry);
+  }
+
+  return today;
+}
+
+/**
  * Writes a mock portfolio's holdings into `positions`.
  *
  * Deliberately the same table the broker sync writes to, so the holdings
@@ -81,6 +118,7 @@ export async function syncMockPositions(
   const { cash, holdings } = await mockState(db, portfolio);
   const syncedAt = now.toISOString();
   const currency = portfolio.baseCurrency;
+  const traded = todayBySymbol(await readTransactions(db, portfolio.id, 5000), now);
 
   const rows: unknown[][] = [];
 
@@ -94,6 +132,16 @@ export async function syncMockPositions(
       price === undefined
         ? null
         : lot.quantity.times(price).times(multiplier).toNumber();
+
+    const moved = traded.get(symbol) ?? { quantity: new Decimal(0), cash: new Decimal(0) };
+    const carried = lot.quantity.minus(moved.quantity);
+    const todayPnL =
+      marketValue === null || quote?.previousClose === undefined
+        ? null
+        : new Decimal(marketValue)
+            .minus(carried.times(quote.previousClose).times(multiplier))
+            .plus(moved.cash)
+            .toNumber();
 
     rows.push([
       randomUUID(),
@@ -113,7 +161,7 @@ export async function syncMockPositions(
       price ?? null,
       marketValue,
       marketValue === null ? null : marketValue - lot.cost.toNumber(),
-      null,
+      todayPnL,
       null,
       syncedAt,
       portfolio.id,

@@ -280,9 +280,15 @@ const en = {
     market: "Market",
     limit: "Limit",
     stop: "Stop",
-    marketHint: "Fills now, at whatever the price is.",
-    limitHint: "Fills only at your price or better. Waits until then.",
-    stopHint: "Rests until the price passes your trigger, then fills at market.",
+    marketHint: "Fills at the current price in regular hours, 9:30 to 16:00 New York",
+    limitHint: "Buys at your price or lower, sells at your price or higher. Waits until then",
+    stopHint: "Waits for the price to move through your trigger, then fills at market",
+    outsideHours: "Outside regular hours. Orders placed now wait for the 9:30 open, New York time",
+    restingUntilOpen: "Placed. It is checked from the 9:30 open, New York time",
+    buyStopTriggered:
+      "A buy stop waits for the price to rise to it, and the price is already {price}, above your stop, so it would buy at once. To buy if the price falls to yours, choose Limit",
+    sellStopTriggered:
+      "A sell stop waits for the price to fall to it, and the price is already {price}, below your stop, so it would sell at once. To sell if the price rises to yours, choose Limit",
     limitPrice: "Limit price",
     stopPrice: "Stop price",
     timeInForce: "Good for",
@@ -307,7 +313,7 @@ const en = {
     lastChecked: "last checked",
     neverChecked: "not checked yet",
     restingNote:
-      "Resting orders are checked whenever somebody opens this portfolio, and once a day. There is no always-on server watching the market, so a fill can arrive late.",
+      "Orders fill only in regular hours, 9:30 to 16:00 New York, on a price that prints after they were placed. Waiting orders are checked about every ten seconds while the market is open",
     perContract: "Priced per share — one contract is a hundred of them",
     quoteUnavailable: "No price available for that symbol.",
     failed: "Could not place the order.",
@@ -485,7 +491,7 @@ const en = {
       "Cash that can actually be spent right now. It is lower than the cash balance whenever orders are waiting, because that money is already promised to them. Without this, ten waiting orders could each spend the same dollars.",
     orderKinds: "Order types",
     orderKindsBody:
-      "A market order buys or sells at whatever the price is this second. A limit order waits until the price is at least as good as the one named, and may never happen. A stop order sits quiet until the price passes the level named, then buys or sells at whatever the market is — used to cap a loss.",
+      "A market order buys or sells at the current price. A limit order waits until the price is at least as good as the one you name, and may never fill. A stop order waits for the price to move through the level you name, then trades at market: a sell stop below the price caps a loss, a buy stop above it catches a breakout. To buy a dip, use a limit, not a stop. Every order here fills only in regular hours, 9:30 to 16:00 New York time, as at a broker: outside them the feed's price is the last close, which nobody can trade at.",
     mock: "Practice account",
     mockBody:
       "Practice money against real, live prices. The trades are checked against what the market is actually doing, so the result means something. The money does not exist.",
@@ -1004,9 +1010,15 @@ const zh: Dictionary = {
     market: "市价单",
     limit: "限价单",
     stop: "止损单",
-    marketHint: "立即以当前价格成交。",
-    limitHint: "只在你的价格或更优时成交，否则一直等待。",
-    stopHint: "价格触及触发价后转为市价单成交。",
+    marketHint: "在常规交易时段（纽约时间 9:30–16:00）按当前价格成交",
+    limitHint: "买入不高于你的价格、卖出不低于你的价格才成交，否则一直等待",
+    stopHint: "等价格穿过你的触发价后，按市价成交",
+    outsideHours: "现在不在常规交易时段。此时下单，会等到纽约时间 9:30 开盘",
+    restingUntilOpen: "已下单，纽约时间 9:30 开盘后开始检查",
+    buyStopTriggered:
+      "买入止损单要等价格涨到触发价才成交，但现价 {price} 已经高于你的触发价，下单就会立刻买入。想在价格跌到你的价位时买入，请选限价单",
+    sellStopTriggered:
+      "卖出止损单要等价格跌到触发价才成交，但现价 {price} 已经低于你的触发价，下单就会立刻卖出。想在价格涨到你的价位时卖出，请选限价单",
     limitPrice: "限价",
     stopPrice: "触发价",
     timeInForce: "有效期",
@@ -1031,7 +1043,7 @@ const zh: Dictionary = {
     lastChecked: "最近检查",
     neverChecked: "尚未检查",
     restingNote:
-      "挂单会在有人打开该组合时检查，每天也会检查一次。没有常驻服务器盯盘，因此成交可能会延迟。",
+      "订单只在常规交易时段（纽约时间 9:30–16:00）内、按下单之后出现的价格成交。开市期间约每十秒检查一次挂单",
     perContract: "按每股报价——一张合约等于一百股",
     quoteUnavailable: "无法获取该代码的报价。",
     failed: "无法提交订单。",
@@ -1199,7 +1211,7 @@ const zh: Dictionary = {
       "现在真正能花出去的钱。只要有挂单在等着成交，它就会低于现金余额，因为那部分钱已经被挂单预留了。没有这个机制，十张挂单会各自花掉同一笔钱。",
     orderKinds: "订单类型",
     orderKindsBody:
-      "市价单：按此刻的价格立刻成交。限价单：等价格至少达到你指定的水平才成交，也可能永远不成交。止损单：价格触及你设定的水平之前什么都不做，触及后按市价买入或卖出，通常用来控制亏损。",
+      "市价单：按当前价格成交。限价单：等价格至少达到你指定的水平才成交，也可能一直不成交。止损单：等价格穿过你设定的水平后按市价成交——设在现价之下的卖出止损用来控制亏损，设在现价之上的买入止损用来追突破。想在下跌时买入，请用限价单而不是止损单。和券商一样，这里所有订单只在常规交易时段（纽约时间 9:30–16:00）成交：休市时行情里的价格只是上一次收盘价，没人能按它成交。",
     mock: "模拟账户",
     mockBody:
       "用模拟的钱，对着真实的实时行情交易。成交与否是按市场真实走势判断的，所以结果有意义；只是钱是假的。",

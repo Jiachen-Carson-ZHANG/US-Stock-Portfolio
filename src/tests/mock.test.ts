@@ -92,6 +92,70 @@ describe("mock holdings in the shared positions table", () => {
   });
 });
 
+/**
+ * A share bought this morning was never worth yesterday's close to the person
+ * who bought it. Measuring "today" from that close showed a profit the moment
+ * an order filled — found on a real account, where a buy at 1,080.53 on a
+ * stock that had closed at 1,071.88 read +8.65 today before anything moved.
+ */
+describe("today's profit on a mock position", () => {
+  const priced = (symbol: string, price: number, previousClose: number, iso = NOW.toISOString()): Quote => ({
+    ...quote(symbol, price),
+    previousClose,
+    dataTimestamp: iso,
+  });
+  const todayOf = async (symbol: string) =>
+    (await readPositions(db, paper.id)).find((p) => p.symbol === symbol)?.reportedTodayPnL;
+  const buy = (symbol: string, quantity: number, q: Quote, at: Date) =>
+    placeOrder(db, paper, { symbol, side: "buy", kind: "market", quantity }, q, null, at);
+
+  it("measures a share bought today from what was paid", async () => {
+    await buy("MU", 1, priced("MU", 1080.53, 1071.88), NOW);
+
+    await syncMockPositions(db, paper, new Map([["MU", priced("MU", 1080.53, 1071.88)]]), NOW);
+    expect(await todayOf("MU")).toBeCloseTo(0, 6);
+
+    await syncMockPositions(db, paper, new Map([["MU", priced("MU", 1090, 1071.88)]]), NOW);
+    expect(await todayOf("MU")).toBeCloseTo(9.47, 6);
+  });
+
+  it("measures shares held since before today from the previous close", async () => {
+    // Bought on the Friday, looked at on the Monday.
+    const friday = new Date("2026-09-18T14:00:00.000Z");
+    await buy("NVDA", 10, priced("NVDA", 98, 97, friday.toISOString()), friday);
+
+    await syncMockPositions(db, paper, new Map([["NVDA", priced("NVDA", 105, 100)]]), NOW);
+    expect(await todayOf("NVDA")).toBeCloseTo(50, 6);
+  });
+
+  it("splits a holding that was topped up today", async () => {
+    const friday = new Date("2026-09-18T14:00:00.000Z");
+    await buy("NVDA", 10, priced("NVDA", 98, 97, friday.toISOString()), friday);
+    await buy("NVDA", 5, priced("NVDA", 102, 100), NOW);
+
+    // Ten carried over: 10 x (103 - 100). Five bought today: 5 x (103 - 102).
+    await syncMockPositions(db, paper, new Map([["NVDA", priced("NVDA", 103, 100)]]), NOW);
+    expect(await todayOf("NVDA")).toBeCloseTo(35, 6);
+  });
+
+  it("still counts yesterday's buys as today's before the open", async () => {
+    // Before 9:30 the feed's "today" is still the session just gone: its price
+    // is yesterday's close and its previous close the day before's. A share
+    // bought yesterday at 1,080 has made 1,085 - 1,080 in that session, not
+    // 1,085 - 1,071.
+    await buy("MU", 1, priced("MU", 1080, 1071), NOW);
+
+    const tuesdayPreMarket = new Date("2026-09-22T12:00:00.000Z");
+    await syncMockPositions(
+      db,
+      paper,
+      new Map([["MU", priced("MU", 1085, 1071, tuesdayPreMarket.toISOString())]]),
+      tuesdayPreMarket,
+    );
+    expect(await todayOf("MU")).toBeCloseTo(5, 6);
+  });
+});
+
 describe("a brand-new mock account", () => {
   it("counts its opening balance as the money paid in, not the real account's", async () => {
     const { netDeposits } = await import("@/lib/portfolio/service");
