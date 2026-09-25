@@ -145,7 +145,9 @@ export function assertReadOnlyRequest(path: string, method = "GET"): void {
   const allowed = method === "GET" && (
     pathname === "/api/v1.0/accounts/authorized_trd_accs" ||
     /^\/api\/v1\.0\/accounts\/[0-9]+\/(positions|funds|fills_history)$/.test(pathname) ||
-    /^\/api\/v1\.0\/quote\/[^/]+\/history-kline$/.test(pathname)
+    /^\/api\/v1\.0\/quote\/[^/]+\/history-kline$/.test(pathname) ||
+    // Listed expiries and the contracts on one: market data, read only.
+    /^\/api\/v1\.0\/quote\/[^/]+\/(option-expiration|option-chain)$/.test(pathname)
   ) || method === "POST" && pathname === "/api/v1.0/quote/snapshot";
   if (!allowed) throw new Error("Broker operation is not on the read-only allowlist.");
 }

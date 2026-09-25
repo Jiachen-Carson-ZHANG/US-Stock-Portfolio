@@ -204,6 +204,33 @@ export const portfolioAccessSchema = z.object({
   grant: z.boolean(),
 });
 
+/** The option finder: an underlying, and optionally an expiry and a strategy. */
+export const optionScreenSchema = z.object({
+  symbol: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z][A-Z0-9.]{0,9}$/, "Give a share or fund ticker"),
+  expiry: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  strategy: z
+    .enum([
+      "sell-put",
+      "covered-call",
+      "buy-call",
+      "buy-put",
+      "bull-call-spread",
+      "bear-put-spread",
+      "bull-put-spread",
+      "bear-call-spread",
+    ])
+    .optional(),
+  /** For income trades: how likely keeping the money has to be, at least. */
+  sure: z.coerce.number().min(0).max(0.95).optional(),
+});
+
 /** What somebody typed into a symbol field: a ticker, or part of a name in any language. */
 export const symbolQuerySchema = z.string().trim().min(1).max(40);
 

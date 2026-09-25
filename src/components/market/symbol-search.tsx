@@ -107,6 +107,10 @@ export function SymbolSearch({
             event.preventDefault();
             pick(results[active]);
           } else if (event.key === "Escape") {
+            // Only the list closes. Inside a pop-up, letting Escape through
+            // closed the whole pop-up along with it.
+            event.preventDefault();
+            event.stopPropagation();
             setOpen(false);
           }
         }}

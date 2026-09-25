@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assertReadOnlyScope } from "@/lib/moomoo/oauth";
 import { isOpenAccess } from "@/lib/auth/mode";
-import { clearTokenCache, moomooGet, moomooRequest } from "@/lib/moomoo/client";
+import { assertReadOnlyRequest, clearTokenCache, moomooGet, moomooRequest } from "@/lib/moomoo/client";
 
 const mocks = vi.hoisted(() => ({ scope: "quote:read trade:read", db: { run: vi.fn() } }));
 vi.mock("@/lib/db", () => ({ getDb: async () => mocks.db }));
@@ -57,5 +57,18 @@ describe("production authentication", () => {
   it("requires passwords in production", () => {
     vi.stubEnv("NODE_ENV", "production"); vi.stubEnv("AUTH_MODE", "password");
     expect(isOpenAccess()).toBe(false);
+  });
+});
+
+describe("the option finder's broker reads", () => {
+  it("allows listing an underlying's expiries and one expiry's chain, by GET only", () => {
+    expect(() => assertReadOnlyRequest("/api/v1.0/quote/US.NBIS/option-expiration")).not.toThrow();
+    expect(() => assertReadOnlyRequest("/api/v1.0/quote/US.NBIS/option-chain?start=2026-12-18&end=2026-12-18")).not.toThrow();
+    expect(() => assertReadOnlyRequest("/api/v1.0/quote/US.NBIS/option-chain", "POST")).toThrow();
+  });
+
+  it("still refuses anything that trades", () => {
+    expect(() => assertReadOnlyRequest("/api/v1.0/trade/order", "POST")).toThrow();
+    expect(() => assertReadOnlyRequest("/api/v1.0/quote/US.NBIS/option-strategy")).toThrow();
   });
 });

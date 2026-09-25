@@ -76,23 +76,31 @@ export function Ticket({
   portfolioSlug,
   currency,
   initialBuyingPower,
+  initialSymbol = "",
+  initialSide = "buy",
 }: {
   portfolioSlug: string;
   currency: string;
   initialBuyingPower: string;
+  initialSymbol?: string;
+  initialSide?: Side;
 }) {
   const t = useT();
   const router = useRouter();
 
-  const [side, setSide] = useState<Side>("buy");
+  const [side, setSide] = useState<Side>(initialSide);
   const [kind, setKind] = useState<Kind>("market");
-  const [symbol, setSymbol] = useState("");
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [quantity, setQuantity] = useState("");
   const [limitPrice, setLimitPrice] = useState("");
   const [stopPrice, setStopPrice] = useState("");
   const [tif, setTif] = useState<Tif>("day");
 
   const [quote, setQuote] = useState<Quote | null>(null);
+  // The ticker whose lookup last came back, answer or not. "No price" is
+  // only said about a lookup that has finished; before, it flashed up on
+  // every symbol while the price was still on its way.
+  const [lookedUp, setLookedUp] = useState<string | null>(null);
   const [power, setPower] = useState(initialBuyingPower);
   const [reviewing, setReviewing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -116,8 +124,11 @@ export function Ticket({
         .then((body) => {
           if (cancelled) return;
           setQuote(body?.quotes?.[0] ?? null);
+          setLookedUp(ticker);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (!cancelled) setLookedUp(ticker);
+        });
     }, 350);
 
     return () => {
@@ -128,6 +139,9 @@ export function Ticket({
 
   const session = useMarketSession();
   const ticker = symbol.trim().toUpperCase();
+  // The price for what is in the box now, not for what was there a moment
+  // ago: the lookup trails the typing, and a stale price is a wrong estimate.
+  const live = quote && quote.symbol === ticker ? quote : null;
   const shares = Number(quantity);
   // A stop already past its trigger would go off the moment it was placed.
   // The server refuses it; saying so here, while the numbers are still being
@@ -135,11 +149,11 @@ export function Ticket({
   const stop = Number(stopPrice);
   const stopTriggered =
     kind === "stop" &&
-    quote !== null &&
+    live !== null &&
     stop > 0 &&
-    (side === "buy" ? quote.price >= stop : quote.price <= stop);
+    (side === "buy" ? live.price >= stop : live.price <= stop);
   const reference =
-    kind === "market" ? (quote?.price ?? 0) : Number(kind === "limit" ? limitPrice : stopPrice);
+    kind === "market" ? (live?.price ?? 0) : Number(kind === "limit" ? limitPrice : stopPrice);
   const estimate =
     Number.isFinite(shares) && shares > 0 && reference > 0
       ? shares * reference * contractSize(ticker)
@@ -307,18 +321,20 @@ export function Ticket({
             />
           </div>
 
-          {quote ? (
+          {live ? (
             <div className="space-y-1">
               {/* The price, bid and ask, and where today sits in the day's
                   range — and for an option its delta and daily decay, since
                   buying a contract without them is a guess, not a trade. */}
-              <QuoteCard quote={quote} session={session} />
+              <QuoteCard quote={live} session={session} />
               {contractSize(ticker) === 100 && (
                 <p className="text-xs text-muted-foreground">{t.trade.perContract}</p>
               )}
             </div>
           ) : ticker.length > 0 ? (
-            <p className="text-xs text-muted-foreground">{t.trade.quoteUnavailable}</p>
+            <p className="text-xs text-muted-foreground">
+              {lookedUp === ticker ? t.trade.quoteUnavailable : t.trade.gettingPrice}
+            </p>
           ) : null}
 
           <div className="grid grid-cols-2 gap-3">
@@ -382,7 +398,7 @@ export function Ticket({
                       : setStopPrice(event.target.value)
                   }
                   inputMode="decimal"
-                  placeholder={quote ? quote.price.toFixed(2) : "0.00"}
+                  placeholder={live ? live.price.toFixed(2) : "0.00"}
                 />
               </div>
               <div className="space-y-1.5">
@@ -402,11 +418,11 @@ export function Ticket({
             </div>
           )}
 
-          {stopTriggered && quote && (
+          {stopTriggered && live && (
             <p role="alert" className="text-xs text-negative">
               {(side === "buy" ? t.trade.buyStopTriggered : t.trade.sellStopTriggered).replace(
                 "{price}",
-                money(quote.price),
+                money(live.price),
               )}
             </p>
           )}

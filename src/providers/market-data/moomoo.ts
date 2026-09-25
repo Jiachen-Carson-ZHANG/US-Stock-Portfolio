@@ -1,4 +1,10 @@
-import type { DateRange, HistoricalPrice, Quote } from "@/types/market";
+import type {
+  DateRange,
+  HistoricalPrice,
+  OptionContract,
+  OptionExpiration,
+  Quote,
+} from "@/types/market";
 import type { MarketDataProvider } from "./types";
 import { moomooGet, moomooPost, UnknownSymbolsError } from "@/lib/moomoo/client";
 import { marketSession } from "@/lib/market-hours";
@@ -136,6 +142,16 @@ function isoDate(yyyymmdd: number): string {
   return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
 }
 
+/** moomoo's "valid underlying, but nothing here" — an answer, not a failure. */
+async function noDataAsEmpty<T>(work: () => Promise<T>): Promise<T | null> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof Error && /error -10\b/.test(error.message)) return null;
+    throw error;
+  }
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -198,6 +214,62 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
     }
 
     return quotes;
+  }
+
+  /**
+   * Expiries listed for an underlying, from moomoo's option-expiration
+   * endpoint. Past dates are dropped; "no options on this" (-10) is an
+   * answer, so it comes back as an empty list rather than an error.
+   */
+  async getOptionExpirations(symbol: string): Promise<OptionExpiration[]> {
+    const data = await noDataAsEmpty(() =>
+      moomooGet<{
+        expiration_list?: {
+          strike_time: string;
+          option_expiry_date_distance: number;
+          expiration_cycle?: string;
+        }[];
+      }>(
+        this.portfolioId,
+        `/api/v1.0/quote/${encodeURIComponent(toMoomooCode(symbol))}/option-expiration`,
+      ),
+    );
+    return (data?.expiration_list ?? [])
+      .filter((row) => row.option_expiry_date_distance >= 0)
+      .map((row) => ({
+        date: row.strike_time,
+        days: row.option_expiry_date_distance,
+        cycle: row.expiration_cycle,
+      }));
+  }
+
+  /**
+   * Every contract on one expiry. moomoo returns names and strikes but no
+   * prices; those come from the same snapshot every other price does.
+   */
+  async getOptionChain(symbol: string, expiry: string): Promise<OptionContract[]> {
+    const query = new URLSearchParams({ start: expiry, end: expiry });
+    const data = await noDataAsEmpty(() =>
+      moomooGet<{
+        option_chain?: {
+          code: string;
+          option_type: string;
+          strike_price: number;
+          strike_time: string;
+          lot_size?: number;
+        }[];
+      }>(
+        this.portfolioId,
+        `/api/v1.0/quote/${encodeURIComponent(toMoomooCode(symbol))}/option-chain?${query}`,
+      ),
+    );
+    return (data?.option_chain ?? []).map((row) => ({
+      symbol: fromMoomooCode(row.code),
+      type: row.option_type === "PUT" ? ("put" as const) : ("call" as const),
+      strike: row.strike_price,
+      expiry: row.strike_time,
+      multiplier: row.lot_size && row.lot_size > 0 ? row.lot_size : 100,
+    }));
   }
 
   async getHistoricalPrices(

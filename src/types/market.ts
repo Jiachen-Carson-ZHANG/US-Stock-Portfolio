@@ -50,6 +50,18 @@ export type Quote = {
   raw?: Record<string, unknown>;
 };
 
+/** A listed expiry for an underlying's options. */
+export type OptionExpiration = { date: string; days: number; cycle?: string };
+
+/** One contract in an option chain, before it is priced. */
+export type OptionContract = {
+  symbol: string;
+  type: "call" | "put";
+  strike: number;
+  expiry: string;
+  multiplier: number;
+};
+
 export type HistoricalPrice = {
   date: string;
   close: number;
