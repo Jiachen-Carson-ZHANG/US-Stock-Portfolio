@@ -103,14 +103,11 @@ export const registerSchema = z.object({
     .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
     .max(512),
   referredBy: z.string().trim().max(60).default(""),
-  // Written rather than chosen, and required: a sentence in somebody's own
-  // words tells whoever approves far more than a tick-box, and a blank one
-  // tells them nothing at all.
-  reason: z
-    .string()
-    .trim()
-    .min(10, "Say a little about why you would like to join")
-    .max(500),
+  // Optional, with no minimum. A sentence in somebody's own words still tells
+  // whoever approves more than a tick-box would, but requiring one — ten
+  // characters at least — turned people away at the door, and whoever
+  // approves can always ask.
+  reason: z.string().trim().max(500).default(""),
   email: z
     .string()
     .trim()

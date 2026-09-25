@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUser, isOpenAccess } from "@/lib/auth/guards";
+import { getDb } from "@/lib/db";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { RegisterForm } from "@/components/layout/register-form";
@@ -15,7 +16,29 @@ export default async function RegisterPage() {
   const signedIn = await getSessionUser();
   if (signedIn) redirect(signedIn.status === "active" ? "/" : "/pending");
 
-  const { locale, t } = await serverDictionary();
+  // Named in the help about forgotten passwords: "ask Carson" is something a
+  // person can act on, "ask the owner" is a riddle. The forgotten-password
+  // screen already says the same to anyone who asks.
+  //
+  // Never waited on for long. This page did not use to touch the database,
+  // and a sign-up form that hangs while the database wakes is worse than
+  // one that says "the owner".
+  const [{ locale, t }, ownerName] = await Promise.all([
+    serverDictionary(),
+    Promise.race([
+      getDb()
+        .then((db) =>
+          db.get<{ display_name: string }>(
+            `SELECT display_name FROM users
+              WHERE role = 'owner' AND status = 'active' AND disabled_at IS NULL
+              ORDER BY created_at LIMIT 1`,
+          ),
+        )
+        .then((row) => row?.display_name ?? null)
+        .catch(() => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_500)),
+    ]),
+  ]);
 
   return (
     <LocaleProvider locale={locale}>
@@ -31,7 +54,7 @@ export default async function RegisterPage() {
             </p>
           </div>
 
-          <RegisterForm />
+          <RegisterForm ownerName={ownerName ?? t.register.theOwner} />
 
           <div className="mt-6 flex justify-center">
             <LanguageToggle className="min-h-9 rounded-full border border-border bg-surface px-3.5 text-xs" />

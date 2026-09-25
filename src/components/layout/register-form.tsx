@@ -4,21 +4,46 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { Help } from "@/components/ui/help";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useT } from "@/lib/i18n/context";
 import { MIN_PASSWORD_LENGTH } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 
 /**
  * Open sign-up, but the account is inert until somebody approves it — so the
  * form says so before it is filled in rather than after it is submitted.
  */
-export function RegisterForm() {
+export function RegisterForm({ ownerName }: { ownerName: string }) {
   const t = useT();
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Checked as it is typed, so a password that is too short, or a second
+  // copy that does not match, is visible before Submit rather than after.
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const short = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
+  const isUsername = password.length > 0 && password.toLowerCase() === username.trim().toLowerCase();
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const passwordReady =
+    password.length >= MIN_PASSWORD_LENGTH && !isUsername && confirm === password;
+  const owner = (text: string) => text.replaceAll("{owner}", ownerName);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!passwordReady) {
+      setError(
+        password.length < MIN_PASSWORD_LENGTH
+          ? t.register.passwordHint
+          : isUsername
+            ? t.register.passwordIsUsername
+            : t.register.mismatch,
+      );
+      return;
+    }
     const data = new FormData(event.currentTarget);
 
     setPending(true);
@@ -75,6 +100,8 @@ export function RegisterForm() {
             autoComplete="username"
             autoCapitalize="none"
             autoCorrect="off"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
             required
           />
           <p className="text-xs text-muted-foreground">{t.register.usernameHint}</p>
@@ -88,34 +115,91 @@ export function RegisterForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-xs text-muted-foreground">
-            {t.register.password}
-          </Label>
-          <Input
+          <span className="flex items-center gap-1">
+            <Label htmlFor="password" className="text-xs text-muted-foreground">
+              {t.register.password}
+            </Label>
+            <Help title={t.register.passwordSafetyTitle}>
+              {owner(t.register.passwordSafetyBody)}
+            </Help>
+          </span>
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="new-password"
             minLength={MIN_PASSWORD_LENGTH}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            aria-describedby="password-status"
             required
           />
-          <p className="text-xs text-muted-foreground">{t.register.passwordHint}</p>
+          <p
+            id="password-status"
+            aria-live="polite"
+            className={cn(
+              "text-xs",
+              short || isUsername
+                ? "text-negative"
+                : password.length >= MIN_PASSWORD_LENGTH
+                  ? "text-positive"
+                  : "text-muted-foreground",
+            )}
+          >
+            {isUsername
+              ? t.register.passwordIsUsername
+              : short
+                ? t.register.passwordShort.replace(
+                    "{n}",
+                    String(MIN_PASSWORD_LENGTH - password.length),
+                  )
+                : password.length >= MIN_PASSWORD_LENGTH
+                  ? t.register.passwordOk
+                  : t.register.passwordHint}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword" className="text-xs text-muted-foreground">
+            {t.register.confirm}
+          </Label>
+          <PasswordInput
+            id="confirmPassword"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+            aria-describedby="confirm-status"
+            required
+          />
+          {confirm.length > 0 && (
+            <p
+              id="confirm-status"
+              aria-live="polite"
+              className={cn("text-xs", mismatch ? "text-negative" : "text-positive")}
+            >
+              {mismatch ? t.register.mismatch : t.register.match}
+            </p>
+          )}
         </div>
 
         {/* The one thing the forgotten-password screen can offer without an
             owner stepping in. Required, and refused if it gives the password
-            away. */}
+            away. Why it is asked for sits behind the question mark, because
+            "what if I forget?" is the question it answers. */}
         <div className="space-y-2">
-          <Label htmlFor="passwordHint" className="text-xs text-muted-foreground">
-            {t.register.hint}
-          </Label>
+          <span className="flex items-center gap-1">
+            <Label htmlFor="passwordHint" className="text-xs text-muted-foreground">
+              {t.register.hint}
+            </Label>
+            <Help title={t.register.hintWhyTitle}>{owner(t.register.hintWhyBody)}</Help>
+          </span>
           <Input id="passwordHint" name="passwordHint" autoComplete="off" maxLength={100} required />
           <p className="text-xs text-muted-foreground">{t.register.hintHelp}</p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="referredBy" className="text-xs text-muted-foreground">
-            {t.pending.referredBy}
+            {t.pending.referredBy}{" "}
+            <span className="text-muted-foreground/70">({t.register.optional})</span>
           </Label>
           <Input id="referredBy" name="referredBy" autoComplete="off" />
           <p className="text-xs text-muted-foreground">{t.pending.referredByHint}</p>
@@ -123,14 +207,16 @@ export function RegisterForm() {
 
         <div className="space-y-2">
           <Label htmlFor="reason" className="text-xs text-muted-foreground">
-            {t.pending.reason}
+            {t.pending.reason}{" "}
+            <span className="text-muted-foreground/70">({t.register.optional})</span>
           </Label>
+          {/* Optional, with no minimum. Insisting on a sentence stopped people
+              signing up; whoever approves can always ask. */}
           <textarea
             id="reason"
             name="reason"
-            rows={3}
-            minLength={MIN_PASSWORD_LENGTH}
-            required
+            rows={2}
+            maxLength={500}
             className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-base transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/70 hover:border-muted-foreground/40 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/10"
           />
           <p className="text-xs text-muted-foreground">{t.pending.reasonHint}</p>
@@ -138,7 +224,8 @@ export function RegisterForm() {
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-xs text-muted-foreground">
-            {t.pending.email}
+            {t.pending.email}{" "}
+            <span className="text-muted-foreground/70">({t.register.optional})</span>
           </Label>
           <Input id="email" name="email" type="email" autoComplete="email" />
           <p className="text-xs text-muted-foreground">{t.pending.emailHint}</p>
@@ -153,7 +240,7 @@ export function RegisterForm() {
           </p>
         )}
 
-        <Button type="submit" className="mt-1 w-full" disabled={pending}>
+        <Button type="submit" className="mt-1 w-full" disabled={pending || !passwordReady}>
           {pending ? t.register.submitting : t.register.submit}
         </Button>
       </form>

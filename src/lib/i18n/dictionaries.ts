@@ -46,6 +46,8 @@ const en = {
     unavailable:
       "Sign-in is unavailable: this copy of the site cannot reach its database. Nothing you type will work until that is fixed, so it is not your password.",
     unreachable: "Cannot reach the server. Check your connection.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
   },
 
   market: {
@@ -349,15 +351,29 @@ const en = {
     referredBy: "Who invited you?",
     referredByHint: "A name helps whoever approves this.",
     reason: "Why would you like to join?",
-    reasonHint: "A sentence or two, in your own words. This is what gets read.",
+    reasonHint: "A line in your own words helps whoever approves you",
     email: "Email",
-    emailHint: "Optional. Only used to tell you when you are approved.",
+    emailHint: "The site does not send email yet. It only lets the owner reach you",
     referredByLabel: "Referred by",
   },
 
   register: {
     hint: "Password hint",
-    hintHelp: "A reminder only you would understand, shown if you forget your password. It must not contain the password itself.",
+    hintHelp: "A reminder only you would understand, shown if you forget your password. It must not contain the password itself",
+    hintWhyTitle: "Why a hint, and what if I forget?",
+    hintWhyBody:
+      "This site does not send email, so there is no reset link. If you forget your password, tap “Forgot your password?” on the sign-in page and this hint is shown to you. If the hint does not help, ask {owner} to reset it: you get a temporary password, sign in with it, then change it on your Account page.",
+    passwordSafetyTitle: "How your password is kept",
+    passwordSafetyBody:
+      "It is stored scrambled (hashed), so nobody can read it — not {owner}, not the server. That is also why a forgotten password is reset, never sent back. Use one you do not use anywhere else. Length beats symbols: a short sentence is strong and easy to remember.",
+    passwordShort: "{n} more to go — at least 8 characters",
+    passwordOk: "Long enough",
+    passwordIsUsername: "Pick something other than your username",
+    confirm: "Type it again",
+    mismatch: "The two passwords do not match",
+    match: "They match",
+    optional: "optional",
+    theOwner: "the owner",
     title: "Create an account",
     subtitle: "Someone has to approve it before you can sign in.",
     username: "Username",
@@ -365,7 +381,7 @@ const en = {
     displayName: "Name",
     displayNameHint: "How the family sees you.",
     password: "Password",
-    passwordHint: "At least 8 characters.",
+    passwordHint: "At least 8 characters",
     submit: "Request an account",
     submitting: "Sending…",
     done: "Thanks. Somebody will approve it shortly, and you will be able to sign in.",
@@ -780,6 +796,8 @@ const zh: Dictionary = {
     unavailable:
       "暂时无法登录：这个站点连不上数据库。在修复之前，输入什么都不会成功——问题不在你的密码。",
     unreachable: "无法连接服务器，请检查网络。",
+    showPassword: "显示密码",
+    hidePassword: "隐藏密码",
   },
 
   market: {
@@ -1079,15 +1097,29 @@ const zh: Dictionary = {
     referredBy: "谁邀请你来的？",
     referredByHint: "填写姓名有助于审核。",
     reason: "你为什么想加入？",
-    reasonHint: "用自己的话写一两句，审核时看的就是这段。",
+    reasonHint: "用自己的话写一句，有助于审核",
     email: "邮箱",
-    emailHint: "选填。仅用于在通过后通知你。",
+    emailHint: "本站暂时不发邮件，只是方便站主联系你",
     referredByLabel: "推荐人",
   },
 
   register: {
     hint: "密码提示",
-    hintHelp: "一句只有你自己看得懂的提示，忘记密码时会显示给你。不能包含密码本身。",
+    hintHelp: "一句只有你自己看得懂的提示，忘记密码时会显示给你。不能包含密码本身",
+    hintWhyTitle: "为什么要写提示？忘了密码怎么办？",
+    hintWhyBody:
+      "本站不发送邮件，所以没有重置链接。如果忘记密码，在登录页点“忘记密码？”，就会看到这条提示。如果提示也帮不上忙，请联系 {owner} 重置：你会拿到一个临时密码，用它登录后，在“账户”页面改成新密码。",
+    passwordSafetyTitle: "密码是怎么保存的",
+    passwordSafetyBody:
+      "密码经过不可逆的加密（哈希）后才保存，任何人都看不到原文——{owner} 看不到，服务器也看不到。所以忘记密码只能重置，不会把原密码发还给你。请不要用在别处用过的密码。长度比符号更重要：一句简短的话既安全又好记。",
+    passwordShort: "还差 {n} 个字符——至少需要 8 个",
+    passwordOk: "长度够了",
+    passwordIsUsername: "请不要用用户名当密码",
+    confirm: "再输入一次",
+    mismatch: "两次输入的密码不一致",
+    match: "两次输入一致",
+    optional: "选填",
+    theOwner: "站主",
     title: "创建账户",
     subtitle: "需要有人通过后才能登录。",
     username: "用户名",
@@ -1095,7 +1127,7 @@ const zh: Dictionary = {
     displayName: "称呼",
     displayNameHint: "家人看到的名字。",
     password: "密码",
-    passwordHint: "至少 8 个字符。",
+    passwordHint: "至少 8 个字符",
     submit: "申请账户",
     submitting: "发送中…",
     done: "已收到。稍后会有人通过，届时你就可以登录了。",

@@ -5,6 +5,7 @@ import { RegistrationError, decideAccount, pendingAccounts, register } from "@/l
 import { createSession, validateSession } from "@/lib/auth/session";
 import { canRead, createPortfolio, findBySlug, visibleTo } from "@/lib/portfolios";
 import { notificationsFor } from "@/lib/notifications";
+import { registerSchema } from "@/lib/schemas";
 
 let db: TestDb;
 
@@ -228,6 +229,21 @@ describe("what they are asked at sign-up", () => {
 
     const told = await notificationsFor(db, owner);
     expect(told[0].body).toContain("Mile");
+  });
+
+  it("accepts a sign-up with no reason, or a very short one", () => {
+    // Required, at ten characters or more, it turned people away at the door.
+    const base = {
+      username: "newcomer",
+      displayName: "New",
+      password: "correct horse",
+      passwordHint: "the horse",
+    };
+    expect(registerSchema.safeParse(base).success).toBe(true);
+    expect(registerSchema.safeParse({ ...base, reason: "" }).success).toBe(true);
+    expect(registerSchema.safeParse({ ...base, reason: "hi" }).success).toBe(true);
+    // The password rule is unchanged.
+    expect(registerSchema.safeParse({ ...base, password: "short" }).success).toBe(false);
   });
 
   it("still lists somebody who gave no reason", async () => {

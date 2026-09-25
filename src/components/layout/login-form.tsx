@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useT } from "@/lib/i18n/context";
 import { loginAction, type LoginState } from "@/app/login/actions";
 
@@ -45,10 +46,9 @@ export function LoginForm() {
           <Label htmlFor="password" className="text-xs text-muted-foreground">
             {t.login.password}
           </Label>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             required
           />
