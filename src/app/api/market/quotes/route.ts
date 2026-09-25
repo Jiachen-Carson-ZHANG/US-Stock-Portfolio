@@ -8,7 +8,7 @@ import { marketSession } from "@/lib/market-hours";
 
 export async function GET(request: Request) {
   // Quotes are not portfolio data, but fetching them spends a broker token,
-  // so the request still says whose. Defaults to the viewer's own.
+  // so the request still says whose. Leaving it out is refused, not guessed.
   const context = await requirePortfolioApi(portfolioSlugFrom(request));
   if ("response" in context) return context.response;
 

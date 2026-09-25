@@ -3,7 +3,8 @@
  *
  * A query parameter rather than a path segment, because these endpoints are
  * called from client components that already know the slug and would
- * otherwise each need their own route. Absent, the caller means their own.
+ * otherwise each need their own route. Absent, API routes refuse the request
+ * (see requirePortfolioApi) rather than guess whose it is.
  *
  * Returning the raw string is safe: it is only ever used to look up a row,
  * and access is re-checked against the result.

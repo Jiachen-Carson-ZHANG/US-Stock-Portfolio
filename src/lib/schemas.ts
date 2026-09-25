@@ -204,9 +204,8 @@ export const portfolioAccessSchema = z.object({
   grant: z.boolean(),
 });
 
-export const searchSchema = z.object({
-  q: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/, "Unsupported query"),
-});
+/** What somebody typed into a symbol field: a ticker, or part of a name in any language. */
+export const symbolQuerySchema = z.string().trim().min(1).max(40);
 
 export const watchlistAddSchema = z.object({
   symbol: symbolSchema,

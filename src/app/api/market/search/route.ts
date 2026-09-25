@@ -1,41 +1,42 @@
-import { searchSchema } from "@/lib/schemas";
-import { requirePortfolioApi } from "@/lib/portfolios/context";
-import { portfolioSlugFrom } from "@/lib/portfolios/request";
-import { getMarketDataProvider } from "@/providers";
+import { getCurrentUser, unauthorized } from "@/lib/auth/guards";
+import { getDb } from "@/lib/db";
+import { chineseNamed, loadDirectory } from "@/lib/market/directory";
+import { WELL_KNOWN, searchListings } from "@/lib/market/search";
+import { symbolQuerySchema } from "@/lib/schemas";
 
 /**
- * moomoo's own search endpoint covers news and community posts, not symbol
- * lookup, so a ticker is resolved by asking for its quote: if one comes back,
- * the ticker is real and carries its name and price.
+ * Symbols by ticker or by name, for the dropdown under every symbol field.
+ *
+ * No portfolio is involved and no broker token is spent: the answer comes
+ * from the symbol directory, not a quote. The price is fetched separately,
+ * once somebody has picked.
  */
 export async function GET(request: Request) {
-  // Quotes are not portfolio data, but fetching them spends a broker token,
-  // so the request still says whose. Defaults to the viewer's own.
-  const context = await requirePortfolioApi(portfolioSlugFrom(request));
-  if ("response" in context) return context.response;
+  const user = await getCurrentUser();
+  if (!user) return unauthorized();
 
-  const parsed = searchSchema.safeParse({
-    q: new URL(request.url).searchParams.get("q") ?? "",
-  });
-  if (!parsed.success) {
-    return Response.json({ error: "Invalid query" }, { status: 400 });
-  }
+  const parsed = symbolQuerySchema.safeParse(new URL(request.url).searchParams.get("q") ?? "");
+  if (!parsed.success) return Response.json({ results: [] });
 
-  const symbol = parsed.data.q.toUpperCase();
+  const db = await getDb();
+  const [directory, chinese, priced] = await Promise.all([
+    loadDirectory(db),
+    chineseNamed(db, parsed.data),
+    // Whatever the site has already priced is the family's own shortlist.
+    db.all<{ symbol: string }>(`SELECT symbol FROM quote_cache`),
+  ]);
+  const preferred = new Set([...WELL_KNOWN, ...priced.map((row) => row.symbol)]);
 
-  try {
-    const quotes = await (
-      await getMarketDataProvider(context.portfolio.id)
-    ).getQuotes([symbol]);
-    return Response.json({
-      results: quotes.map((quote) => ({
-        symbol: quote.symbol,
-        name: quote.name ?? quote.symbol,
-        price: quote.price,
-        changePercent: quote.changePercent,
-      })),
-    });
-  } catch {
-    return Response.json({ results: [] });
-  }
+  // Chinese names first when that is what was typed; they are the only
+  // matches such a query can have.
+  const results = [...chinese, ...searchListings(directory, parsed.data, 8, preferred)]
+    .filter((listing, index, all) => all.findIndex((l) => l.symbol === listing.symbol) === index)
+    .slice(0, 8);
+
+  return Response.json(
+    { results },
+    // The directory changes once a day; the same keystrokes from the same
+    // person can be answered by their own browser for a minute.
+    { headers: { "Cache-Control": "private, max-age=60" } },
+  );
 }

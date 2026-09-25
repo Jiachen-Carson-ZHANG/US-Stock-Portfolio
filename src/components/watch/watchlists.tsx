@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronRight, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
 import { Help } from "@/components/ui/help";
+import { SymbolSearch } from "@/components/market/symbol-search";
 import { QuoteDetailPanel } from "@/components/market/quote-detail";
 import { useLocale } from "@/lib/i18n/context";
 import { cn, signClass } from "@/lib/utils";
@@ -182,12 +182,13 @@ export function Watchlists({
             }}
             className="flex gap-2"
           >
-            <Input
+            {/* By name as well as ticker: "micron" finds MU. */}
+            <SymbolSearch
+              id="watch-add"
+              className="flex-1"
               value={symbol}
-              onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-              placeholder={say("Add a ticker, e.g. NVDA", "添加代码，例如 NVDA")}
-              autoCapitalize="characters"
-              autoCorrect="off"
+              onChange={(value) => setSymbol(value.toUpperCase())}
+              placeholder={say("Add a ticker or company, e.g. NVDA", "添加代码或公司名，例如 NVDA")}
             />
             <Button type="submit" disabled={busy || !symbol.trim()}>
               <Plus className="size-4" aria-hidden="true" />

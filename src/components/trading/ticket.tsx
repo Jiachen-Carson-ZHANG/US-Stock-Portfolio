@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
 import { Help } from "@/components/ui/help";
-import { QuoteDetailPanel } from "@/components/market/quote-detail";
-import { quoteDetail } from "@/lib/market/detail";
+import { SymbolSearch } from "@/components/market/symbol-search";
+import { QuoteCard } from "@/components/trading/quote-card";
 import { marketSession, quotePollIntervalMs } from "@/lib/market-hours";
 import { formatMoney } from "@/lib/money";
-import { cn, signClass } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Order } from "@/lib/trading/orders";
 import type { MarketSession } from "@/types/market";
 
@@ -295,20 +295,33 @@ export function Ticket({
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="ticket-symbol" className="text-xs text-muted-foreground">
-                {t.trade.symbol}
-              </Label>
-              <Input
-                id="ticket-symbol"
-                value={symbol}
-                onChange={(event) => setSymbol(event.target.value)}
-                autoCapitalize="characters"
-                autoCorrect="off"
-                placeholder="NVDA"
-              />
+          <div className="space-y-1.5">
+            <Label htmlFor="ticket-symbol" className="text-xs text-muted-foreground">
+              {t.trade.symbol}
+            </Label>
+            <SymbolSearch
+              id="ticket-symbol"
+              value={symbol}
+              onChange={setSymbol}
+              placeholder={t.trade.symbolPlaceholder}
+            />
+          </div>
+
+          {quote ? (
+            <div className="space-y-1">
+              {/* The price, bid and ask, and where today sits in the day's
+                  range — and for an option its delta and daily decay, since
+                  buying a contract without them is a guess, not a trade. */}
+              <QuoteCard quote={quote} session={session} />
+              {contractSize(ticker) === 100 && (
+                <p className="text-xs text-muted-foreground">{t.trade.perContract}</p>
+              )}
             </div>
+          ) : ticker.length > 0 ? (
+            <p className="text-xs text-muted-foreground">{t.trade.quoteUnavailable}</p>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="ticket-quantity" className="text-xs text-muted-foreground">
                 {t.trade.quantity}
@@ -321,55 +334,27 @@ export function Ticket({
                 placeholder="10"
               />
             </div>
-          </div>
-
-          {quote ? (
-            <div className="space-y-1">
-              <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
-                <span className="font-medium">{quote.symbol}</span>
-                <span className="tabular">{money(quote.price)}</span>
-                <span className={cn("tabular text-xs", signClass(quote.changePercent))}>
-                  {quote.changePercent >= 0 ? "+" : ""}
-                  {quote.changePercent.toFixed(2)}%
-                </span>
-                {quote.name && (
-                  <span className="text-xs text-muted-foreground">{quote.name}</span>
-                )}
-              </p>
-
-              {/* Everything the broker publishes about this symbol: the day's
-                  range, bid and ask, and for an option its greeks, strike and
-                  days to expiry. A price on its own is the least informative
-                  number on a trading screen, and buying a contract without
-                  seeing its delta and daily decay is a guess, not a trade. */}
-              <QuoteDetailPanel detail={quoteDetail(quote.symbol, quote.raw)} compactView />
-
-              {contractSize(ticker) === 100 && (
-                <p className="text-xs text-muted-foreground">{t.trade.perContract}</p>
-              )}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="ticket-kind"
+                className="flex items-center gap-1 text-xs text-muted-foreground"
+              >
+                {t.trade.orderType}
+                <Help title={t.help.orderKinds}>{t.help.orderKindsBody}</Help>
+              </Label>
+              <select
+                id="ticket-kind"
+                value={kind}
+                onChange={(event) => setKind(event.target.value as Kind)}
+                className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
+              >
+                <option value="market">{t.trade.market}</option>
+                <option value="limit">{t.trade.limit}</option>
+                <option value="stop">{t.trade.stop}</option>
+              </select>
             </div>
-          ) : ticker.length > 0 ? (
-            <p className="text-xs text-muted-foreground">{t.trade.quoteUnavailable}</p>
-          ) : null}
-
+          </div>
           <div className="space-y-1.5">
-            <Label
-              htmlFor="ticket-kind"
-              className="flex items-center gap-1 text-xs text-muted-foreground"
-            >
-              {t.trade.orderType}
-              <Help title={t.help.orderKinds}>{t.help.orderKindsBody}</Help>
-            </Label>
-            <select
-              id="ticket-kind"
-              value={kind}
-              onChange={(event) => setKind(event.target.value as Kind)}
-              className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
-            >
-              <option value="market">{t.trade.market}</option>
-              <option value="limit">{t.trade.limit}</option>
-              <option value="stop">{t.trade.stop}</option>
-            </select>
             <p className="text-xs text-muted-foreground">
               {kind === "market"
                 ? t.trade.marketHint
