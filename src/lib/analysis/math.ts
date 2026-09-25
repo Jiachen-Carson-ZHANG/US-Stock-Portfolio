@@ -312,3 +312,54 @@ export function expirationPayoff(
     -fees,
   );
 }
+
+export type PayoffProfile = {
+  /** Share prices at expiry where the position exactly breaks even. */
+  breakEvens: number[];
+  /** Best result at expiry; Infinity when a rising share keeps paying. */
+  maxProfit: number;
+  /** Worst result at expiry; -Infinity when a rising share keeps costing. */
+  maxLoss: number;
+};
+
+/**
+ * Break-even, best case and worst case at expiry, exactly.
+ *
+ * An option position held to expiry is a straight line between strikes, so
+ * nothing needs sampling: its extremes sit at zero, at a strike, or run off
+ * to infinity past the highest strike, and its break-evens are where one of
+ * those straight pieces crosses zero. Beyond the highest strike only the
+ * calls still move, so their quantities alone say whether the position gains
+ * or loses without limit as the share rises.
+ */
+export function payoffProfile(legs: PayoffLeg[], fees = 0): PayoffProfile {
+  if (legs.length === 0) return { breakEvens: [], maxProfit: 0, maxLoss: 0 };
+
+  const kinks = [0, ...new Set(legs.map((leg) => leg.strike))].sort((a, b) => a - b);
+  const values = kinks.map((price) => expirationPayoff(legs, price, fees));
+  const slopeAbove = legs
+    .filter((leg) => leg.type === "call")
+    .reduce((sum, leg) => sum + leg.quantity * leg.multiplier, 0);
+
+  const breakEvens: number[] = [];
+  for (let i = 1; i < kinks.length; i += 1) {
+    const [a, b] = [kinks[i - 1], kinks[i]];
+    const [pa, pb] = [values[i - 1], values[i]];
+    if (pa === 0 && i === 1) breakEvens.push(a);
+    if (pb === 0) breakEvens.push(b);
+    else if ((pa < 0 && pb > 0) || (pa > 0 && pb < 0)) {
+      breakEvens.push(a + ((0 - pa) * (b - a)) / (pb - pa));
+    }
+  }
+  const last = kinks[kinks.length - 1];
+  const atLast = values[values.length - 1];
+  if (slopeAbove !== 0 && atLast !== 0 && Math.sign(atLast) !== Math.sign(slopeAbove)) {
+    breakEvens.push(last - atLast / slopeAbove);
+  }
+
+  return {
+    breakEvens: [...new Set(breakEvens.map((price) => Math.round(price * 100) / 100))],
+    maxProfit: slopeAbove > 0 ? Infinity : Math.max(...values),
+    maxLoss: slopeAbove < 0 ? -Infinity : Math.min(...values),
+  };
+}
