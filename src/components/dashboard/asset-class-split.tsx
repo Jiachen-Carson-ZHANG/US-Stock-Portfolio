@@ -34,8 +34,12 @@ import type { AssetClassPerformance } from "@/lib/portfolio/options";
  *
  * Judging a class on open positions alone judges it on whichever trades
  * happened to survive: sell your winners and the class looks worse than it
- * was. Both halves are shown, stacked, with the total called out — the
- * stack is what makes it obvious when one half is carrying the other.
+ * was. Both halves are shown, side by side, each measured from zero, with
+ * the total on the cards above.
+ *
+ * Side by side, not stacked. Stacked, a small unrealized loss was a sliver
+ * on top of a large realized one and read as the realized bar covering it;
+ * two bars from the same baseline need no arithmetic to read.
  */
 export function AssetClassSplit({ data }: { data: AssetClassPerformance[] }) {
   const t = useT();
@@ -52,7 +56,8 @@ export function AssetClassSplit({ data }: { data: AssetClassPerformance[] }) {
 
   const series = [
     { key: "unrealized" as const, label: t.summary.unrealized, color: seriesColor(0) },
-    { key: "realized" as const, label: t.summary.realized, color: seriesColor(2) },
+    // Orange, not the third colour: that green read as profit even on a loss.
+    { key: "realized" as const, label: t.summary.realized, color: seriesColor(1) },
   ];
 
   return (
@@ -126,7 +131,11 @@ export function AssetClassSplit({ data }: { data: AssetClassPerformance[] }) {
           <SeriesLegend items={series.map((s) => ({ label: s.label, color: s.color }))} />
           <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
+          <BarChart
+            data={chartData}
+            barGap={6}
+            margin={{ top: 8, right: 8, bottom: 4, left: 8 }}
+          >
             <CartesianGrid vertical={false} stroke={GRID} />
             <XAxis dataKey="name" tick={AXIS_TICK} axisLine={false} tickLine={false} />
             <YAxis
@@ -166,10 +175,9 @@ export function AssetClassSplit({ data }: { data: AssetClassPerformance[] }) {
               <Bar
                 key={entry.key}
                 dataKey={entry.key}
-                stackId="result"
                 fill={entry.color}
                 shape={<VerticalRoundedBar />}
-                maxBarSize={72}
+                maxBarSize={48}
                 isAnimationActive={false}
               />
             ))}

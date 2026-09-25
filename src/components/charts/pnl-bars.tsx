@@ -64,10 +64,12 @@ export function UnrealizedPnLBars({
   if (data.length === 0) return null;
 
   // Two series, so a legend is required: colour alone must not carry which
-  // half of the result a segment is.
+  // half of the result a segment is. Blue and orange, the palette's first two
+  // in order. Realized used to be the third, a green close enough to the
+  // profit green that a realized loss was painted in the colour of a gain.
   const allSeries = [
     { key: "unrealized" as const, label: t.summary.unrealized, color: seriesColor(0) },
-    { key: "realized" as const, label: t.summary.realized, color: seriesColor(2) },
+    { key: "realized" as const, label: t.summary.realized, color: seriesColor(1) },
   ];
   const series = allSeries.filter((s) => show === "both" || show === s.key);
 
@@ -115,9 +117,15 @@ export function UnrealizedPnLBars({
         </div>
         <div className="min-h-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
+            {/* Stacked by sign: gains run right from zero, losses left.
+                Stacked the default way, a loss began where the gain beside
+                it ended and ran back over it — a +500 unrealized with a
+                -300 realized drew the realized bar across the unrealized
+                one, hiding it. */}
             <BarChart
               data={shown}
               layout="vertical"
+              stackOffset="sign"
               margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
             >
               <CartesianGrid horizontal={false} stroke={GRID} />

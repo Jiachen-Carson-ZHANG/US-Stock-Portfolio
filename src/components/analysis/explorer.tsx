@@ -20,16 +20,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  BarChart,
-  Bar,
-  Cell,
 } from "recharts";
 import {
   adjustedSeries,
   analysisStats,
   missingWeekdays,
   benchmarkComparison,
-  fxDecomposition,
+  madeOrLostSeries,
   monthlyReturns,
 } from "@/lib/analysis/math";
 import { compareAll, type BenchmarkSeries } from "@/lib/analysis/benchmarks";
@@ -37,7 +34,8 @@ import { Help } from "@/components/ui/help";
 import {
   CURRENCY_LABEL,
   VIEW_CURRENCIES,
-  rateOn,
+  currencyView,
+  type ViewCurrency,
   type RateSeries,
 } from "@/lib/analysis/fx";
 import type { AnalysisData } from "@/lib/analysis/store";
@@ -123,8 +121,7 @@ export function PerformanceExplorer({
     n === null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
   const start = Number(first?.totalMarketValue ?? 0),
     end = Number(last?.totalMarketValue ?? 0);
-  const flowEnd = start + result.netFlows;
-  const waterfall =
+  const bridge =
     result.gain === null
       ? []
       : [
@@ -137,17 +134,14 @@ export function PerformanceExplorer({
               `Worth on ${first?.snapshotDate ?? ""}`,
               `${first?.snapshotDate ?? ""} 的价值`,
             ),
-            range: [0, start],
             amount: start,
           },
           {
             name: say("Paid in since", "期间转入"),
-            range: [Math.min(start, flowEnd), Math.max(start, flowEnd)],
             amount: result.netFlows,
           },
           {
             name: say("Made or lost", "投资损益"),
-            range: [Math.min(flowEnd, end), Math.max(flowEnd, end)],
             amount: result.gain,
           },
           {
@@ -155,50 +149,39 @@ export function PerformanceExplorer({
               `Worth on ${last?.snapshotDate ?? ""}`,
               `${last?.snapshotDate ?? ""} 的价值`,
             ),
-            range: [0, end],
             amount: end,
           },
         ];
   /**
    * The same account, seen from each currency somebody actually spends.
    *
-   * The split is exact rather than approximate: what the investments did is
-   * valued at the starting rate, and everything else — including the
-   * interaction between a bigger balance and a moved rate — is the exchange
-   * rate's doing. The two always add to the total, which is the property that
-   * makes the table trustworthy.
+   * Day by day rather than first and last day only: each day's value and
+   * each deposit is converted at its own day's rate, so money paid in at a
+   * different rate is counted at the rate it actually crossed at. The split
+   * between the investing and the rate is exact — see currencyView.
+   *
+   * Works for an account kept in any of the four currencies, not only
+   * dollars; the rates are quoted per dollar and crossed.
    */
-  const currencyViews = useMemo(() => {
-    if (currency !== "USD" || !first || !last) return [];
-
-    return VIEW_CURRENCIES.flatMap((code) => {
-      const series = rates[code] ?? [];
-      // One source, published daily by the European Central Bank. A
-      // hand-maintained rate table was a second answer to the same question,
-      // and two answers that disagree are worse than one that is occasionally
-      // a day behind.
-      const startRate = code === "USD" ? 1 : rateOn(series, first.snapshotDate);
-      const endRate = code === "USD" ? 1 : rateOn(series, last.snapshotDate);
-      if (!startRate || !endRate) return [];
-
-      const parts = fxDecomposition(start, end, startRate, endRate);
-      return [
-        {
-          code,
-          startRate,
-          endRate,
-          ratePercent: startRate === 0 ? 0 : ((endRate - startRate) / startRate) * 100,
-          startValue: start * startRate,
-          endValue: end * endRate,
-          // What the rate move alone did to the money. The other half of the
-          // old table — the dollar change converted — was labelled "from the
-          // investments" and was not: it included every deposit. One column
-          // that means one thing beats two that need a paragraph.
-          fromRate: parts.currency,
-        },
-      ];
-    });
-  }, [currency, first, last, rates, start, end]);
+  // Four currencies over a few hundred days: cheap enough to work out on
+  // every render, which is also what keeps it in step with the period picked.
+  const currencyViews =
+    result.issue || !VIEW_CURRENCIES.includes(currency as ViewCurrency)
+      ? []
+      : VIEW_CURRENCIES.flatMap((code) => {
+          // One source, published daily by the European Central Bank. A
+          // hand-maintained rate table was a second answer to the same
+          // question, and two answers that disagree are worse than one that
+          // is occasionally a day behind.
+          const view = currencyView(
+            result.points,
+            data.flows,
+            code,
+            currency as ViewCurrency,
+            rates,
+          );
+          return view ? [view] : [];
+        });
 
   async function save(body: unknown) {
     if (pending.current) return false;
@@ -563,58 +546,41 @@ export function PerformanceExplorer({
               </div>
             ))}
           </div>
-          <ChartFrame
-            title={say("What changed?", "价值变化来自哪里？")}
-            note={say(
-              "Account value = starting value + net external flows + investment gain/loss.",
-              "账户价值 = 期初价值 + 外部净转入 + 投资损益。",
-            )}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={waterfall}>
-                <CartesianGrid vertical={false} stroke={GRID} />
-                <XAxis dataKey="name" tick={AXIS_TICK} />
-                <YAxis
-                  tick={AXIS_TICK}
-                  width={72}
-                  tickFormatter={(n) =>
-                    Intl.NumberFormat("en", { notation: "compact" }).format(n)
-                  }
-                />
-                <Tooltip
-                  content={({ active, payload }) =>
-                    active && payload?.length ? (
-                      <div className="rounded-lg border border-border bg-surface p-3 text-sm">
-                        {payload[0].payload.name}:{" "}
-                        {fmt(payload[0].payload.amount)}
-                      </div>
-                    ) : null
-                  }
-                />
-                <Bar dataKey="range" radius={4} isAnimationActive={false}>
-                  {waterfall.map((row, i) => (
-                    <Cell
-                      key={row.name}
-                      fill={
-                        i === 1 || i === 2
-                          ? row.amount < 0
-                            ? "var(--negative)"
-                            : "var(--positive)"
-                          : seriesColor(0)
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartFrame>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-            {waterfall.map((row) => (
-              <span key={row.name}>
-                {row.name}: <strong>{fmt(row.amount)}</strong>
-              </span>
-            ))}
-          </div>
+          {/* Four figures in a line, not a chart. It was a waterfall, and with
+              twenty thousand in the first and last bars and a gain of fifteen
+              dollars the one bar anybody wanted to see was a sliver — the
+              chart mostly repeated the sentence printed under it. The sum is
+              the point, so the sum is what is shown. */}
+          {bridge.length === 4 && (
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h2 className="flex items-center gap-1 text-sm font-medium">
+                {say("How the value got here", "价值是怎么来的")}
+                <Help title={say("How the value got here", "价值是怎么来的")}>
+                  {say(
+                    "What the account was worth at the start of the period, plus money paid in less anything taken out, plus what the investments made or lost, is what it is worth now. Only the middle two can change it, and only the third is the investing",
+                    "区间开始时的账户价值，加上期间转入（减去转出），再加上投资赚到或亏掉的钱，就是现在的价值。能让它变化的只有中间两项，而只有第三项是投资本身的结果",
+                  )}
+                </Help>
+              </h2>
+              <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {bridge.map((row, i) => (
+                  <div key={row.name} className="min-w-0">
+                    <dt className="truncate text-xs text-muted-foreground">
+                      {i === 0 ? "" : i === 3 ? "= " : "+ "}
+                      {row.name}
+                    </dt>
+                    <dd
+                      className={`tabular mt-1 text-lg font-semibold ${
+                        i === 2 ? (row.amount < 0 ? "text-negative" : "text-positive") : ""
+                      }`}
+                    >
+                      {fmt(row.amount)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
           <ChartFrame
             title={say("Growth of 100", "100 的增长轨迹")}
             note={say(
@@ -703,17 +669,35 @@ export function PerformanceExplorer({
           </section>
         </>
       )}
-      <ValueLine
-        currency={currency}
-        title={say(
-          "Portfolio value (includes cash flows)",
-          "组合价值（含现金流）",
-        )}
-        data={selected.map((s) => ({
-          date: s.snapshotDate,
-          value: Number(s.totalMarketValue),
-        }))}
-      />
+      {/* The result in money, not the value. Plotting the value showed the
+          September deposit as a leap that read as a gain; this line counts
+          deposits as neither, and ends on the "Made or lost" figure above.
+          Until the transfers are reviewed they cannot be taken out, so the
+          plain value is shown, labelled as such. */}
+      {issue ? (
+        <ValueLine
+          currency={currency}
+          title={say(
+            "Account value, deposits included",
+            "账户价值（含转入资金）",
+          )}
+          data={selected.map((s) => ({
+            date: s.snapshotDate,
+            value: Number(s.totalMarketValue),
+          }))}
+        />
+      ) : (
+        <ValueLine
+          currency={currency}
+          title={say("Made or lost over time", "累计盈亏走势")}
+          note={say(
+            "What the investments had made or lost by each day of the period, in money. Money paid in or taken out is left out, so a deposit is not a jump",
+            "区间内每一天，投资本身累计赚了或亏了多少钱。转入转出的资金不计入，所以存钱不会显示成一次跳涨",
+          )}
+          valueLabel={say("Made or lost", "盈亏")}
+          data={madeOrLostSeries(result.points, data.flows)}
+        />
+      )}
       <section className="space-y-3">
         <h2 className="font-medium">
           {say("Portfolio versus benchmark", "投资组合与基准")}
@@ -820,17 +804,18 @@ export function PerformanceExplorer({
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="font-medium">
           {say("What it is worth in your currency", "换成你的货币是多少")}
+          <Help title={say("How this is worked out", "这是怎么算的")}>
+            {say(
+              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate — money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went: a rate that weakens can take money away from a yuan holder in a period the account did well. Rates: European Central Bank daily reference rates`,
+              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算——你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关：即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来源：欧洲央行每日参考汇率`,
+            )}
+          </Help>
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
           {say(
-            "The account holds US dollars, but not everybody spends them. Each row is one dollar in that currency at the start and at the end, with what the whole account was worth at that rate underneath.",
-            "账户里是美元，但不是每个人都花美元。每一行是一美元在期初和期末分别值多少，下面灰色的是按该汇率折算的整个账户价值。",
-          )}{" "}
-          {say(
-            "The last column is the exchange rate on its own: how far it moved, and what that alone did to the money — nothing to do with how the investments went. A rate that weakens can take money away from a yuan holder in a year the account did well, and that is the thing worth seeing.",
-            "最后一列只讲汇率本身：它变动了多少，以及仅仅因为这个变动，这笔钱多了或少了多少——与投资做得好不好无关。即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截，这正是值得看清楚的地方。",
-          )}{" "}
-          {say("Rates: European Central Bank daily reference rates.", "汇率来源：欧洲央行每日参考汇率。")}
+            "Every day and every deposit at its own day's rate",
+            "每一天、每一笔转入都按当天汇率换算",
+          )}
         </p>
         {currencyViews.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
@@ -845,6 +830,9 @@ export function PerformanceExplorer({
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
                     {say("Rate at the end", "期末汇率")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("Return in this currency", "按该货币计的收益")}
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
                     {say("What the rate move did", "汇率变动的影响")}
@@ -863,7 +851,7 @@ export function PerformanceExplorer({
                         worth at that rate. */}
                     <td className="py-2.5 text-right">
                       <span className="tabular block font-medium">
-                        {view.code === "USD" ? "—" : view.startRate.toFixed(4)}
+                        {view.code === currency ? "—" : view.startRate.toFixed(4)}
                       </span>
                       <span className="tabular block text-xs text-muted-foreground">
                         {fmt(view.startValue, view.code)}
@@ -872,15 +860,30 @@ export function PerformanceExplorer({
 
                     <td className="py-2.5 text-right">
                       <span className="tabular block font-medium">
-                        {view.code === "USD" ? "—" : view.endRate.toFixed(4)}
+                        {view.code === currency ? "—" : view.endRate.toFixed(4)}
                       </span>
                       <span className="tabular block text-xs text-muted-foreground">
                         {fmt(view.endValue, view.code)}
                       </span>
                     </td>
 
+                    {/* Time-weighted in this currency, with what was made or
+                        lost underneath — deposits counted at their own day's
+                        rate, never as a gain. */}
                     <td className="py-2.5 text-right">
-                      {view.code === "USD" ? (
+                      <span
+                        className={`tabular block font-medium ${view.returnPercent >= 0 ? "text-positive" : "text-negative"}`}
+                      >
+                        {pct(view.returnPercent)}
+                      </span>
+                      <span className="tabular block text-xs text-muted-foreground">
+                        {view.madeOrLost >= 0 ? "+" : "−"}
+                        {fmt(Math.abs(view.madeOrLost), view.code)}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 text-right">
+                      {view.code === currency ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
                         <>
@@ -903,8 +906,8 @@ export function PerformanceExplorer({
         ) : (
           <p className="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
             {say(
-              "Needs a US dollar account and a published exchange rate on both the first and last day of the period.",
-              "需要美元账户，并且期初和期末两天都有公布的汇率。",
+              "Needs the transfers reviewed, and a published exchange rate for every day of the period.",
+              "需要先核对转入转出记录，并且区间内每天都有公布的汇率。",
             )}
           </p>
         )}

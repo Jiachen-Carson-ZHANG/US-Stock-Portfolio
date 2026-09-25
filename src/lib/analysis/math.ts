@@ -142,6 +142,36 @@ export function adjustedSeries(
   };
 }
 
+/**
+ * What the investments had made or lost by each day, in money.
+ *
+ * The value less what it started the period at and less everything paid in
+ * since, so a deposit is a step in neither direction. Plotting the value
+ * itself showed a twelve-thousand-dollar deposit as a leap that looked like a
+ * gain. Same end-of-day flow convention as the index, so the last point is
+ * the period's gain.
+ */
+export function madeOrLostSeries(
+  points: { date: string; value: number }[],
+  flows: CashFlow[],
+): { date: string; value: number }[] {
+  if (points.length === 0) return [];
+  const start = points[0];
+  const later = flows
+    .filter((flow) => flow.date > start.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  let paidIn = 0;
+  let next = 0;
+  return points.map((point) => {
+    while (next < later.length && later[next].date <= point.date) {
+      paidIn += later[next].amount;
+      next += 1;
+    }
+    return { date: point.date, value: point.value - start.value - paidIn };
+  });
+}
+
 export function analysisStats(result: Analysis): SeriesStats {
   const values = result.points.map((p) => p.index),
     returns = result.points.slice(1).map((p) => p.intervalReturn!);
