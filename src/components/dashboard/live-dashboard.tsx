@@ -35,7 +35,7 @@ export function LiveDashboard({
   ownerName: string | null;
 }) {
   const t = useT();
-  const { data, refreshing, failures, refresh } = usePortfolio(initial);
+  const { data, refreshing, failures, refresh } = usePortfolio(initial, portfolioSlug);
 
   // What the fills cannot account for. Dividends, interest and fees live
   // here legitimately; a transfer nobody recorded also does, and is much

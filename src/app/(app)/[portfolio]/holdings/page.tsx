@@ -35,6 +35,7 @@ export default async function HoldingsPage({
 
   return (
     <LiveHoldings
+      portfolioSlug={portfolio.slug}
       initial={{ summary, positions, allocations, totalInvested, optionGroups }}
     />
   );

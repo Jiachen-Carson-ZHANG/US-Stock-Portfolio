@@ -16,7 +16,7 @@ import { FamilyActivity } from "@/components/layout/family-activity";
 import { PendingAccounts } from "@/components/layout/pending-accounts";
 import { PortfolioAdmin } from "@/components/layout/portfolio-admin";
 import { pendingAccounts } from "@/lib/accounts";
-import { listPortfolios, readersOf } from "@/lib/portfolios";
+import { defaultFor, listPortfolios, readersOf } from "@/lib/portfolios";
 import { activityByMember, mostViewedAssets } from "@/lib/activity";
 
 const CONNECT_OUTCOME: Record<string, { tone: "ok" | "bad"; message: string }> = {
@@ -79,7 +79,11 @@ export default async function SettingsPage({
   searchParams: Promise<{ moomoo?: string }>;
 }) {
   const me = await requireOwner();
-  const { portfolio } = await requirePortfolio();
+  // The broker connection is the owner's own account, named outright. Left
+  // unnamed it followed whichever portfolio was viewed last, so a sync or
+  // reconnect here could act on a practice account.
+  const own = await defaultFor(await getDb(), me);
+  const { portfolio } = await requirePortfolio(own?.slug);
 
   const provider = await activeProvider(portfolio.id);
   const { summary, positions } = await loadPortfolio(portfolio.id);
@@ -162,7 +166,10 @@ export default async function SettingsPage({
         )}
 
         <div className="mt-5">
-          <MoomooConnection connected={connection !== null} />
+          <MoomooConnection
+            connected={connection !== null}
+            portfolioSlug={portfolio.slug}
+          />
         </div>
       </section>
 
@@ -205,7 +212,7 @@ export default async function SettingsPage({
         )}
 
         <div className="mt-5">
-          <SyncButton />
+          <SyncButton portfolioSlug={portfolio.slug} />
         </div>
       </section>
 

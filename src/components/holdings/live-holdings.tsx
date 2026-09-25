@@ -5,9 +5,15 @@ import { usePortfolio, type LivePortfolio } from "@/components/dashboard/use-por
 import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { useT } from "@/lib/i18n/context";
 
-export function LiveHoldings({ initial }: { initial: LivePortfolio }) {
+export function LiveHoldings({
+  initial,
+  portfolioSlug,
+}: {
+  initial: LivePortfolio;
+  portfolioSlug: string;
+}) {
   const t = useT();
-  const { data, refreshing, refresh } = usePortfolio(initial);
+  const { data, refreshing, refresh } = usePortfolio(initial, portfolioSlug);
 
   return (
     <div className="space-y-5">

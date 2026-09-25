@@ -75,6 +75,7 @@ export default async function PerformancePage({
       </header>
       <AssetClassSplit data={portfolio.byAssetClass} />
       <PerformanceExplorer
+        portfolioSlug={current.slug}
         snapshots={snapshots}
         initial={analysis}
         owner={user.role === "owner"}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutGrid,
   Library,
@@ -20,6 +21,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 import type { UserRole } from "@/lib/auth/session";
 import { useLocale, useSetLocale, useT } from "@/lib/i18n/context";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { navSlug } from "@/lib/portfolios/nav-slug";
 
 /**
  * `scoped` items live under a portfolio and take its slug as the first path
@@ -52,11 +54,21 @@ function useVisibleItems(role: UserRole) {
  * Which portfolio the page is showing, read from the address rather than
  * passed down: the nav lives in a layout above the [portfolio] segment, so
  * it never receives the parameter.
+ *
+ * On a page with no portfolio in its address it is the last one that had
+ * one. It used to be `fallback`, which the layout computes once and does not
+ * refresh as the reader moves around — so reading Carson's account, opening
+ * the playground and tapping Holdings put people in their own practice
+ * account.
  */
 function useCurrentSlug(portfolios: NavPortfolio[], fallback: string): string {
   const pathname = usePathname();
-  const first = pathname.split("/")[1] ?? "";
-  return portfolios.some((p) => p.slug === first) ? first : fallback;
+  const [last, setLast] = useState(fallback);
+  const slug = navSlug(pathname, portfolios, last);
+  // Remembered during render, React's pattern for keeping something from a
+  // previous render; an effect would draw one frame of wrong links first.
+  if (slug !== last) setLast(slug);
+  return slug;
 }
 
 function hrefFor(item: (typeof ITEMS)[number], slug: string): string {

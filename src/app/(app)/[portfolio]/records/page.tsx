@@ -76,6 +76,7 @@ export default async function RecordsPage({
       </section>
 
       <PerformanceExplorer
+        portfolioSlug={portfolio.slug}
         mode="manage"
         snapshots={snapshots}
         initial={analysis}

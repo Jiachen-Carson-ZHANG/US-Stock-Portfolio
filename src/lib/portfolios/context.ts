@@ -4,7 +4,7 @@ import { forbidden, requireUser, unauthorized, getCurrentUser } from "@/lib/auth
 import { getDb } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth/session";
 import { canRead, findBySlug, type Portfolio } from "@/lib/portfolios";
-import { lastViewedOr, rememberViewing } from "./last-viewed";
+import { lastViewedOr } from "./last-viewed";
 
 export type PortfolioContext = { user: AuthUser; portfolio: Portfolio };
 
@@ -39,10 +39,10 @@ async function resolve(user: AuthUser, slug: string | undefined): Promise<Resolu
   if (!portfolio) return { kind: "missing" };
   if (!(await canRead(db, user, portfolio.id))) return { kind: "locked", portfolio };
 
-  // Naming a portfolio in the address is the act of choosing one, so that is
-  // what gets remembered — not a click on a switcher, which would miss every
-  // other way of arriving.
-  await rememberViewing(portfolio.slug);
+  // Remembering which one was opened is not done here. Pages cannot set a
+  // cookie while they render, so the call that used to sit here silently did
+  // nothing; the [portfolio] layout reports the choice to /api/me/viewing,
+  // which can.
   return { kind: "ok", portfolio };
 }
 
@@ -63,12 +63,34 @@ export async function requirePortfolio(slug?: string): Promise<PortfolioContext>
   notFound();
 }
 
-/** Route Handler guard. Returns a Response instead of redirecting. */
+/**
+ * Route Handler guard. Returns a Response instead of redirecting.
+ *
+ * An API request must name its portfolio; there is no default here. There
+ * used to be — "none named" meant the caller's own — and it produced the
+ * worst kind of bug: a correct-looking answer about the wrong account. The
+ * dashboard's refresh forgot the slug, so anybody reading an account shared
+ * with them had it swapped for their own practice account five seconds after
+ * it loaded. Refusing outright turns that mistake into an error the first
+ * time anyone runs the code, rather than a wrong page nobody can explain.
+ *
+ * Pages still fall back to the last one viewed: an address without a
+ * portfolio in it is somebody navigating, not a program forgetting.
+ */
 export async function requirePortfolioApi(
-  slug?: string,
+  slug: string | undefined,
 ): Promise<PortfolioContext | { response: Response }> {
   const user = await getCurrentUser();
   if (!user) return { response: unauthorized() };
+
+  if (!slug) {
+    return {
+      response: Response.json(
+        { error: "Say which portfolio: add ?portfolio=<slug> to the request" },
+        { status: 400 },
+      ),
+    };
+  }
 
   const resolution = await resolve(user, slug);
   if (resolution.kind === "locked") {

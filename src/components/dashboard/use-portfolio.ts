@@ -44,7 +44,17 @@ const REFRESH_TIMEOUT_MS = 12_000;
 /** After a failure, wait longer each time, up to this. */
 const MAX_BACKOFF_MS = 60_000;
 
-export function usePortfolio(initial: LivePortfolio) {
+/**
+ * `portfolioSlug` is required, and that is the whole fix for a real bug.
+ *
+ * The refresh used to ask for "positions" without saying whose. The server
+ * answers that question with the viewer's own default portfolio — which, for
+ * anybody looking at an account shared with them, is their practice account.
+ * So the page loaded the account they chose and, five seconds later, the
+ * refresh quietly replaced it with their own. The owner never saw it, because
+ * the owner's default is the account being looked at.
+ */
+export function usePortfolio(initial: LivePortfolio, portfolioSlug: string) {
   const [data, setData] = useState(initial);
   const [refreshing, setRefreshing] = useState(false);
   const [failures, setFailures] = useState(0);
@@ -63,10 +73,13 @@ export function usePortfolio(initial: LivePortfolio) {
       setRefreshing(true);
 
       try {
-        const response = await fetch("/api/portfolio/positions", {
-          cache: "no-store",
-          signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
-        });
+        const response = await fetch(
+          `/api/portfolio/positions?portfolio=${encodeURIComponent(portfolioSlug)}`,
+          {
+            cache: "no-store",
+            signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
+          },
+        );
         if (response.ok && !cancelled) {
           setData((await response.json()) as LivePortfolio);
           consecutiveFailures = 0;
@@ -131,7 +144,7 @@ export function usePortfolio(initial: LivePortfolio) {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [data.summary.marketStatus]);
+  }, [data.summary.marketStatus, portfolioSlug]);
 
   return {
     data,

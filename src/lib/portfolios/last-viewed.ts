@@ -28,6 +28,20 @@ const COOKIE = "viewing";
 /** A year: this is a preference, and nobody wants it forgotten over a weekend. */
 const MAX_AGE_SECONDS = 365 * 86_400;
 
+/** The slug last remembered, if any, so a page can skip reporting it again. */
+export async function rememberedSlug(): Promise<string | undefined> {
+  try {
+    return (await cookies()).get(COOKIE)?.value;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Only works from a Route Handler or Server Action. Called while a page
+ * renders, the cookie is refused and nothing is remembered, silently — which
+ * is how it went unnoticed. /api/me/viewing is the caller.
+ */
 export async function rememberViewing(slug: string): Promise<void> {
   try {
     const jar = await cookies();

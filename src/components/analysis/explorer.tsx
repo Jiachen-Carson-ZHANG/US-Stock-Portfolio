@@ -44,6 +44,7 @@ import type { AnalysisData } from "@/lib/analysis/store";
 import type { PortfolioSnapshot } from "@/types/portfolio";
 
 export function PerformanceExplorer({
+  portfolioSlug,
   snapshots,
   initial,
   owner,
@@ -52,6 +53,12 @@ export function PerformanceExplorer({
   rates = { USD: [], CNY: [], SGD: [], EUR: [] },
   mode = "analysis",
 }: {
+  /**
+   * Whose data a save belongs to. Required: without it the server filed the
+   * save under the viewer's own default portfolio, which is not necessarily
+   * the one on screen.
+   */
+  portfolioSlug: string;
   snapshots: PortfolioSnapshot[];
   initial: AnalysisData;
   owner: boolean;
@@ -200,11 +207,14 @@ export function PerformanceExplorer({
     setStatus("");
     setFailed(false);
     try {
-      const response = await fetch("/api/analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(
+        `/api/analysis?portfolio=${encodeURIComponent(portfolioSlug)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       if (!response.ok) throw new Error();
       setData(await response.json());
       setStatus(say("Saved.", "已保存。"));
