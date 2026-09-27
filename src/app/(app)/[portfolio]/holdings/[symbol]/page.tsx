@@ -14,7 +14,7 @@ import { parseSymbol } from "@/lib/moomoo/symbols";
 import { visibleTo } from "@/lib/portfolios";
 import { Badge } from "@/components/ui/misc";
 import { MarketPanel } from "@/components/market/market-panel";
-import { PriceVolumeChart } from "@/components/market/price-volume-chart";
+import { StockChart } from "@/components/market/stock-chart";
 import { WatchButton } from "@/components/market/watch-button";
 import { quoteDetail } from "@/lib/market/detail";
 import { getQuotes } from "@/lib/portfolio/quotes";
@@ -24,8 +24,8 @@ import type { PositionView } from "@/types/portfolio";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** A year of daily bars: enough for the 1Y view, and the most moomoo sends at once. */
-const HISTORY_DAYS = 380;
+/** The month of daily candles the chart opens on; other ranges load on demand. */
+const HISTORY_DAYS = 31;
 
 /**
  * One page for any symbol — held or not.
@@ -183,8 +183,11 @@ export default async function StockPage({
         </div>
       </header>
 
-      <PriceVolumeChart
-        history={history}
+      <StockChart
+        symbol={symbol}
+        portfolioSlug={portfolio.slug}
+        initialRange="1M"
+        initial={history.length > 0 ? { interval: "day", bars: history } : undefined}
         averageCost={position && terms.instrumentType !== "option" ? paidPerShare : undefined}
       />
 

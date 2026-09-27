@@ -1,4 +1,5 @@
 import type {
+  BarInterval,
   DateRange,
   HistoricalPrice,
   OptionContract,
@@ -114,6 +115,8 @@ function greeksFrom(snapshot: Snapshot): Quote["greeks"] {
 
 type Kline = {
   date: number;
+  /** When the bar starts, in milliseconds. */
+  time_key?: number;
   close: number;
   open?: number;
   high?: number;
@@ -123,6 +126,15 @@ type Kline = {
 };
 
 const SNAPSHOT_BATCH = 400;
+
+/** moomoo's K-line types, from its naming dictionary. */
+const KTYPE: Record<BarInterval, string> = {
+  "5m": "6",
+  "30m": "8",
+  day: "2",
+  week: "3",
+  month: "4",
+};
 
 function market(): string {
   return process.env.MOOMOO_MARKET ?? "US";
@@ -294,13 +306,15 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
   async getHistoricalPrices(
     symbol: string,
     range: DateRange,
+    options: { interval?: BarInterval } = {},
   ): Promise<HistoricalPrice[]> {
     if (isCash(symbol)) return [];
 
+    const interval = options.interval ?? "day";
     const query = new URLSearchParams({
       start: range.from,
       end: range.to,
-      ktype: "2",
+      ktype: KTYPE[interval],
       autype: "1",
       num: "370",
     });
@@ -310,8 +324,10 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
       `/api/v1.0/quote/${encodeURIComponent(toMoomooCode(symbol))}/history-kline?${query}`,
     );
 
+    const intraday = interval === "5m" || interval === "30m";
     return (data.kline_list ?? []).map((bar) => ({
       date: isoDate(bar.date),
+      ...(intraday && bar.time_key ? { time: new Date(bar.time_key).toISOString() } : {}),
       close: bar.close,
       open: bar.open,
       high: bar.high,

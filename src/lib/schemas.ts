@@ -41,6 +41,8 @@ export const quotesQuerySchema = z.object({
     .pipe(z.array(symbolSchema).min(1).max(50)),
 });
 
+export const chartRangeSchema = z.enum(["1D", "1W", "1M", "1Y", "MAX"]);
+
 export const historyRangeSchema = z.object({
   days: z.coerce.number().int().min(1).max(1825).default(180),
 });

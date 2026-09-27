@@ -5,7 +5,8 @@ import { canWrite } from "@/lib/portfolios";
 import { requirePortfolio } from "@/lib/portfolios/context";
 import { baseCurrency } from "@/lib/portfolio/service";
 import { buyingPower, recentOrders } from "@/lib/trading/orders";
-import { OrderList, Ticket } from "@/components/trading/ticket";
+import { OrderList } from "@/components/trading/ticket";
+import { TradeWorkspace } from "@/components/trading/trade-workspace";
 import { Help } from "@/components/ui/help";
 import { BackLink } from "@/components/ui/back-link";
 import Link from "next/link";
@@ -70,33 +71,36 @@ export default async function TradePage({
         )}
       </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        {mine ? (
-          <Ticket
-            // A new pre-filled symbol starts a fresh ticket rather than
-            // editing whatever was half typed.
-            key={`${initialSymbol}:${initialSide}`}
-            initialSymbol={initialSymbol}
-            initialSide={initialSide}
-            portfolioSlug={portfolio.slug}
-            currency={baseCurrency()}
-            initialBuyingPower={power.toFixed(2)}
-          />
-        ) : (
+      <TradeWorkspace
+        // A new pre-filled symbol starts a fresh ticket rather than editing
+        // whatever was half typed.
+        key={`${initialSymbol}:${initialSide}`}
+        ticket={
+          mine
+            ? {
+                initialSymbol,
+                initialSide,
+                portfolioSlug: portfolio.slug,
+                currency: baseCurrency(),
+                initialBuyingPower: power.toFixed(2),
+              }
+            : null
+        }
+        notMine={
           <section className="rounded-xl border border-border bg-surface p-5">
             <p className="text-sm text-muted-foreground">
               {t.mockTrade.onlyOwnerCanTradeGeneric}
             </p>
           </section>
-        )}
-
+        }
+      >
         <OrderList
           portfolioSlug={portfolio.slug}
           orders={orders}
           canCancel={mine}
           currency={baseCurrency()}
         />
-      </div>
+      </TradeWorkspace>
     </div>
   );
 }

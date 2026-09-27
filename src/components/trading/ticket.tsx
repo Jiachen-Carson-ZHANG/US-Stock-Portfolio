@@ -73,18 +73,29 @@ function contractSize(symbol: string): number {
  * before it happens. A single button that both prices and submits is how
  * somebody buys a hundred contracts meaning a hundred shares.
  */
+export type TicketDraft = {
+  symbol: string;
+  level: { price: number; label: string } | null;
+};
+
 export function Ticket({
   portfolioSlug,
   currency,
   initialBuyingPower,
   initialSymbol = "",
   initialSide = "buy",
+  onDraft,
 }: {
   portfolioSlug: string;
   currency: string;
   initialBuyingPower: string;
   initialSymbol?: string;
   initialSide?: Side;
+  /**
+   * The symbol being traded, once it has a price, and the limit or stop
+   * being typed — for the chart beside the ticket to show and mark.
+   */
+  onDraft?: (draft: TicketDraft | null) => void;
 }) {
   const t = useT();
   const router = useRouter();
@@ -144,6 +155,24 @@ export function Ticket({
   // ago: the lookup trails the typing, and a stale price is a wrong estimate.
   const live = quote && quote.symbol === ticker ? quote : null;
   const shares = Number(quantity);
+
+  // Plain values only in the dependencies, so reporting the draft can never
+  // set off another render that reports it again.
+  const liveSymbol = live?.symbol ?? null;
+  const typed = Number(kind === "limit" ? limitPrice : kind === "stop" ? stopPrice : "");
+  const levelLabel =
+    kind === "limit" ? (side === "buy" ? t.trade.draftBuyLimit : t.trade.draftSellLimit) : t.trade.draftStop;
+  useEffect(() => {
+    onDraft?.(
+      liveSymbol
+        ? {
+            symbol: liveSymbol,
+            level: kind !== "market" && typed > 0 ? { price: typed, label: levelLabel } : null,
+          }
+        : null,
+    );
+  }, [onDraft, liveSymbol, kind, typed, levelLabel]);
+
   // A stop already past its trigger would go off the moment it was placed.
   // The server refuses it; saying so here, while the numbers are still being
   // typed, is kinder than a refusal after Review.

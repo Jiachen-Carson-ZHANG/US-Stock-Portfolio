@@ -1,4 +1,5 @@
 import type {
+  BarInterval,
   DateRange,
   HistoricalPrice,
   OptionContract,
@@ -8,7 +9,12 @@ import type {
 
 export interface MarketDataProvider {
   getQuotes(symbols: string[]): Promise<Quote[]>;
-  getHistoricalPrices(symbol: string, range: DateRange): Promise<HistoricalPrice[]>;
+  /** Daily bars unless another interval is asked for. */
+  getHistoricalPrices(
+    symbol: string,
+    range: DateRange,
+    options?: { interval?: BarInterval },
+  ): Promise<HistoricalPrice[]>;
   /** The expiries listed for an underlying's options, nearest first. */
   getOptionExpirations?(symbol: string): Promise<OptionExpiration[]>;
   /** Every contract on one expiry, unpriced; prices come from getQuotes. */

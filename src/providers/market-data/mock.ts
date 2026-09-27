@@ -1,4 +1,5 @@
 import type {
+  BarInterval,
   DateRange,
   HistoricalPrice,
   OptionContract,
@@ -79,6 +80,60 @@ function eachDay(range: DateRange): string[] {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return days;
+}
+
+/** The Monday of a date's week, which names the week. */
+function mondayOf(date: string): string {
+  const day = new Date(`${date}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+
+/** Daily bars merged into longer ones: first open, last close, extremes, totals. */
+function grouped(days: HistoricalPrice[], keyOf: (date: string) => string): HistoricalPrice[] {
+  const bars: HistoricalPrice[] = [];
+  let key = "";
+  for (const day of days) {
+    const current = bars[bars.length - 1];
+    if (current && keyOf(day.date) === key) {
+      current.close = day.close;
+      current.high = Math.max(current.high ?? day.close, day.high ?? day.close);
+      current.low = Math.min(current.low ?? day.close, day.low ?? day.close);
+      current.volume = (current.volume ?? 0) + (day.volume ?? 0);
+      current.turnover = (current.turnover ?? 0) + (day.turnover ?? 0);
+    } else {
+      key = keyOf(day.date);
+      bars.push({ ...day });
+    }
+  }
+  return bars;
+}
+
+/** One session cut into bars of `minutes`, wandering from the open to the close. */
+function intradayBars(symbol: string, day: HistoricalPrice, minutes: number): HistoricalPrice[] {
+  const count = Math.round(390 / minutes);
+  const open = day.open ?? day.close;
+  const start = Date.parse(`${day.date}T13:30:00Z`);
+  const bars: HistoricalPrice[] = [];
+  let price = open;
+  for (let i = 0; i < count; i++) {
+    const target = open + ((day.close - open) * (i + 1)) / count;
+    const wobble = (seededUnit(`${symbol}:${day.date}:${i}`) - 0.5) * open * 0.003;
+    const next = i === count - 1 ? day.close : target + wobble;
+    const reach = open * 0.0008 * (1 + seededUnit(`${symbol}:${day.date}:h${i}`));
+    bars.push({
+      date: day.date,
+      time: new Date(start + i * minutes * 60_000).toISOString(),
+      open: Number(price.toFixed(2)),
+      high: Number((Math.max(price, next) + reach).toFixed(2)),
+      low: Number((Math.min(price, next) - reach).toFixed(2)),
+      close: Number(next.toFixed(2)),
+      volume: Math.round((day.volume ?? 0) / count),
+      turnover: Math.round((day.turnover ?? 0) / count),
+    });
+    price = next;
+  }
+  return bars;
 }
 
 export class MockMarketDataProvider implements MarketDataProvider {
@@ -177,6 +232,7 @@ export class MockMarketDataProvider implements MarketDataProvider {
   async getHistoricalPrices(
     symbol: string,
     range: DateRange,
+    options: { interval?: BarInterval } = {},
   ): Promise<HistoricalPrice[]> {
     const base = MOCK_PRICES[symbol];
     if (!base) return [];
@@ -188,17 +244,30 @@ export class MockMarketDataProvider implements MarketDataProvider {
     const series: HistoricalPrice[] = [];
     let close = base.price;
     for (let i = days.length - 1; i >= 0; i--) {
-      // A made-up but plausible day's trading, so the volume chart has
-      // something to draw without a broker.
+      // A made-up but plausible day's trading, so the charts have something
+      // to draw without a broker.
       const shares = Math.round(2_000_000 * (0.5 + seededUnit(`${symbol}:v:${days[i]}`)));
+      const drift = (seededUnit(`${symbol}:${days[i]}`) - 0.48) * 0.028;
+      const open = close / (1 + drift);
+      const reach = 0.004 + seededUnit(`${symbol}:r:${days[i]}`) * 0.012;
       series.unshift({
         date: days[i],
+        open: Number(open.toFixed(2)),
+        high: Number((Math.max(open, close) * (1 + reach)).toFixed(2)),
+        low: Number((Math.min(open, close) * (1 - reach)).toFixed(2)),
         close: Number(close.toFixed(2)),
         volume: shares,
         turnover: Math.round(shares * close),
       });
-      const drift = (seededUnit(`${symbol}:${days[i]}`) - 0.48) * 0.028;
-      close = Math.max(0.01, close / (1 + drift));
+      close = Math.max(0.01, open);
+    }
+
+    const interval = options.interval ?? "day";
+    if (interval === "week" || interval === "month") {
+      return grouped(series, (date) => (interval === "month" ? date.slice(0, 7) : mondayOf(date)));
+    }
+    if (interval === "5m" || interval === "30m") {
+      return series.flatMap((day) => intradayBars(symbol, day, interval === "5m" ? 5 : 30));
     }
     return series;
   }

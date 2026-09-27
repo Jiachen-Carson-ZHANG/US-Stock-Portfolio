@@ -62,8 +62,14 @@ export type OptionContract = {
   multiplier: number;
 };
 
+/** How long each price bar covers. */
+export type BarInterval = "5m" | "30m" | "day" | "week" | "month";
+
 export type HistoricalPrice = {
+  /** The trading day the bar belongs to. */
   date: string;
+  /** When an intraday bar starts. Daily and longer bars have only a date. */
+  time?: string;
   close: number;
   open?: number;
   high?: number;
