@@ -61,7 +61,7 @@ export function GlobalSearch({
     </form>
   );
 
-  if (variant === "bar") return <div className="w-full max-w-sm">{form}</div>;
+  if (variant === "bar") return <div className="w-full">{form}</div>;
 
   return (
     <>

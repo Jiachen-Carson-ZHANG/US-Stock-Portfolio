@@ -1,37 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { compareAll, equalMix, type BenchmarkSeries } from "@/lib/analysis/benchmarks";
+import { compareAll, type BenchmarkSeries } from "@/lib/analysis/benchmarks";
 import { missingWeekdays, type AdjustedPoint } from "@/lib/analysis/math";
 
 const series = (key: string, values: [string, number][]): BenchmarkSeries => ({
   key,
   label: key,
   points: values.map(([date, value]) => ({ date, value })),
-});
-
-describe("a third in each", () => {
-  it("averages the three curves, which is what daily rebalancing means", () => {
-    const mix = equalMix([
-      series("A", [["2026-01-01", 100], ["2026-01-02", 110]]),
-      series("B", [["2026-01-01", 50], ["2026-01-02", 55]]),
-      series("C", [["2026-01-01", 200], ["2026-01-02", 180]]),
-    ])!;
-
-    // Two up 10%, one down 10%: the mix is up 10/3 percent.
-    expect(mix.points[0].value).toBeCloseTo(1, 6);
-    expect(mix.points[1].value).toBeCloseTo((1.1 + 1.1 + 0.9) / 3, 6);
-  });
-
-  it("uses only the days every fund has", () => {
-    const mix = equalMix([
-      series("A", [["2026-01-01", 100], ["2026-01-02", 110], ["2026-01-03", 120]]),
-      series("B", [["2026-01-01", 50], ["2026-01-03", 60]]),
-    ])!;
-    expect(mix.points.map((p) => p.date)).toEqual(["2026-01-01", "2026-01-03"]);
-  });
-
-  it("is not built from a single fund", () => {
-    expect(equalMix([series("A", [["2026-01-01", 1], ["2026-01-02", 2]])])).toBeNull();
-  });
 });
 
 describe("putting the account and the funds on one scale", () => {

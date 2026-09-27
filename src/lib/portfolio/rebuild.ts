@@ -40,7 +40,26 @@ export async function rebuildHistory(options: {
   loadPrices: PriceLoader;
   /** Value the account should land on, used as the sanity check. */
   liveValue?: number | null;
+  /**
+   * What the broker values one unit of each holding at now — a share, or a
+   * contract including its hundred. With these the check prices the replay's
+   * holdings the way the broker prices the live ones, so it compares what is
+   * held rather than which price was used.
+   *
+   * Without them an option was valued at its last trade on one side and at
+   * the broker's mark on the other. For contracts that trade rarely those sit
+   * hundreds of dollars apart — a Vertiv call last traded at 49.80 was marked
+   * at 55.58 — and the owner's account was refused every rebuild although
+   * nothing in it was wrong.
+   */
+  liveMarks?: Map<string, number>;
   tolerance?: number;
+  /**
+   * Only these days are written; the rest are worked out but left as they
+   * are. For filling a gap without rewriting the evenings that were captured
+   * live at the broker's own prices.
+   */
+  only?: Set<string> | null;
   write?: boolean;
   now?: Date;
   /**
@@ -56,10 +75,12 @@ export async function rebuildHistory(options: {
     portfolioId,
     loadPrices,
     liveValue = null,
+    liveMarks = null,
     tolerance = 250,
     write = false,
     now = new Date(),
     opening = null,
+    only = null,
   } = options;
 
   const empty: RebuildReport = {
@@ -85,16 +106,16 @@ export async function rebuildHistory(options: {
   // A practice account that has never traded is worth its cash every day:
   // no prices to fetch, nothing to replay.
   if (fills.length === 0 && opening && opening.amount > 0) {
-    return untradedHistory({ db, portfolioId, flows, from: opening.date, now, write });
+    return untradedHistory({ db, portfolioId, flows, from: opening.date, now, write, only });
   }
   if (fills.length === 0) {
-    return { ...empty, refusals: ["No fills on record"] };
+    return { ...empty, refusals: ["There are no trades on record to replay."] };
   }
   if (flows.length === 0) {
     return {
       ...empty,
       refusals: [
-        "No cash flows recorded — without dates a deposit cannot be told apart from a gain",
+        "No deposits are recorded. Without their dates a deposit cannot be told apart from a gain — add them under Records.",
       ],
     };
   }
@@ -118,7 +139,7 @@ export async function rebuildHistory(options: {
     for (const date of series.keys()) tradingDays.add(date);
   }
   if (tradingDays.size === 0) {
-    return { ...empty, from, to, refusals: ["No price history available"] };
+    return { ...empty, from, to, refusals: ["The broker sent no price history."] };
   }
 
   // Every weekday, not only the days with a close: the daily statistics
@@ -137,16 +158,28 @@ export async function rebuildHistory(options: {
   const last = days[days.length - 1];
   const finalValue = last ? last.marketValue.toNumber() : null;
 
-  const drift =
-    liveValue !== null && finalValue !== null ? Math.abs(finalValue - liveValue) : 0;
+  // Like for like: the replay's holdings and cash, priced where the broker
+  // prices the live ones. What is left is a difference in what is held — a
+  // missing trade, a wrong contract size, a gift share — not in which price
+  // was used for it.
+  const replayed =
+    last && liveMarks
+      ? last.holdings.reduce((sum, holding) => {
+          const mark = liveMarks.get(holding.symbol);
+          const close = lastCloseOf(prices, holding.symbol);
+          const unit = mark ?? (close === undefined ? 0 : close * multiplierFor(holding.symbol));
+          return sum + holding.quantity * unit;
+        }, last.cash.toNumber())
+      : finalValue;
+  const drift = liveValue !== null && replayed !== null ? Math.abs(replayed - liveValue) : 0;
 
   const refusals = [
     mismatched.length > 0 &&
-      `${mismatched.length} fill(s) disagree with the cash the broker recorded`,
-    missing.length > 0 && `${missing.length} symbol(s) have no price history: ${missing.join(", ")}`,
+      `${mismatched.length} trade(s) disagree with the cash the broker recorded for them.`,
+    missing.length > 0 && `The broker has no price history for ${missing.join(", ")}.`,
     liveValue !== null &&
       drift > tolerance &&
-      `final value is ${drift.toFixed(2)} from the live account, over the ${tolerance} tolerance`,
+      `Replaying the trades lands $${drift.toFixed(2)} away from what the broker shows now (more than $${tolerance}), so something is missing — a trade, a transfer or a dividend. Nothing was changed.`,
   ].filter(Boolean) as string[];
 
   if (!write || refusals.length > 0) {
@@ -161,6 +194,7 @@ export async function rebuildHistory(options: {
 
   let written = 0;
   for (const day of days) {
+    if (only && !only.has(day.date)) continue;
     await writeSnapshot(
       db,
       portfolioId,
@@ -181,6 +215,14 @@ export async function rebuildHistory(options: {
   }
 
   return { days: days.length, written, from, to, refusals: [], finalValue };
+}
+
+/** The most recent close on record for a symbol, whatever its date. */
+function lastCloseOf(prices: PriceSeries, symbol: string): number | undefined {
+  const series = prices.get(symbol);
+  if (!series || series.size === 0) return undefined;
+  const latest = [...series.keys()].sort().pop()!;
+  return series.get(latest);
 }
 
 /** Each weekday from `from` to yesterday, New York's calendar. */
@@ -215,8 +257,9 @@ async function untradedHistory(options: {
   from: string;
   now: Date;
   write: boolean;
+  only: Set<string> | null;
 }): Promise<RebuildReport> {
-  const { db, portfolioId, flows, from, now, write } = options;
+  const { db, portfolioId, flows, from, now, write, only } = options;
   const dates = weekdaysFrom(from, now);
   const currency = process.env.PORTFOLIO_BASE_CURRENCY ?? "USD";
   const money = (value: number) => ({ amount: value.toFixed(2), currency });
@@ -226,7 +269,7 @@ async function untradedHistory(options: {
   for (const date of dates) {
     const cash = flows.filter((flow) => flow.date <= date).reduce((sum, flow) => sum + flow.amount, 0);
     finalValue = cash;
-    if (!write) continue;
+    if (!write || (only && !only.has(date))) continue;
     await writeSnapshot(
       db,
       portfolioId,

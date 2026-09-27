@@ -230,10 +230,11 @@ export default async function SettingsPage({
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">Daily history</h2>
         <p className="mt-1 mb-4 text-xs text-muted-foreground">
-          A day is recorded only if something captured it that evening, so an
-          outage leaves a hole in the performance chart. Nothing is lost — every
-          day can be re-derived from the trades — and this is what does it. Safe
-          to run at any time, and safe to run twice.
+          Every account&apos;s value is recorded each evening after the US close.
+          If an evening is missed, the next evening fills it in by replaying the
+          trades — you don&apos;t need to do anything. This button does the same
+          straight away, for every account, and rewrites their whole history from
+          the trades. Safe to run at any time, and safe to run twice.
         </p>
         <RebuildHistory />
       </section>

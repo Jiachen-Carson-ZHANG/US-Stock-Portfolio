@@ -20,48 +20,12 @@ export const BENCHMARKS = [
 
 export type BenchmarkKey = (typeof BENCHMARKS)[number]["key"];
 
-/** The equal-weight mix of the three, a third in each. */
-export const BLEND = { key: "BLEND", label: "Equal mix · a third in each" } as const;
-
 export type BenchmarkSeries = {
   key: string;
   label: string;
   /** Close by date, already filtered to trading days the feed returned. */
   points: { date: string; value: number }[];
 };
-
-/**
- * A third in each, rebalanced daily.
- *
- * Averaging the three indexed curves is exactly a daily-rebalanced equal
- * mix, which is the honest reading of "a third in each" — and it needs only
- * the dates all three actually share, so a fund with a missing day cannot
- * quietly drag the mix down.
- */
-export function equalMix(series: BenchmarkSeries[]): BenchmarkSeries | null {
-  if (series.length < 2) return null;
-
-  const shared = series
-    .map((s) => new Set(s.points.map((p) => p.date)))
-    .reduce((all, dates) => new Set([...all].filter((date) => dates.has(date))));
-  const dates = [...shared].sort();
-  if (dates.length < 2) return null;
-
-  const base = series.map((s) => {
-    const byDate = new Map(s.points.map((p) => [p.date, p.value]));
-    return { byDate, first: byDate.get(dates[0])! };
-  });
-
-  return {
-    key: BLEND.key,
-    label: BLEND.label,
-    points: dates.map((date) => ({
-      date,
-      value:
-        base.reduce((total, s) => total + s.byDate.get(date)! / s.first, 0) / base.length,
-    })),
-  };
-}
 
 export type ComparisonRow = { date: string; portfolio: number } & Record<string, number>;
 

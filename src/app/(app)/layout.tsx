@@ -73,12 +73,15 @@ export default async function AppLayout({
           {/* The desktop toolbar. The language switch used to sit alone at
               the bottom of the sidebar, below the navigation, where nobody
               looked for it. Top right is where people look. */}
-          <div className="hidden items-center justify-end gap-3 px-8 pt-4 md:flex">
-            <div className="mr-auto w-full max-w-sm">
-              <GlobalSearch portfolios={portfolios} defaultSlug={defaultSlug} variant="bar" />
+          {/* Search in the middle, over the page it searches from, rather
+              than tucked into the top left corner. */}
+          <div className="hidden grid-cols-[1fr_minmax(0,36rem)_1fr] items-center gap-3 px-8 pt-4 md:grid">
+            <div />
+            <GlobalSearch portfolios={portfolios} defaultSlug={defaultSlug} variant="bar" />
+            <div className="flex items-center justify-end gap-3">
+              <LanguageToggle />
+              {canSignOut && <NotificationBell initialUnread={unread} />}
             </div>
-            <LanguageToggle />
-            {canSignOut && <NotificationBell initialUnread={unread} />}
           </div>
 
           <main className="flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-4 md:pb-10">

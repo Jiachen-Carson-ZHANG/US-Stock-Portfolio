@@ -111,8 +111,8 @@ export function PerformanceExplorer({
     currency === "USD"
       ? benchmarkComparison(result.points, data.benchmark)
       : [];
-  // The live comparison: VOO, QQQ, ONEQ and the equal mix of the three, all
-  // re-based to 100 on the first day the account and every fund share.
+  // The live comparison: VOO, QQQ and ONEQ, all re-based to 100 on the
+  // first day the account and every fund share.
   const live = compareAll(result.points, benchmarks);
   const first = selected[0],
     last = selected.at(-1);
@@ -718,8 +718,8 @@ export function PerformanceExplorer({
         </h2>
         <p className="text-xs text-muted-foreground">
           {say(
-            "Put the same money into each on the first day and watch what happens. Every line starts at 100 on that day, so the gap between them is the difference in result, not the difference in size. The mix is a third in each fund.",
-            "在同一天把同样一笔钱分别投进去，看看后来各自变成多少。所有曲线都从那天的 100 起步，因此曲线之间的差距就是成绩的差距，而不是本金的差距。「等额组合」是三只各买三分之一。",
+            "Put the same money into each on the first day and watch what happens. Every line starts at 100 on that day, so the gap between them is the difference in result, not the difference in size.",
+            "在同一天把同样一笔钱分别投进去，看看后来各自变成多少。所有曲线都从那天的 100 起步，因此曲线之间的差距就是成绩的差距，而不是本金的差距。",
           )}{" "}
           {live.rows.length >= 2 ? "" : data.sources.benchmark}
         </p>
@@ -728,7 +728,7 @@ export function PerformanceExplorer({
             <p className="text-xs text-muted-foreground">
               {live.rows[0].date} → {live.rows.at(-1)?.date}
             </p>
-            <ChartFrame title={say("Growth of the same money", "同一笔钱的增长")}>
+            <ChartFrame title={say("Growth of the same money", "同一笔钱的增长")} height={420}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={live.rows}>
                   <CartesianGrid vertical={false} stroke={GRID} />
@@ -750,7 +750,7 @@ export function PerformanceExplorer({
                       dataKey={series.key}
                       name={series.label}
                       stroke={seriesColor(index + 1)}
-                      strokeDasharray={series.key === "BLEND" ? undefined : "4 3"}
+                      strokeDasharray="4 3"
                       dot={false}
                       isAnimationActive={false}
                     />
@@ -820,8 +820,8 @@ export function PerformanceExplorer({
           {say("What it is worth in your currency", "换成你的货币是多少")}
           <Help title={say("How this is worked out", "这是怎么算的")}>
             {say(
-              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate — money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. "Paid in" is what the deposits less withdrawals in the period came to in that currency, each at its own day's rate; below the table, every transfer is listed one by one. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went: a rate that weakens can take money away from a yuan holder in a period the account did well. Rates: European Central Bank daily reference rates`,
-              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算——你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。「转入」是区间内转入减转出、每笔按当天汇率换算后的合计；表格下方可以逐笔查看。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关：即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来源：欧洲央行每日参考汇率`,
+              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate — money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. Below the table, every transfer is listed one by one. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went: a rate that weakens can take money away from a yuan holder in a period the account did well. Rates: European Central Bank daily reference rates`,
+              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算——你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。表格下方可以逐笔查看每一笔转入转出。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关：即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来源：欧洲央行每日参考汇率`,
             )}
           </Help>
         </h2>
@@ -841,9 +841,6 @@ export function PerformanceExplorer({
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
                     {say("Rate at the start", "期初汇率")}
-                  </th>
-                  <th scope="col" className="py-2 text-right font-medium">
-                    {say("Paid in", "转入")}
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
                     {say("Rate at the end", "期末汇率")}
@@ -872,17 +869,6 @@ export function PerformanceExplorer({
                       </span>
                       <span className="tabular block text-xs text-muted-foreground">
                         {fmt(view.startValue, view.code)}
-                      </span>
-                    </td>
-
-                    {/* Deposits less withdrawals in the period, each at its
-                        own day's rate: start + this + the result = end. */}
-                    <td className="py-2.5 text-right">
-                      <span className="tabular block font-medium">
-                        {fmt(view.paidIn, view.code)}
-                      </span>
-                      <span className="tabular block text-xs text-muted-foreground">
-                        {view.code === currency ? "" : say("at each day's rate", "按当天汇率")}
                       </span>
                     </td>
 
@@ -915,13 +901,19 @@ export function PerformanceExplorer({
                         <span className="text-muted-foreground">—</span>
                       ) : (
                         <>
+                          {/* The money leads, coloured by its own sign; the
+                              rate's move sits under it as context. Coloured
+                              together, a rate down 0.57% showed in green
+                              whenever the deposits' timing made the effect
+                              a gain. */}
                           <span
                             className={`tabular block font-medium ${view.fromRate >= 0 ? "text-positive" : "text-negative"}`}
                           >
-                            {pct(view.ratePercent)}
+                            {view.fromRate >= 0 ? "+" : "−"}
+                            {fmt(Math.abs(view.fromRate), view.code)}
                           </span>
                           <span className="tabular block text-xs text-muted-foreground">
-                            {fmt(view.fromRate, view.code)}
+                            {say("rate", "汇率")} {pct(view.ratePercent)}
                           </span>
                         </>
                       )}

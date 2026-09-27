@@ -1,7 +1,7 @@
 import { requireApiOwner } from "@/lib/auth/guards";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logger } from "@/lib/logger";
-import { rebuildEveryPortfolio } from "@/app/api/cron/reconstruct/route";
+import { rebuildEveryPortfolio } from "@/lib/portfolio/rebuild-accounts";
 
 export const dynamic = "force-dynamic";
 // The hosting plan caps this at 60 seconds whatever is asked for.

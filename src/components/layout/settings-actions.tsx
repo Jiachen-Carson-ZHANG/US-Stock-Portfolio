@@ -356,14 +356,20 @@ export function UserRows({ users, me }: { users: AdminUser[]; me: string }) {
  * is lost when that happens — every day can be re-derived from the fills —
  * but "later" has to actually happen, and this is later.
  */
+type RebuildRow = { slug: string; name: string; written: number; refusals: string[] };
+
 export function RebuildHistory() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // One line per account. A single total ("Rebuilt 17 days") hid that the
+  // owner's own account had been refused while the practice accounts filled.
+  const [rows, setRows] = useState<RebuildRow[]>([]);
 
   async function rebuild() {
     setPending(true);
     setMessage(null);
+    setRows([]);
     try {
       const response = await fetch("/api/admin/rebuild", { method: "POST" });
       const data = await response.json().catch(() => ({}));
@@ -371,11 +377,7 @@ export function RebuildHistory() {
         setMessage(data.error ?? "The rebuild could not finish.");
         return;
       }
-      setMessage(
-        data.written === 0
-          ? "Nothing to add — every day was already recorded."
-          : `Rebuilt ${data.written} ${data.written === 1 ? "day" : "days"}.`,
-      );
+      setRows((data.results ?? []) as RebuildRow[]);
       router.refresh();
     } catch {
       setMessage("The rebuild could not be reached.");
@@ -385,11 +387,29 @@ export function RebuildHistory() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-3">
       <Button variant="outline" onClick={rebuild} disabled={pending}>
         {pending ? "Rebuilding…" : "Rebuild history from trades"}
       </Button>
       {message && <p className="text-sm text-muted-foreground">{message}</p>}
+      {rows.length > 0 && (
+        <ul className="divide-y divide-border rounded-lg border border-border text-sm">
+          {rows.map((row) => (
+            <li key={row.slug} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3 py-2">
+              <span className="font-medium">{row.name}</span>
+              {row.refusals.length > 0 ? (
+                <span className="text-negative">Not rebuilt — {row.refusals.join(" ")}</span>
+              ) : (
+                <span className="text-muted-foreground">
+                  {row.written === 0
+                    ? "Nothing to rebuild"
+                    : `${row.written} ${row.written === 1 ? "day" : "days"} rewritten`}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

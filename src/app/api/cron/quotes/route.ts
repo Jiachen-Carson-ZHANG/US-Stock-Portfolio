@@ -5,6 +5,7 @@ import { awardCompletedPeriods } from "@/lib/arena/trophies";
 import { captureDailySnapshots } from "@/lib/portfolio/daily-capture";
 import { logger } from "@/lib/logger";
 import { matchAllRestingOrders } from "@/lib/portfolio/service";
+import { fillHistoryGaps } from "@/lib/portfolio/gap-fill";
 import { warmQuotes } from "@/lib/portfolio/warm-quotes";
 
 export const dynamic = "force-dynamic";
@@ -69,11 +70,22 @@ export async function GET(request: Request) {
   // second scheduler nobody set up, or on somebody opening the site at 4am
   // Singapore time.
   if (isAfterMarketClose(new Date())) {
-    await recordEveningSnapshots(db).catch((error: unknown) => {
+    const evening = await recordEveningSnapshots(db).catch((error: unknown) => {
       logger.error("snapshot.capture.failed", {
         reason: error instanceof Error ? error.message : "unknown",
       });
+      return "failed" as const;
     });
+    // Once tonight's snapshots are all in — on a later minute than the one
+    // that took them, so the two never share a time limit — the days that
+    // were missed are filled in.
+    if (evening === "done") {
+      await fillHistoryGaps(db, new Date()).catch((error: unknown) => {
+        logger.error("snapshot.gapfill.failed", {
+          reason: error instanceof Error ? error.message : "unknown",
+        });
+      });
+    }
   }
 
   const session = marketSession(new Date());
@@ -127,7 +139,9 @@ export async function GET(request: Request) {
 
 const SNAPSHOT_RETRY_MS = 10 * 60_000;
 
-async function recordEveningSnapshots(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+async function recordEveningSnapshots(
+  db: Awaited<ReturnType<typeof getDb>>,
+): Promise<"done" | "captured" | "waiting"> {
   const now = new Date();
   const today = marketDateString(now);
   const mark = await db.get<{ payload: string; fetched_at: string }>(
@@ -139,8 +153,8 @@ async function recordEveningSnapshots(db: Awaited<ReturnType<typeof getDb>>): Pr
   } catch {
     state = {};
   }
-  if (state.date === today && state.complete) return;
-  if (mark && Date.now() - Date.parse(mark.fetched_at) < SNAPSHOT_RETRY_MS) return;
+  if (state.date === today && state.complete) return "done";
+  if (mark && Date.now() - Date.parse(mark.fetched_at) < SNAPSHOT_RETRY_MS) return "waiting";
 
   const { results } = await captureDailySnapshots(now);
   const complete = results.every(
@@ -154,4 +168,5 @@ async function recordEveningSnapshots(db: Awaited<ReturnType<typeof getDb>>): Pr
      ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, fetched_at = excluded.fetched_at`,
     [JSON.stringify({ date: today, complete }), now.toISOString()],
   );
+  return complete ? "captured" : "waiting";
 }

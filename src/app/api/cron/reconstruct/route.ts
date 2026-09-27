@@ -1,9 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { getDb } from "@/lib/db";
-import { logger } from "@/lib/logger";
-import { listPortfolios } from "@/lib/portfolios";
-import { rebuildHistory, type PriceLoader } from "@/lib/portfolio/rebuild";
-import { getMarketDataProvider } from "@/providers";
+import { rebuildEveryPortfolio } from "@/lib/portfolio/rebuild-accounts";
 
 /**
  * The backstop for portfolio history.
@@ -19,33 +15,6 @@ import { getMarketDataProvider } from "@/providers";
 // The hosting plan caps a function at 60 seconds and clamps anything
 // higher, so asking for 300 only hid where the real ceiling was.
 export const maxDuration = 60;
-
-function loaderFor(portfolioId: string): PriceLoader {
-  return async (symbols, range) => {
-    const provider = await getMarketDataProvider(portfolioId);
-    const prices = new Map<string, Map<string, number>>();
-    const missing: string[] = [];
-
-    for (const symbol of symbols) {
-      try {
-        const history = await provider.getHistoricalPrices(symbol, range);
-        if (history.length === 0) {
-          missing.push(symbol);
-          continue;
-        }
-        prices.set(symbol, new Map(history.map((p) => [p.date, p.close])));
-      } catch {
-        missing.push(symbol);
-      }
-      // The broker rate-limits, and a throttled response comes back empty
-      // rather than as an error. Pacing the requests is what keeps a rebuild
-      // from quietly pricing half the account at nothing.
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-
-    return { prices, missing };
-  };
-}
 
 export async function POST(request: Request) {
   const secret = process.env.SNAPSHOT_CRON_SECRET;
@@ -64,82 +33,4 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ results: await rebuildEveryPortfolio() });
-}
-
-/**
- * The rebuild itself, with no opinion about who asked for it.
- *
- * Two callers: the monthly scheduler above, which carries a shared secret,
- * and an owner pressing a button in settings, which carries a session. The
- * work is identical and lives here rather than being duplicated or, worse,
- * having the button hold a copy of the secret.
- */
-export async function rebuildEveryPortfolio(): Promise<
-  { slug: string; written: number; days: number; refusals: string[] }[]
-> {
-  const db = await getDb();
-  const results: {
-    slug: string;
-    written: number;
-    days: number;
-    refusals: string[];
-  }[] = [];
-
-  for (const portfolio of await listPortfolios(db)) {
-    // Like for like: the replay's value includes cash, so the comparison must.
-    const live = await db.get<{ positions: string; cash: string }>(
-      `SELECT COALESCE(SUM(CASE WHEN instrument_type <> 'cash'
-                                THEN COALESCE(reported_market_value, 0) ELSE 0 END), 0)::text AS positions,
-              COALESCE(SUM(CASE WHEN instrument_type = 'cash'
-                                THEN quantity ELSE 0 END), 0)::text AS cash
-         FROM positions WHERE portfolio_id = ?`,
-      [portfolio.id],
-    );
-    const liveValue = live
-      ? Number(live.positions) + Number(live.cash)
-      : null;
-
-    const report = await rebuildHistory({
-      db,
-      portfolioId: portfolio.id,
-      loadPrices: loaderFor(portfolio.id),
-      liveValue: liveValue && liveValue > 0 ? liveValue : null,
-      write: true,
-      // A practice account starts from its opening balance on the day it was
-      // made; that is its first deposit.
-      opening:
-        portfolio.kind === "mock"
-          ? {
-              date: new Intl.DateTimeFormat("en-CA", {
-                timeZone: "America/New_York",
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-              }).format(new Date(portfolio.createdAt)),
-              amount: Number(portfolio.openingCash ?? 0),
-            }
-          : null,
-    });
-
-    if (report.refusals.length > 0) {
-      logger.warn("portfolio.rebuild.refused", {
-        portfolio: portfolio.slug,
-        reason: report.refusals.join("; "),
-      });
-    } else {
-      logger.info("portfolio.rebuild.done", {
-        portfolio: portfolio.slug,
-        written: report.written,
-      });
-    }
-
-    results.push({
-      slug: portfolio.slug,
-      written: report.written,
-      days: report.days,
-      refusals: report.refusals,
-    });
-  }
-
-  return results;
 }

@@ -2,7 +2,7 @@ import "server-only";
 import type { MarketDataProvider } from "@/providers/market-data/types";
 import { observe } from "@/lib/observe";
 import { cachedSeries, DAILY_TTL_MS } from "./series-cache";
-import { BENCHMARKS, equalMix, type BenchmarkSeries } from "./benchmarks";
+import { BENCHMARKS, type BenchmarkSeries } from "./benchmarks";
 
 /**
  * Fetching the benchmark closes.
@@ -64,8 +64,8 @@ async function fetchBenchmarks(
     }),
   );
 
-  const series = loaded.filter((item): item is BenchmarkSeries => item !== null);
-  const blend = equalMix(series);
-  return blend ? [...series, blend] : series;
+  // The three funds and nothing else. An equal mix of them made a fifth line
+  // that sat between the other three and said nothing they did not.
+  return loaded.filter((item): item is BenchmarkSeries => item !== null);
 }
 
