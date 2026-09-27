@@ -8,6 +8,7 @@ import { useT } from "@/lib/i18n/context";
 import { Help } from "@/components/ui/help";
 import { SymbolSearch } from "@/components/market/symbol-search";
 import { QuoteCard } from "@/components/trading/quote-card";
+import { Clock } from "@/components/ui/clock";
 import { marketSession, quotePollIntervalMs } from "@/lib/market-hours";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -588,9 +589,17 @@ export function OrderList({
                     <p className="text-sm font-medium">{order.symbol}</p>
                     <p className="text-xs text-muted-foreground">{describe(order)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {order.lastCheckedAt
-                        ? `${t.trade.lastChecked} ${new Date(order.lastCheckedAt).toLocaleTimeString()}`
-                        : t.trade.neverChecked}
+                      {order.lastCheckedAt ? (
+                        <>
+                          {t.trade.lastChecked}{" "}
+                          <Clock
+                            iso={order.lastCheckedAt}
+                            options={{ hour: "2-digit", minute: "2-digit", second: "2-digit" }}
+                          />
+                        </>
+                      ) : (
+                        t.trade.neverChecked
+                      )}
                     </p>
                   </div>
                   {canCancel && (

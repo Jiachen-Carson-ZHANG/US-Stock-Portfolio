@@ -6,6 +6,7 @@ import { MessageSquare, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useT } from "@/lib/i18n/context";
+import { useHydrated } from "@/lib/local-time";
 import { cn, signClass } from "@/lib/utils";
 import { FollowButton } from "@/components/feed/follow";
 import type { Horizon, Post } from "@/lib/playground";
@@ -19,6 +20,16 @@ function ago(iso: string): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h`;
   return `${Math.round(hours / 24)}d`;
+}
+
+/**
+ * How long ago, once the page has loaded. Worked out during the server's
+ * render it could say "4m" while the browser says "5m", and that mismatch
+ * throws the first render away.
+ */
+function Ago({ iso }: { iso: string }) {
+  const hydrated = useHydrated();
+  return <>{hydrated ? ago(iso) : ""}</>;
 }
 
 /**
@@ -229,7 +240,7 @@ export function Playground({
                   </span>
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {ago(thread.createdAt)}
+                  <Ago iso={thread.createdAt} />
                 </span>
               </div>
 
@@ -276,7 +287,7 @@ export function Playground({
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium">{item.author}</span>
                         <span className="text-xs text-muted-foreground">
-                          {ago(item.createdAt)}
+                          <Ago iso={item.createdAt} />
                         </span>
                         {(item.userId === me.id || me.isAdministrator) && (
                           <button

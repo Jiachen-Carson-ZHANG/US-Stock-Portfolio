@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n/context";
 import type { PendingAccount } from "@/lib/accounts";
+import { Clock } from "@/components/ui/clock";
 
 /**
  * Who is waiting to be let in.
@@ -63,7 +64,7 @@ export function PendingAccounts({ pending }: { pending: PendingAccount[] }) {
                   <p className="mt-0.5 text-xs text-muted-foreground">{account.email}</p>
                 )}
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {new Date(account.createdAt).toLocaleString()}
+                  <Clock iso={account.createdAt} />
                 </p>
               </div>
               <div className="flex gap-2">

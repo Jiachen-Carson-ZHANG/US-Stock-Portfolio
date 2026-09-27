@@ -125,8 +125,17 @@ export function OptionFinder({
         `/api/options/screen?portfolio=${encodeURIComponent(portfolioSlug)}&symbol=${encodeURIComponent(ticker)}`,
       )
         .then((response) => response.json())
-        .then((body: Answer) => {
+        .then((raw: Partial<Answer>) => {
           if (cancelled) return;
+          // An error answer has no expiries at all, and reading a list that
+          // is not there crashed the whole Trade page — which is what
+          // searching for DBS did. Every answer is given one.
+          const body: Answer = {
+            symbol: raw.symbol ?? ticker,
+            spot: raw.spot ?? 0,
+            expirations: raw.expirations ?? [],
+            error: raw.error,
+          };
           setBase(body);
           // Three weeks out or more by default: the nearest weekly is mostly
           // a coin toss with a fee attached.
@@ -161,8 +170,15 @@ export function OptionFinder({
         `/api/options/screen?portfolio=${encodeURIComponent(portfolioSlug)}&symbol=${encodeURIComponent(base.symbol)}&expiry=${expiry}&strategy=${strategy}&sure=${sure}`,
       )
         .then((response) => response.json())
-        .then((body: Answer) => {
-          if (!cancelled) setResult(body);
+        .then((raw: Partial<Answer>) => {
+          if (!cancelled) {
+            setResult({
+              ...raw,
+              symbol: raw.symbol ?? base.symbol,
+              spot: raw.spot ?? base.spot,
+              expirations: raw.expirations ?? [],
+            });
+          }
         })
         .catch(() => {
           if (!cancelled) setResult({ symbol: base.symbol, spot: base.spot, expirations: [], error: "offline" });

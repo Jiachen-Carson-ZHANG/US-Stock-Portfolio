@@ -2,6 +2,7 @@
 
 import { useT } from "@/lib/i18n/context";
 import type { AssetInterest, MemberActivity } from "@/lib/activity";
+import { Clock } from "@/components/ui/clock";
 
 export function FamilyActivity({
   mostViewed,
@@ -67,7 +68,7 @@ export function FamilyActivity({
                       <>
                         {" · "}
                         {t.settings.lastSeen}{" "}
-                        {new Date(member.lastSeen).toLocaleString()}
+                        <Clock iso={member.lastSeen} />
                       </>
                     )}
                   </p>

@@ -63,7 +63,12 @@ export async function GET(request: Request) {
     const { quotes: underlying } = await getQuotes(db, [symbol], provider, now);
     const spot = underlying.get(symbol)?.price;
     if (!spot) {
-      return Response.json({ error: `No price for ${symbol} right now.` }, { status: 404 });
+      return Response.json(
+        {
+          error: `Couldn't find ${symbol}. Options here cover shares and funds listed in the US.`,
+        },
+        { status: 404 },
+      );
     }
 
     const expirations = await cachedSeries<OptionExpiration[]>(

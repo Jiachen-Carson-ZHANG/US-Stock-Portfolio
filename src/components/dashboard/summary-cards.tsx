@@ -3,25 +3,28 @@
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { signClass } from "@/lib/utils";
-import { useT } from "@/lib/i18n/context";
-import { currentSessionDate } from "@/lib/market-hours";
+import { useLocale, useT } from "@/lib/i18n/context";
+import { currentSessionDate, marketDateString } from "@/lib/market-hours";
 import { Help } from "@/components/ui/help";
+import { formatDay } from "@/lib/local-time";
 import type { MoneyDTO, PortfolioSummary } from "@/types/portfolio";
 
 /**
  * A figure is meaningless without the window it covers. "Total return
  * +3.1%" invites "since when?", and the honest answer differs per card:
  * today's is one session, the return runs from the first deposit.
+ *
+ * Written in the app's language, not the device's, and read as a calendar
+ * day: the device's locale made the server's text and the browser's differ,
+ * which is one of the page-load errors the logs were full of.
  */
-function when(iso: string | null | undefined, prefix: string): string | undefined {
+function when(
+  iso: string | null | undefined,
+  prefix: string,
+  locale: "en" | "zh",
+): string | undefined {
   if (!iso) return undefined;
-  const date = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
-  if (!Number.isFinite(date.getTime())) return undefined;
-  return `${prefix} ${date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })}`;
+  return `${prefix} ${formatDay(iso, locale)}`;
 }
 
 function Stat({
@@ -84,6 +87,7 @@ export function SummaryCards({
   since?: string | null;
 }) {
   const t = useT();
+  const locale = useLocale();
   const today = Number(summary.todayPnL.amount);
   const unrealized = Number(summary.totalUnrealizedPnL.amount);
   const totalReturn = Number(summary.totalReturn.amount);
@@ -99,7 +103,13 @@ export function SummaryCards({
         help={{ title: t.help.portfolioValue, body: t.help.portfolioValueBody }}
         value={formatMoney(summary.totalMarketValue)}
         sub={`${summary.positionCount} ${t.summary.positions} · ${summary.cashPercent.toFixed(1)}% ${t.summary.cash}`}
-        period={when(summary.dataTimestamp, t.summary.asAt)}
+        period={when(
+          // The market's own date for the moment the prices are from, so it
+          // reads the same in any timezone.
+          summary.dataTimestamp ? marketDateString(new Date(summary.dataTimestamp)) : null,
+          t.summary.asAt,
+          locale,
+        )}
       >
         <p className={`mt-1.5 text-xs ${signClass(unrealized)}`}>
           {formatMoney(summary.totalUnrealizedPnL, { signed: true })} ·{" "}
@@ -123,7 +133,7 @@ export function SummaryCards({
         value={formatMoney(summary.todayPnL, { signed: true })}
         sub={formatPercent(summary.todayPnLPercent, { signed: true })}
         tone={signClass(today)}
-        period={when(currentSessionDate(), t.summary.sessionOf)}
+        period={when(currentSessionDate(), t.summary.sessionOf, locale)}
       />
 
       <Stat
@@ -132,7 +142,7 @@ export function SummaryCards({
         value={formatMoney(summary.totalReturn, { signed: true })}
         sub={formatPercent(summary.totalReturnPercent, { signed: true })}
         tone={signClass(totalReturn)}
-        period={when(since, t.summary.since)}
+        period={when(since, t.summary.since, locale)}
       />
 
       {/* "Invested" is the money actually paid in. Cash and cost of holdings
@@ -147,7 +157,7 @@ export function SummaryCards({
         help={{ title: t.help.totalInvested, body: t.help.totalInvestedBody }}
         value={formatMoney(summary.netDeposits ?? totalInvested)}
         sub={summary.netDeposits ? t.summary.paidIn : undefined}
-        period={when(since, t.summary.since)}
+        period={when(since, t.summary.since, locale)}
       >
         {summary.netDeposits ? (
           <dl className="mt-3 space-y-1 text-xs">

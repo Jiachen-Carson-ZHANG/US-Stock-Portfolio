@@ -3,24 +3,15 @@
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n/context";
+import { useClock } from "@/lib/local-time";
 import type { PortfolioSummary } from "@/types/portfolio";
 
 /**
- * The viewer's own clock, with the zone named.
- *
- * Everyone reading this is on UTC+8 today, but a bare "05:25:10 PM" beside a
- * US market status invites reading it as New York time. Naming the zone costs
- * a few characters and removes the question.
+ * The viewer's own clock, with the zone named — once the page has loaded
+ * (see useClock). A bare "05:25:10 PM" beside a US market status invites
+ * reading it as New York time; naming the zone removes the question.
  */
-function clockTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short",
-  });
-}
+const CLOCK: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", second: "2-digit" };
 
 const DOT_COLOR: Record<PortfolioSummary["marketStatus"], string> = {
   regular: "var(--positive)",
@@ -42,6 +33,7 @@ export function MarketStatus({
   onRefresh?: () => void;
 }) {
   const t = useT();
+  const updated = useClock(summary.dataTimestamp, CLOCK);
 
   const sessionLabel = {
     "pre-market": t.market.preMarket,
@@ -65,7 +57,7 @@ export function MarketStatus({
 
       <span className="col-span-2 row-start-2 sm:order-none">
         {t.market.lastUpdated}:{" "}
-        <span className="tabular">{clockTime(summary.dataTimestamp)}</span>
+        <span className="tabular">{updated}</span>
       </span>
 
       {onRefresh && (
