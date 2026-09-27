@@ -133,13 +133,27 @@ function isCash(symbol: string): boolean {
   return symbol.endsWith(".CASH");
 }
 
+/**
+ * The markets moomoo writes in front of a code: US.AAPL, HK.00700, SG.D05.
+ *
+ * Named rather than inferred from "has a dot": US tickers have dots of their
+ * own — BRK.B, BF.B and 170 more — and were being sent as if "BRK" were a
+ * market, so moomoo had no price for them.
+ */
+const MARKET_PREFIX = /^(US|HK|SH|SZ|SG|JP|AU|MY|CA)\./;
+
 function toMoomooCode(symbol: string): string {
-  return symbol.includes(".") ? symbol : `${market()}.${symbol}`;
+  return MARKET_PREFIX.test(symbol) ? symbol : `${market()}.${symbol}`;
 }
 
+/**
+ * Back to the symbol the caller asked with: the home market's prefix comes
+ * off, any other market's stays, so a Hong Kong code is not mistaken for a US
+ * ticker of the same digits.
+ */
 function fromMoomooCode(code: string): string {
-  const separator = code.indexOf(".");
-  return separator === -1 ? code : code.slice(separator + 1);
+  const home = `${market()}.`;
+  return code.startsWith(home) ? code.slice(home.length) : code;
 }
 
 function isoDate(yyyymmdd: number): string {
