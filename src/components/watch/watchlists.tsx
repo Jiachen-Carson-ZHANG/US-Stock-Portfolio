@@ -7,7 +7,7 @@ import { ArrowUpRight, ChevronRight, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Help } from "@/components/ui/help";
 import { SymbolSearch } from "@/components/market/symbol-search";
-import { QuoteDetailPanel } from "@/components/market/quote-detail";
+import { MarketPanel } from "@/components/market/market-panel";
 import { useLocale } from "@/lib/i18n/context";
 import { cn, signClass } from "@/lib/utils";
 import type { QuoteDetail } from "@/lib/market/detail";
@@ -139,15 +139,16 @@ export function Watchlists({
           </Link>
           {action}
         </div>
+        {/* The same grouped cards as the stock's own page: a flat grid of
+            twenty figures in equal type was hard to find anything in. */}
         {expanded && detail && (
-          <div className="space-y-3 border-t border-border px-3 py-3">
-            <QuoteDetailPanel detail={detail} />
-            <Link
-              href={`${stockBase}/${encodeURIComponent(value)}`}
-              className="inline-block text-sm underline underline-offset-4"
-            >
-              {say("Open its page: chart, trading and more", "打开详情页：走势、成交等")}
-            </Link>
+          <div className="space-y-3 border-t border-border bg-background/60 px-3 py-3">
+            <MarketPanel detail={detail} />
+            <Button asChild variant="outline" size="sm">
+              <Link href={`${stockBase}/${encodeURIComponent(value)}`}>
+                {say("Open its page for the chart and more", "打开它的详情页，看走势和更多")}
+              </Link>
+            </Button>
           </div>
         )}
       </li>

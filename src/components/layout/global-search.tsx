@@ -57,6 +57,8 @@ export function GlobalSearch({
         onPick={(listing) => go(listing.symbol)}
         placeholder={zh ? "搜索股票、基金或公司名" : "Search stocks, funds or companies"}
         autoFocus={variant === "icon"}
+        leading={<Search className="size-4" aria-hidden="true" />}
+        inputClassName={variant === "bar" ? "shadow-sm" : undefined}
       />
     </form>
   );

@@ -120,7 +120,13 @@ export function LiveDashboard({
         />
         <div className="space-y-4">
           <ShareBar title={t.charts.assetType} slices={data.allocations.byAssetType} />
-          <ShareBar title={t.charts.sector} slices={data.allocations.bySector} />
+          <ShareBar
+            title={t.charts.sector}
+            slices={data.allocations.bySector.map((slice) => ({
+              ...slice,
+              label: t.sectors[slice.key as keyof typeof t.sectors] ?? slice.label,
+            }))}
+          />
         </div>
       </div>
 

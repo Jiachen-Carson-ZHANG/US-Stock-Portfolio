@@ -106,8 +106,8 @@ export type Concentration = {
   top1Percent: number;
   top3Percent: number;
   top5Percent: number;
-  /** The largest holdings by today's value, biggest first, up to five. */
-  top?: { symbol: string; percent: number }[];
+  /** The largest companies by today's value, biggest first, up to five. */
+  top?: { symbol: string; percent: number; options?: boolean }[];
 };
 
 export type AllocationSlice = {

@@ -235,37 +235,53 @@ export function shortExposure(positions: Position[], currency: string): Money {
 }
 
 /**
- * Factual share of portfolio value held in the largest N positions. Cash is
- * excluded so the figure describes invested concentration, not idle balance,
- * and short positions are excluded because a negative leg would push the
- * percentages above 100.
+ * Factual share of what is invested held in the largest one, three and five
+ * companies. Cash is left out, so the figure describes invested concentration
+ * rather than an idle balance.
+ *
+ * By company, not by line: every option counts under its company, and a
+ * spread's short leg is netted against its long one. Counted line by line,
+ * the long leg of a call spread showed as a quarter of the account when the
+ * money actually at stake in it was a tenth, and two expiries on the same
+ * share looked like two separate bets.
  */
 export function concentration(positions: Position[], currency: string): Concentration {
-  const invested = longPositions(positions).filter(
-    (p) => p.instrumentType !== "cash",
+  const byCompany = new Map<string, { value: Money; options: boolean }>();
+  for (const position of positions) {
+    if (position.instrumentType === "cash") continue;
+    const company = position.underlyingSymbol ?? position.symbol;
+    const entry = byCompany.get(company) ?? { value: money(0, currency), options: false };
+    byCompany.set(company, {
+      value: add(entry.value, marketValue(position)),
+      options: entry.options || position.instrumentType === "option",
+    });
+  }
+
+  const ranked = [...byCompany]
+    .filter(([, entry]) => entry.value.amount.greaterThan(0))
+    .map(([symbol, entry]) => ({ symbol, value: entry.value, options: entry.options }))
+    .sort((a, b) => b.value.amount.comparedTo(a.value.amount));
+  const total = sum(
+    ranked.map((entry) => entry.value),
+    currency,
   );
-  const total = totalMarketValue(invested, currency);
   if (total.amount.isZero()) {
     return { top1Percent: 0, top3Percent: 0, top5Percent: 0 };
   }
 
-  const ranked = invested
-    .map((position) => ({ symbol: position.symbol, value: marketValue(position) }))
-    .sort((a, b) => b.value.amount.comparedTo(a.value.amount));
-  const sorted = ranked.map((entry) => entry.value);
-
   const topN = (n: number) =>
-    percentOf(sum(sorted.slice(0, n), currency), total) ?? 0;
+    percentOf(sum(ranked.slice(0, n).map((entry) => entry.value), currency), total) ?? 0;
 
   return {
     top1Percent: topN(1),
     top3Percent: topN(3),
     top5Percent: topN(5),
-    // Named, so the card says which holdings it means — and visibly moves
+    // Named, so the card says which companies it means, and visibly moves
     // with the prices, which "34.5%" on its own does not show.
     top: ranked.slice(0, 5).map((entry) => ({
       symbol: entry.symbol,
       percent: percentOf(entry.value, total) ?? 0,
+      options: entry.options,
     })),
   };
 }

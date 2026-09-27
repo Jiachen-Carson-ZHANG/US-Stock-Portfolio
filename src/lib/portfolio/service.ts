@@ -43,6 +43,7 @@ import {
 } from "./options";
 import { money, toDTO } from "@/lib/money";
 import { getQuotes } from "./quotes";
+import { sectorsFor } from "@/lib/market/sectors";
 import { lastSyncedAt, readPositions, syncPositions } from "./sync";
 import { maybeCreateSnapshot, readSnapshots } from "./snapshots";
 import { realizedFor } from "./realized-cache";
@@ -409,7 +410,7 @@ async function loadPortfolioInner(
   // None needs another's answer, so they go to the database at the same time
   // rather than one after another. Sitting beside the database that saves
   // milliseconds; across an ocean it saves two full round trips per page.
-  const [{ positions, quotes, dataTimestamp, isStale }, deposits, realized] = await Promise.all([
+  const [{ positions: priced, quotes, dataTimestamp, isStale }, deposits, realized] = await Promise.all([
     pricedPositions(portfolioId, now),
     netDeposits(db, portfolio, currency),
     // From the fills, which cover the whole account, rather than the broker's
@@ -418,6 +419,18 @@ async function loadPortfolioInner(
     // rather than on every page view.
     realizedFor(db, portfolioId),
   ]);
+
+  // The industry of each holding, from the cache: an option takes its
+  // company's. Anything not yet known is looked up after this answer and
+  // appears from the next load, so a page never waits on the lookup.
+  const sectors = await sectorsFor(
+    db,
+    priced.map((position) => position.underlyingSymbol ?? position.symbol),
+  ).catch(() => new Map<string, string>());
+  const positions = priced.map((position) => {
+    const sector = sectors.get(position.underlyingSymbol ?? position.symbol);
+    return sector && !position.sector ? { ...position, sector } : position;
+  });
 
   const summary = summarize(
     positions,

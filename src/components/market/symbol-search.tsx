@@ -24,6 +24,8 @@ export function SymbolSearch({
   onPick,
   placeholder = "NVDA",
   className,
+  inputClassName,
+  leading,
   autoFocus = false,
 }: {
   id: string;
@@ -34,6 +36,10 @@ export function SymbolSearch({
   onPick?: (listing: Listing) => void;
   placeholder?: string;
   className?: string;
+  /** Extra classes for the field itself. */
+  inputClassName?: string;
+  /** An icon drawn inside the field, at its start. */
+  leading?: React.ReactNode;
   autoFocus?: boolean;
 }) {
   const zh = useLocale() === "zh";
@@ -96,7 +102,13 @@ export function SymbolSearch({
 
   return (
     <div className={cn("relative", className)}>
+      {leading && (
+        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-muted-foreground">
+          {leading}
+        </span>
+      )}
       <Input
+        className={cn(leading && "pl-10", inputClassName)}
         id={id}
         role="combobox"
         aria-expanded={showing}

@@ -75,7 +75,7 @@ export default async function AppLayout({
               looked for it. Top right is where people look. */}
           {/* Search in the middle, over the page it searches from, rather
               than tucked into the top left corner. */}
-          <div className="hidden grid-cols-[1fr_minmax(0,36rem)_1fr] items-center gap-3 px-8 pt-4 md:grid">
+          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,46rem)_minmax(0,1fr)] items-center gap-3 px-8 pt-4 md:grid">
             <div />
             <GlobalSearch portfolios={portfolios} defaultSlug={defaultSlug} variant="bar" />
             <div className="flex items-center justify-end gap-3">

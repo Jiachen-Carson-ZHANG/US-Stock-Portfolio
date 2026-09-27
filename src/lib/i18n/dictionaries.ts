@@ -98,10 +98,11 @@ const en = {
     assetType: "Asset type",
     sector: "Sector",
     concentration: "Concentration",
-    concentrationNote: "Share of what is invested, at today's prices. Cash left out",
-    topHolding: "Top holding",
-    top3: "Top 3 holdings",
-    top5: "Top 5 holdings",
+    concentrationNote:
+      "Share of what is invested at today's prices, with cash left out. Options count under their company.",
+    topHolding: "Largest",
+    top3: "Top 3",
+    top5: "Top 5",
     contribution: "Today's contribution",
     contributionNote: "How much each position moved the portfolio today.",
     unrealizedByPosition: "Unrealized P&L by position",
@@ -522,7 +523,7 @@ const en = {
       "How the money is split between holdings. Measured by what each one cost rather than what it is worth now, so a position that doubled does not look like twice the bet it actually was. Option spreads count once, at what was paid for the pair.",
     concentration: "Concentration",
     concentrationBody:
-      "How much rides on the largest holdings. A high number means a couple of names decide how the whole account does, which is fine as a choice and dangerous as a surprise.",
+      "How much rides on the largest companies you hold. A high number means a couple of names decide how the whole account does, which is fine as a choice and dangerous as a surprise.",
     breakEven: "Break-even",
     breakEvenBody:
       "The share price at which this option position would be worth exactly what was paid for it. Above that line it is ahead, below it, behind. That is why the share's current price sits underneath it.",
@@ -699,6 +700,21 @@ const en = {
     connectLead:
       "It takes about a minute. You sign in on moomoo's own page, tick two boxes, and come straight back here.",
     connectCardTitle: "Connect now",
+  },
+
+  sectors: {
+    technology: "Technology",
+    communication: "Communication",
+    consumer: "Consumer",
+    healthcare: "Healthcare",
+    financials: "Financials",
+    realEstate: "Real estate",
+    industrials: "Industrials",
+    materials: "Materials",
+    energy: "Energy",
+    utilities: "Utilities",
+    funds: "Funds",
+    other: "Other",
   },
 
   arena: {
@@ -898,10 +914,10 @@ const zh: Dictionary = {
     assetType: "资产类型",
     sector: "行业分布",
     concentration: "集中度",
-    concentrationNote: "按今天的价格计算、占已投资部分的比例，不含现金",
-    topHolding: "第一大持仓",
-    top3: "前三大持仓",
-    top5: "前五大持仓",
+    concentrationNote: "按今天的价格计算、占已投资部分的比例，不含现金。期权计入所属公司。",
+    topHolding: "最大一家",
+    top3: "前三家",
+    top5: "前五家",
     contribution: "今日贡献",
     contributionNote: "各持仓对今日盈亏的贡献。",
     unrealizedByPosition: "各持仓浮动盈亏",
@@ -1465,6 +1481,21 @@ const zh: Dictionary = {
     headingConnected: "你的 moomoo 连接",
     connectLead: "大约一分钟就能完成。你在 moomoo 自己的页面登录，勾选两项，然后直接回到这里。",
     connectCardTitle: "现在连接",
+  },
+
+  sectors: {
+    technology: "科技",
+    communication: "通信",
+    consumer: "消费",
+    healthcare: "医疗",
+    financials: "金融",
+    realEstate: "房地产",
+    industrials: "工业",
+    materials: "原材料",
+    energy: "能源",
+    utilities: "公用事业",
+    funds: "基金",
+    other: "其他",
   },
 
   arena: {
