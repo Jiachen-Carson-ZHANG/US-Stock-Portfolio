@@ -71,6 +71,19 @@ export async function GET(request: Request) {
       return back(request, "write_scope", target?.slug);
     }
 
+    // Too little is a different mistake from too much, and gets its own
+    // message: telling somebody who ticked only Market Data that they
+    // granted something forbidden sends them looking for a box they never
+    // ticked.
+    const granted = (tokens.scope ?? "").split(/\s+/);
+    if (!granted.includes("quote:read") || !granted.includes("trade:read")) {
+      logger.warn("broker.connect.missing_scope", {
+        provider: "moomoo",
+        scopes: tokens.scope ?? "",
+      });
+      return back(request, "missing_scope", target?.slug);
+    }
+
     assertReadOnlyScope(tokens.scope);
 
     if (!tokens.refresh_token) {

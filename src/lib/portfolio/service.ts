@@ -55,7 +55,7 @@ import {
   type StoredTransaction,
   type TransactionTotals,
 } from "./transactions";
-import { activeProvider, getBrokerProvider } from "@/providers";
+import { activeProvider, getBrokerProvider, hasBrokerConnection } from "@/providers";
 import { logger } from "@/lib/logger";
 
 export type PortfolioData = {
@@ -229,6 +229,8 @@ export async function ensureFreshPositions(portfolioId: string, now: Date): Prom
   }
 
   if ((await activeProvider(portfolioId)) !== "moomoo") return;
+  // Nothing to pull from an account that is not connected yet.
+  if (!(await hasBrokerConnection(portfolioId))) return;
 
   const synced = await lastSyncedAt(db, portfolioId);
   if (synced) {
@@ -578,7 +580,10 @@ async function loadTransactionsInner(
 }> {
   const db = await getDb();
 
-  if ((await activeProvider(portfolioId)) === "moomoo") {
+  if (
+    (await activeProvider(portfolioId)) === "moomoo" &&
+    (await hasBrokerConnection(portfolioId))
+  ) {
     const synced = await lastTransactionSync(db, portfolioId);
     const stale =
       !synced ||

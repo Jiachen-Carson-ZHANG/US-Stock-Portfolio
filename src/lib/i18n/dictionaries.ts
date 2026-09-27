@@ -403,6 +403,17 @@ const en = {
 
   account: {
     title: "Your account",
+    brokerTitle: "Your real brokerage account",
+    brokerBody:
+      "Connect your own moomoo account to see your real holdings here, kept up to date by themselves. It is private: only you can open it, and the site owner, who can open every account here. Share it with others yourself if you want to.",
+    brokerCreate: "Connect my moomoo account",
+    brokerCreating: "Setting it up…",
+    brokerOpen: "Open my real account",
+    brokerManage: "Connection",
+    brokerConnected: "connected",
+    brokerNotConnected: "not connected yet",
+    brokerOthers:
+      "Only moomoo can be connected for now. Interactive Brokers and Tiger are being looked into.",
     password: "Password",
     passwordNote:
       "Only you can change this. Passwords are stored as Argon2id hashes, which cannot be read back — not by another family member, and not by whoever runs the server. Changing it signs out your other devices.",
@@ -605,8 +616,7 @@ const en = {
       "This is a mock account. It trades practice money at real prices, so there is no brokerage to connect.",
     notYours: "Only this portfolio's owner can connect or disconnect a brokerage here.",
     tickThese: "On moomoo's screen, tick these two",
-    dontSelectAll:
-      "Do not use “Select all”. A grant with anything else in it is refused on the way back and nothing is saved.",
+    dontSelectAll: "Do not use “Select all”.",
     tick: "tick",
     leaveUnticked: "leave unticked",
     marketData: "Market Data",
@@ -650,6 +660,20 @@ const en = {
       "The connection could not be verified. Start it again from this page.",
     outcomeDenied: "You cancelled on moomoo's screen. Nothing changed.",
     outcomeFailed: "The connection did not complete. Try again.",
+    outcomeMissingScope:
+      "moomoo sent back only part of what is needed. Tick both Market Data and Accounts & Orders — nothing else — and connect again.",
+    enforced:
+      "This is enforced, not just advised: if what moomoo sends back includes anything but these two, this site refuses it and stores nothing. You would simply connect again.",
+    consent: "I will tick only Market Data and Accounts & Orders",
+    connectButton: "Connect moomoo",
+    reconnectButton: "Reconnect moomoo",
+    opening: "Opening moomoo…",
+    disconnect: "Disconnect",
+    startFailed: "Could not start the moomoo connection.",
+    disconnectFailed: "Could not disconnect. Please try again.",
+    reconnectChecklist: "What to tick when reconnecting",
+    mockSetUp:
+      "To see your real holdings here, set up your own real account and connect moomoo to it.",
   },
 
   arena: {
@@ -1150,6 +1174,16 @@ const zh: Dictionary = {
 
   account: {
     title: "我的账户",
+    brokerTitle: "你的真实券商账户",
+    brokerBody:
+      "连接你自己的 moomoo 账户，就能在这里看到真实持仓，并自动保持更新。它是私密的：只有你能打开，另外站主可以打开这里的所有账户。想给别人看，由你自己分享。",
+    brokerCreate: "连接我的 moomoo 账户",
+    brokerCreating: "正在建立…",
+    brokerOpen: "打开我的真实账户",
+    brokerManage: "连接设置",
+    brokerConnected: "已连接",
+    brokerNotConnected: "尚未连接",
+    brokerOthers: "目前只能连接 moomoo。盈透证券（IBKR）和老虎证券正在评估中。",
     password: "密码",
     passwordNote:
       "只有你本人可以修改。密码以 Argon2id 哈希保存，无法被还原读取——家人看不到，运行服务器的人也看不到。修改后会登出你的其他设备。",
@@ -1339,7 +1373,7 @@ const zh: Dictionary = {
     mockAccount: "这是模拟账户，使用模拟资金与真实报价，无需连接券商。",
     notYours: "只有该组合的拥有者可以在此连接或断开券商。",
     tickThese: "在 moomoo 的授权页面，只勾选这两项",
-    dontSelectAll: "请勿使用“全选”。包含其他权限的授权会在回调时被拒绝，不会保存任何内容。",
+    dontSelectAll: "请勿使用“全选”。",
     tick: "勾选",
     leaveUnticked: "不要勾选",
     marketData: "行情数据",
@@ -1376,6 +1410,17 @@ const zh: Dictionary = {
     outcomeStateMismatch: "无法验证此次连接，请从本页面重新发起。",
     outcomeDenied: "你在 moomoo 页面取消了授权，没有任何改动。",
     outcomeFailed: "连接未完成，请重试。",
+    outcomeMissingScope: "moomoo 返回的权限不完整。请同时勾选「行情数据」和「账户与订单」——不要勾其他——然后重新连接。",
+    enforced: "这是强制执行的，不只是建议：只要 moomoo 返回的权限里有这两项以外的内容，本站就会拒绝，不保存任何东西。你只需重新连接即可。",
+    consent: "我只会勾选「行情数据」和「账户与订单」",
+    connectButton: "连接 moomoo",
+    reconnectButton: "重新连接 moomoo",
+    opening: "正在打开 moomoo…",
+    disconnect: "断开连接",
+    startFailed: "无法开始连接 moomoo。",
+    disconnectFailed: "断开失败，请重试。",
+    reconnectChecklist: "重新连接时要勾选什么",
+    mockSetUp: "想在这里看到你的真实持仓，请先建立你自己的真实账户，再把 moomoo 连接上去。",
   },
 
   arena: {

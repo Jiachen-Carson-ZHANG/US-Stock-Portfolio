@@ -282,6 +282,53 @@ const SCOPED_TABLES = [
  * Only adopts rows when exactly one portfolio exists. Once there are two, an
  * unowned row is ambiguous and belongs in a report rather than in a guess.
  */
+/**
+ * The real, broker-linked account a person owns, creating it if they have
+ * none.
+ *
+ * Signing up makes a practice account and nothing else, and a practice
+ * account cannot hold a broker connection — so everybody but the site's
+ * owner had nowhere to connect moomoo to, and no way to make one: creating a
+ * portfolio was an owner-only action in Settings. Anybody may now make their
+ * own, once. It starts empty and private: its owner, and the site owner as
+ * for every account here, can open it; nobody else unless it is shared.
+ *
+ * Named "<username>-moomoo" rather than the bare username, which could
+ * collide with a page of the site ("settings", "arena") and cannot change
+ * once people have links to it.
+ */
+export async function ensureOwnBrokerPortfolio(
+  db: DB,
+  user: Pick<AuthUser, "id" | "username" | "displayName">,
+  now: Date = new Date(),
+): Promise<{ portfolio: Portfolio; created: boolean }> {
+  const owned = await db.get<{ id: string }>(
+    `SELECT id FROM portfolios WHERE owner_user_id = ? AND kind = 'broker'
+      ORDER BY created_at LIMIT 1`,
+    [user.id],
+  );
+  if (owned) {
+    const existing = await findById(db, owned.id);
+    if (existing) return { portfolio: existing, created: false };
+  }
+
+  const base = `${user.username.slice(0, 22)}-moomoo`;
+  let slug = base;
+  for (let n = 2; await findBySlug(db, slug); n += 1) slug = `${base}-${n}`;
+
+  const portfolio = await createPortfolio(
+    db,
+    {
+      slug,
+      displayName: `${user.displayName} · moomoo`,
+      ownerUserId: user.id,
+      kind: "broker",
+    },
+    now,
+  );
+  return { portfolio, created: true };
+}
+
 export async function ensureDefaultPortfolio(
   db: DB,
   now: Date = new Date(),

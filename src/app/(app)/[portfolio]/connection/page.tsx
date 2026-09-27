@@ -1,20 +1,17 @@
-import { Check, X } from "lucide-react";
 import { getDb } from "@/lib/db";
 import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { requirePortfolio } from "@/lib/portfolios/context";
 import { MoomooConnection, SyncButton } from "@/components/layout/settings-actions";
+import { OwnBrokerageButton } from "@/components/broker/own-brokerage";
 import { Badge } from "@/components/ui/misc";
 import { serverDictionary } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 /**
- * What to tick on moomoo's consent screen, and why.
- *
- * Shown as a checklist rather than prose because that screen is a list of
- * checkboxes: matching its shape means nobody has to translate a sentence
- * into clicks. The two refused permissions are listed too — leaving them
- * out invites "Select all", which this app rejects on return.
+ * Connecting a portfolio to its moomoo account. The checklist of what to
+ * tick on moomoo's screen comes with the Connect button (MoomooConnection),
+ * so it is the same here and in Settings.
  */
 export default async function ConnectionPage({
   params,
@@ -27,25 +24,11 @@ export default async function ConnectionPage({
   const { t } = await serverDictionary();
   const owns = portfolio.ownerUserId === user.id;
 
-  /**
-   * What to tick on moomoo's consent screen, and why.
-   *
-   * Shown as a checklist rather than prose because that screen is a list of
-   * checkboxes: matching its shape means nobody has to translate a sentence
-   * into clicks. The two refused permissions are listed too — leaving them
-   * out invites "Select all", which this app rejects on return.
-   */
-  const permissions = [
-    { grant: true, name: t.connection.marketData, why: t.connection.marketDataWhy },
-    { grant: true, name: t.connection.accountsOrders, why: t.connection.accountsOrdersWhy },
-    { grant: false, name: t.connection.watchlists, why: t.connection.watchlistsWhy },
-    { grant: false, name: t.connection.tradeExecution, why: t.connection.tradeExecutionWhy },
-  ];
-
   const outcomes: Record<string, { tone: "ok" | "bad"; message: string }> = {
     connected: { tone: "ok", message: t.connection.outcomeConnected },
     connected_sync_failed: { tone: "bad", message: t.connection.outcomeSyncFailed },
     write_scope: { tone: "bad", message: t.connection.outcomeWriteScope },
+    missing_scope: { tone: "bad", message: t.connection.outcomeMissingScope },
     save_failed: { tone: "bad", message: t.connection.outcomeSaveFailed },
     state_mismatch: { tone: "bad", message: t.connection.outcomeStateMismatch },
     denied: { tone: "bad", message: t.connection.outcomeDenied },
@@ -60,6 +43,15 @@ export default async function ConnectionPage({
           {portfolio.displayName} · {t.connection.title}
         </h1>
         <p className="text-sm text-muted-foreground">{t.connection.mockAccount}</p>
+        {/* The page a practice account's owner lands on when they go looking
+            for "connect". It used to end at "there is nothing to connect",
+            which left them with no way forward at all. */}
+        {owns && (
+          <section className="space-y-3 rounded-xl border border-border bg-surface p-5">
+            <p className="text-sm">{t.connection.mockSetUp}</p>
+            <OwnBrokerageButton />
+          </section>
+        )}
       </div>
     );
   }
@@ -98,47 +90,10 @@ export default async function ConnectionPage({
       ) : (
         <>
           <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-sm font-medium">{t.connection.tickThese}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t.connection.dontSelectAll}
-            </p>
-
-            <ul className="mt-4 space-y-3">
-              {permissions.map((permission) => (
-                <li key={permission.name} className="flex gap-3">
-                  <span
-                    aria-hidden="true"
-                    className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded ${
-                      permission.grant
-                        ? "bg-positive/15 text-positive"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {permission.grant ? (
-                      <Check className="size-3.5" />
-                    ) : (
-                      <X className="size-3.5" />
-                    )}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {permission.name}
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
-                        {permission.grant ? t.connection.tick : t.connection.leaveUnticked}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{permission.why}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-5">
-              <MoomooConnection
-                connected={connection !== null}
-                portfolioSlug={portfolio.slug}
-              />
-            </div>
+            <MoomooConnection
+              connected={connection !== null}
+              portfolioSlug={portfolio.slug}
+            />
           </section>
 
           {connection && (

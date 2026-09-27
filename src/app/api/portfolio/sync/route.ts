@@ -5,7 +5,7 @@ import { requirePortfolioApi } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { logger } from "@/lib/logger";
 import { syncPositions } from "@/lib/portfolio/sync";
-import { activeProvider, getBrokerProvider } from "@/providers";
+import { activeProvider, getBrokerProvider, hasBrokerConnection } from "@/providers";
 
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
@@ -15,6 +15,15 @@ export async function POST(request: Request) {
   // Broker synchronization reads upstream data; every authorized reader may request it.
 
   const portfolioId = context.portfolio.id;
+  // A real account with no connection has nothing to pull — and must never
+  // be filled from the demo feed instead, which is what the provider falls
+  // back to when nothing is connected.
+  if (context.portfolio.kind === "broker" && !(await hasBrokerConnection(portfolioId))) {
+    return Response.json(
+      { error: "Connect moomoo to this account first." },
+      { status: 409 },
+    );
+  }
   const provider = await activeProvider(portfolioId);
   const db = await getDb();
 

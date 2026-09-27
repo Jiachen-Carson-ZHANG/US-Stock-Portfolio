@@ -5,6 +5,9 @@ import { DisplayName } from "@/components/account/display-name";
 import { ChangePassword } from "@/components/layout/account-actions";
 import { pendingRequestsFor } from "@/lib/access";
 import { Badge } from "@/components/ui/misc";
+import Link from "next/link";
+import { OwnBrokerageButton } from "@/components/broker/own-brokerage";
+import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { serverDictionary } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +53,15 @@ export default async function AccountPage() {
 
   const requests = open ? [] : await pendingRequestsFor(db, user.id);
 
+  // The person's own real account, if they have made one, and whether it is
+  // connected yet.
+  const brokerage = await db.get<{ id: string; slug: string }>(
+    `SELECT id, slug FROM portfolios WHERE owner_user_id = ? AND kind = 'broker'
+      ORDER BY created_at LIMIT 1`,
+    [user.id],
+  );
+  const connected = brokerage ? (await readConnectionStatus(db, brokerage.id)) !== null : false;
+
   const eventLabel: Record<string, string> = {
     login: t.account.signedIn,
     logout: t.account.signedOut,
@@ -66,6 +78,31 @@ export default async function AccountPage() {
       </header>
 
       <AccessRequests requests={requests} />
+
+      {/* Where anybody connects their own moomoo account. Until this
+          existed, only the site owner could make an account to connect. */}
+      <section className="space-y-3 rounded-xl border border-border bg-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-medium">{t.account.brokerTitle}</h2>
+          {brokerage && (
+            <Badge>{connected ? t.account.brokerConnected : t.account.brokerNotConnected}</Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{t.account.brokerBody}</p>
+        {brokerage ? (
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Link href={`/${brokerage.slug}`} className="underline underline-offset-4">
+              {t.account.brokerOpen}
+            </Link>
+            <Link href={`/${brokerage.slug}/connection`} className="underline underline-offset-4">
+              {t.account.brokerManage}
+            </Link>
+          </div>
+        ) : (
+          <OwnBrokerageButton />
+        )}
+        <p className="text-xs text-muted-foreground">{t.account.brokerOthers}</p>
+      </section>
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">{t.account.displayName}</h2>

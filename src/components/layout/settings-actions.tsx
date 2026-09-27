@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/context";
 
 type AdminUser = {
   id: string;
@@ -45,9 +47,22 @@ export function SyncButton({ portfolioSlug }: { portfolioSlug: string }) {
   );
 }
 
+/**
+ * Connecting moomoo, with what to tick on moomoo's screen right beside the
+ * button, wherever the button appears.
+ *
+ * The checklist used to live only on a page most people could not reach,
+ * and the Connect button in Settings had none at all. It now comes with the
+ * button, and the button stays off until the person confirms they will tick
+ * only the two read permissions. The confirmation is a reminder, not the
+ * protection: whatever is ticked, a grant carrying anything more is refused
+ * on the way back and nothing is stored (see the callback).
+ */
 export function MoomooConnection({ connected, portfolioSlug }: { connected: boolean; portfolioSlug: string }) {
+  const t = useT();
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function connect() {
@@ -58,7 +73,7 @@ export function MoomooConnection({ connected, portfolioSlug }: { connected: bool
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || !data.authorizeUrl) {
-      setError(data.error ?? "Could not start the moomoo connection.");
+      setError(data.error ?? t.connection.startFailed);
       setPending(false);
       return;
     }
@@ -70,7 +85,7 @@ export function MoomooConnection({ connected, portfolioSlug }: { connected: bool
     setPending(true);
     const response = await fetch(`/api/broker/moomoo/disconnect?portfolio=${encodeURIComponent(portfolioSlug)}`, { method: "POST" });
     if (!response.ok) {
-      setError("Could not disconnect. Please try again.");
+      setError(t.connection.disconnectFailed);
       setPending(false);
       return;
     }
@@ -78,19 +93,93 @@ export function MoomooConnection({ connected, portfolioSlug }: { connected: bool
     router.refresh();
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button onClick={connect} disabled={pending}>
-        {pending ? "Opening moomoo…" : connected ? "Reconnect moomoo" : "Connect moomoo"}
-      </Button>
+  const checklist = <MoomooPermissionChecklist />;
 
-      {connected && (
-        <Button variant="ghost" onClick={disconnect} disabled={pending}>
-          Disconnect
-        </Button>
+  return (
+    <div className="space-y-4">
+      {connected ? (
+        <details className="rounded-lg border border-border p-3 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">
+            {t.connection.reconnectChecklist}
+          </summary>
+          <div className="mt-3">{checklist}</div>
+        </details>
+      ) : (
+        checklist
       )}
 
-      {error && <p className="text-sm text-negative">{error}</p>}
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]"
+          checked={agreed}
+          onChange={(event) => setAgreed(event.target.checked)}
+        />
+        <span>{t.connection.consent}</span>
+      </label>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={connect} disabled={pending || !agreed}>
+          {pending ? t.connection.opening : connected ? t.connection.reconnectButton : t.connection.connectButton}
+        </Button>
+
+        {connected && (
+          <Button variant="ghost" onClick={disconnect} disabled={pending}>
+            {t.connection.disconnect}
+          </Button>
+        )}
+
+        {error && <p className="text-sm text-negative">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What to tick on moomoo's consent screen.
+ *
+ * A checklist because that screen is a list of checkboxes: matching its shape
+ * means nobody has to translate a sentence into clicks. The two refused
+ * permissions are listed as well — leaving them out invites "Select all".
+ */
+export function MoomooPermissionChecklist() {
+  const t = useT();
+  const permissions = [
+    { grant: true, name: t.connection.marketData, why: t.connection.marketDataWhy },
+    { grant: true, name: t.connection.accountsOrders, why: t.connection.accountsOrdersWhy },
+    { grant: false, name: t.connection.watchlists, why: t.connection.watchlistsWhy },
+    { grant: false, name: t.connection.tradeExecution, why: t.connection.tradeExecutionWhy },
+  ];
+
+  return (
+    <div>
+      <p className="text-sm font-medium">{t.connection.tickThese}</p>
+      <ul className="mt-3 space-y-3">
+        {permissions.map((permission) => (
+          <li key={permission.name} className="flex gap-3">
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded ${
+                permission.grant ? "bg-positive/15 text-positive" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {permission.grant ? <Check className="size-3.5" /> : <X className="size-3.5" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {permission.name}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {permission.grant ? t.connection.tick : t.connection.leaveUnticked}
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">{permission.why}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+        {t.connection.dontSelectAll} {t.connection.enforced}
+      </p>
     </div>
   );
 }

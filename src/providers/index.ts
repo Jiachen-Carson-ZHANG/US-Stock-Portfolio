@@ -19,7 +19,15 @@ export async function activeProvider(portfolioId: string): Promise<ProviderName>
   return (await hasBrokerConnection(portfolioId)) ? "moomoo" : "mock";
 }
 
-async function hasBrokerConnection(portfolioId: string): Promise<boolean> {
+/**
+ * Whether this portfolio holds a broker connection of its own.
+ *
+ * Asked before any holdings or trade-history sync: with DATA_PROVIDER forcing
+ * moomoo for everything, an account with no connection was being synced
+ * anyway and failing with "not connected" — which is every newly made real
+ * account until its owner finishes on moomoo's screen.
+ */
+export async function hasBrokerConnection(portfolioId: string): Promise<boolean> {
   try {
     return (await readConnectionStatus(await getDb(), portfolioId)) !== null;
   } catch {
@@ -64,9 +72,16 @@ async function quoteConnectionFor(portfolioId: string): Promise<string | null> {
       // a dead one — refreshing it is the normal path — and skipping it would
       // drop the whole site onto the demo feed, which knows the price of
       // almost nothing.
-      `SELECT portfolio_id FROM broker_connections
-        WHERE provider = 'moomoo' AND portfolio_id IS NOT NULL
-        ORDER BY (status = 'connected') DESC, connected_at DESC
+      //
+      // The site owner's first. Once family members connect their own
+      // accounts, "most recently connected" would quietly move the whole
+      // site's price traffic onto whoever connected last — their token, their
+      // rate limit — without them ever being asked.
+      `SELECT c.portfolio_id FROM broker_connections c
+         LEFT JOIN portfolios p ON p.id = c.portfolio_id
+         LEFT JOIN users u ON u.id = p.owner_user_id
+        WHERE c.provider = 'moomoo' AND c.portfolio_id IS NOT NULL
+        ORDER BY (u.role = 'owner') DESC, (c.status = 'connected') DESC, c.connected_at DESC
         LIMIT 1`,
     );
     return row?.portfolio_id ?? null;
