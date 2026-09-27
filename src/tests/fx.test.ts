@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { currencyView, type RateSeries } from "@/lib/analysis/fx";
+import { currencyView, depositsIn, emptyRates, type RateSeries } from "@/lib/analysis/fx";
 import { adjustedSeries, madeOrLostSeries } from "@/lib/analysis/math";
 
 const rates = (cny: [string, number][]): RateSeries => ({
-  USD: [],
+  ...emptyRates(),
   CNY: cny.map(([date, value]) => ({ date, value })),
-  SGD: [],
-  EUR: [],
 });
 
 describe("the account seen in another currency", () => {
@@ -128,5 +126,69 @@ describe("made or lost over time", () => {
     const series = madeOrLostSeries(result.points, flows);
     expect(series.map((point) => point.value)).toEqual([0, 50, -20]);
     expect(series.at(-1)!.value).toBeCloseTo(result.gain!, 9);
+  });
+});
+
+describe("each deposit on its own", () => {
+  const series = rates([
+    ["2026-03-02", 7.0],
+    ["2026-06-01", 7.2],
+    ["2026-09-25", 7.1],
+  ]);
+
+  it("converts each transfer at its own day's rate and again at the latest", () => {
+    const result = depositsIn(
+      [
+        { date: "2026-06-01", amount: 1000 },
+        { date: "2026-03-02", amount: 5000 },
+      ],
+      "CNY",
+      "USD",
+      series,
+    )!;
+    expect(result.asOf).toBe("2026-09-25");
+    expect(result.rateNow).toBe(7.1);
+    // Oldest first, whatever order the ledger came in.
+    expect(result.rows.map((row) => row.date)).toEqual(["2026-03-02", "2026-06-01"]);
+    const [march, june] = result.rows;
+    expect(march).toMatchObject({ rateThen: 7.0, then: 35_000 });
+    expect(march.fromRate).toBeCloseTo(500, 9); // 5,000 × (7.1 − 7.0)
+    expect(june.then).toBeCloseTo(7_200, 9);
+    expect(june.fromRate).toBeCloseTo(-100, 9); // 1,000 × (7.1 − 7.2)
+  });
+
+  it("uses the last published rate for a weekend deposit, and the first one before any exists", () => {
+    const result = depositsIn(
+      [
+        { date: "2026-03-01", amount: 100 },
+        { date: "2026-06-06", amount: 100 },
+      ],
+      "CNY",
+      "USD",
+      series,
+    )!;
+    expect(result.rows.map((row) => row.rateThen)).toEqual([7.0, 7.2]);
+  });
+
+  it("has nothing to say in the account's own currency", () => {
+    expect(depositsIn([{ date: "2026-03-02", amount: 5000 }], "USD", "USD", series)).toBeNull();
+  });
+
+  it("crosses through the dollar for an account kept in another currency", () => {
+    const crossed: RateSeries = {
+      ...emptyRates(),
+      CNY: [
+        { date: "2026-03-02", value: 7.0 },
+        { date: "2026-09-25", value: 7.1 },
+      ],
+      SGD: [
+        { date: "2026-03-02", value: 1.4 },
+        { date: "2026-09-25", value: 1.25 },
+      ],
+    };
+    // 1,000 Singapore dollars at 5 yuan each in March; at 5.68 yuan now.
+    const result = depositsIn([{ date: "2026-03-02", amount: 1000 }], "CNY", "SGD", crossed)!;
+    expect(result.rows[0].then).toBeCloseTo(5_000, 9);
+    expect(result.rows[0].now).toBeCloseTo(5_680, 9);
   });
 });

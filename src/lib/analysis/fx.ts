@@ -2,10 +2,10 @@
 /**
  * What the account is worth to the people looking at it.
  *
- * The family is split between China and Singapore, so "up $1,200" is not the
- * whole story: the same dollars can be worth less in yuan than they were last
- * month even when the account went up. This turns one account into four
- * honest answers.
+ * The family is spread across China, Singapore, Europe, Canada and
+ * Australia, so "up $1,200" is not the whole story: the same dollars can be
+ * worth less in yuan than they were last month even when the account went up.
+ * This turns one account into an honest answer per currency.
  *
  * moomoo does not publish exchange rates — its API covers US equities and
  * options, and nothing else — so the rates come from the European Central
@@ -13,7 +13,7 @@
  * needs no key and is the same series banks quote against. USD is included
  * as the identity so every view is built the same way.
  */
-export const VIEW_CURRENCIES = ["USD", "CNY", "SGD", "EUR"] as const;
+export const VIEW_CURRENCIES = ["USD", "CNY", "SGD", "EUR", "CAD", "AUD"] as const;
 export type ViewCurrency = (typeof VIEW_CURRENCIES)[number];
 
 export const CURRENCY_LABEL: Record<ViewCurrency, { en: string; zh: string }> = {
@@ -21,9 +21,16 @@ export const CURRENCY_LABEL: Record<ViewCurrency, { en: string; zh: string }> = 
   CNY: { en: "Chinese yuan", zh: "人民币" },
   SGD: { en: "Singapore dollars", zh: "新加坡元" },
   EUR: { en: "Euros", zh: "欧元" },
+  CAD: { en: "Canadian dollars", zh: "加拿大元" },
+  AUD: { en: "Australian dollars", zh: "澳大利亚元" },
 };
 
 export type RateSeries = Record<ViewCurrency, { date: string; value: number }[]>;
+
+/** No rates at all: what a page shows while rates cannot be had. */
+export function emptyRates(): RateSeries {
+  return Object.fromEntries(VIEW_CURRENCIES.map((code) => [code, []])) as unknown as RateSeries;
+}
 
 /**
  * The rate on a date, or the most recent one before it.
@@ -157,4 +164,62 @@ export function currencyView(
     returnPercent: (index - 1) * 100,
     fromRate: madeOrLost - investing,
   };
+}
+
+export type DepositRow = {
+  date: string;
+  /** In the account's own currency; a withdrawal is negative. */
+  amount: number;
+  rateThen: number;
+  /** What the transfer came to in this currency on its own day. */
+  then: number;
+  /** The same money at the latest rate. */
+  now: number;
+  /** now − then: what the rate has done to that money since, and nothing else. */
+  fromRate: number;
+};
+
+/**
+ * Each transfer on its own, in another currency.
+ *
+ * The table above answers for the account as a whole; this answers "the
+ * $5,000 I sent in March — what did it cost me in yuan, and what is it worth
+ * in yuan now, before counting anything the investments did?". Each transfer
+ * is converted at the rate on its own day and again at the latest rate, and
+ * the difference is the rate move alone.
+ *
+ * A transfer dated before the first published rate in the series (a weekend
+ * deposit on the first day the account existed) takes the first rate after it.
+ */
+export function depositsIn(
+  flows: { date: string; amount: number }[],
+  code: ViewCurrency,
+  base: ViewCurrency,
+  rates: RateSeries,
+): { rateNow: number; asOf: string; rows: DepositRow[] } | null {
+  if (code === base || flows.length === 0) return null;
+  const perUsd = (currency: ViewCurrency, date: string) => {
+    if (currency === "USD") return 1;
+    const series = rates[currency] ?? [];
+    return rateOn(series, date) ?? series[0]?.value ?? null;
+  };
+  const factor = (date: string) => {
+    const to = perUsd(code, date);
+    const from = perUsd(base, date);
+    return to && from ? to / from : null;
+  };
+
+  const asOf = [...(rates[code] ?? [])].pop()?.date;
+  const rateNow = asOf ? factor(asOf) : null;
+  if (!asOf || !rateNow) return null;
+
+  const rows: DepositRow[] = [];
+  for (const flow of [...flows].sort((a, b) => a.date.localeCompare(b.date))) {
+    const rateThen = factor(flow.date);
+    if (!rateThen) return null;
+    const then = flow.amount * rateThen;
+    const now = flow.amount * rateNow;
+    rows.push({ date: flow.date, amount: flow.amount, rateThen, then, now, fromRate: now - then });
+  }
+  return { rateNow, asOf, rows };
 }

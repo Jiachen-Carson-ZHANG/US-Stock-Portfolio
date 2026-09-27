@@ -9,6 +9,7 @@ import { getDb } from "@/lib/db";
 import { Help } from "@/components/ui/help";
 import { loadBenchmarks } from "@/lib/analysis/benchmarks-server";
 import { loadRates } from "@/lib/analysis/fx-server";
+import { emptyRates } from "@/lib/analysis/fx";
 import { getMarketDataProvider } from "@/providers";
 import Link from "next/link";
 import { Layers } from "lucide-react";
@@ -58,7 +59,7 @@ export default async function PerformancePage({
       : Promise.resolve([]),
     first && last
       ? loadRates(first, last)
-      : Promise.resolve({ USD: [], CNY: [], SGD: [], EUR: [] }),
+      : Promise.resolve(emptyRates()),
   ]);
 
   return (

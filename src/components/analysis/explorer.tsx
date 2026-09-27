@@ -35,6 +35,8 @@ import {
   CURRENCY_LABEL,
   VIEW_CURRENCIES,
   currencyView,
+  depositsIn,
+  emptyRates,
   type ViewCurrency,
   type RateSeries,
 } from "@/lib/analysis/fx";
@@ -48,7 +50,7 @@ export function PerformanceExplorer({
   owner,
   currency,
   benchmarks = [],
-  rates = { USD: [], CNY: [], SGD: [], EUR: [] },
+  rates = emptyRates(),
   mode = "analysis",
 }: {
   /**
@@ -87,6 +89,9 @@ export function PerformanceExplorer({
   const [status, setStatus] = useState("");
   const [failed, setFailed] = useState(false);
   const [kind, setKind] = useState<"benchmark" | "fx">("benchmark");
+  const [depositCode, setDepositCode] = useState<ViewCurrency>(
+    () => VIEW_CURRENCIES.find((code) => code !== currency) ?? "CNY",
+  );
   const latest = snapshots.at(-1)?.snapshotDate ?? "";
   const selected = useMemo(() => {
     if (period === "all" || !latest) return snapshots;
@@ -182,6 +187,15 @@ export function PerformanceExplorer({
           );
           return view ? [view] : [];
         });
+  // Every transfer, converted one by one into the currency picked below the
+  // table — "what did the $5,000 in March cost me in yuan, and what is it now".
+  const deposits = VIEW_CURRENCIES.includes(currency as ViewCurrency)
+    ? depositsIn(data.flows, depositCode, currency as ViewCurrency, rates)
+    : null;
+  const depositTotals = (deposits?.rows ?? []).reduce(
+    (sum, row) => ({ amount: sum.amount + row.amount, then: sum.then + row.then, now: sum.now + row.now }),
+    { amount: 0, then: 0, now: 0 },
+  );
 
   async function save(body: unknown) {
     if (pending.current) return false;
@@ -806,8 +820,8 @@ export function PerformanceExplorer({
           {say("What it is worth in your currency", "换成你的货币是多少")}
           <Help title={say("How this is worked out", "这是怎么算的")}>
             {say(
-              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate — money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went: a rate that weakens can take money away from a yuan holder in a period the account did well. Rates: European Central Bank daily reference rates`,
-              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算——你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关：即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来源：欧洲央行每日参考汇率`,
+              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate — money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. "Paid in" is what the deposits less withdrawals in the period came to in that currency, each at its own day's rate; below the table, every transfer is listed one by one. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went: a rate that weakens can take money away from a yuan holder in a period the account did well. Rates: European Central Bank daily reference rates`,
+              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算——你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。「转入」是区间内转入减转出、每笔按当天汇率换算后的合计；表格下方可以逐笔查看。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关：即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来源：欧洲央行每日参考汇率`,
             )}
           </Help>
         </h2>
@@ -827,6 +841,9 @@ export function PerformanceExplorer({
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
                     {say("Rate at the start", "期初汇率")}
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    {say("Paid in", "转入")}
                   </th>
                   <th scope="col" className="py-2 text-right font-medium">
                     {say("Rate at the end", "期末汇率")}
@@ -855,6 +872,17 @@ export function PerformanceExplorer({
                       </span>
                       <span className="tabular block text-xs text-muted-foreground">
                         {fmt(view.startValue, view.code)}
+                      </span>
+                    </td>
+
+                    {/* Deposits less withdrawals in the period, each at its
+                        own day's rate: start + this + the result = end. */}
+                    <td className="py-2.5 text-right">
+                      <span className="tabular block font-medium">
+                        {fmt(view.paidIn, view.code)}
+                      </span>
+                      <span className="tabular block text-xs text-muted-foreground">
+                        {view.code === currency ? "" : say("at each day's rate", "按当天汇率")}
                       </span>
                     </td>
 
@@ -902,6 +930,74 @@ export function PerformanceExplorer({
                 ))}
               </tbody>
             </table>
+            {deposits && (
+              <details className="mt-4 rounded-xl border border-border">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                  {say("Each deposit, one by one", "逐笔查看每次转入")}
+                </summary>
+                <div className="space-y-3 border-t border-border px-4 py-3">
+                  <div className="flex flex-wrap gap-1" role="group" aria-label={say("Currency", "货币")}>
+                    {VIEW_CURRENCIES.filter((code) => code !== currency).map((code) => (
+                      <button
+                        key={code}
+                        type="button"
+                        aria-pressed={depositCode === code}
+                        onClick={() => setDepositCode(code)}
+                        className={`min-h-8 rounded-md px-2.5 text-xs ${depositCode === code ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted"}`}
+                      >
+                        {zh ? CURRENCY_LABEL[code].zh : CURRENCY_LABEL[code].en}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-xs text-muted-foreground">
+                          <th scope="col" className="py-2 text-left font-medium">{say("Date", "日期")}</th>
+                          <th scope="col" className="py-2 text-right font-medium">{say("Amount", "金额")} ({currency})</th>
+                          <th scope="col" className="py-2 text-right font-medium">{say("Rate that day", "当天汇率")}</th>
+                          <th scope="col" className="py-2 text-right font-medium">{say("Cost then", "当时折合")}</th>
+                          <th scope="col" className="py-2 text-right font-medium">{say("At today's rate", "按最新汇率")}</th>
+                          <th scope="col" className="py-2 text-right font-medium">{say("Rate move alone", "汇率带来的差额")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deposits.rows.map((row, index) => (
+                          <tr key={`${row.date}:${index}`} className="border-b border-border">
+                            <td className="tabular py-2 text-left">{row.date}</td>
+                            <td className="tabular py-2 text-right">{fmt(row.amount)}</td>
+                            <td className="tabular py-2 text-right">{row.rateThen.toFixed(4)}</td>
+                            <td className="tabular py-2 text-right">{fmt(row.then, depositCode)}</td>
+                            <td className="tabular py-2 text-right">{fmt(row.now, depositCode)}</td>
+                            <td className={`tabular py-2 text-right ${row.fromRate >= 0 ? "text-positive" : "text-negative"}`}>
+                              {row.fromRate >= 0 ? "+" : "−"}
+                              {fmt(Math.abs(row.fromRate), depositCode)}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="font-medium">
+                          <th scope="row" className="py-2 text-left">{say("All", "合计")}</th>
+                          <td className="tabular py-2 text-right">{fmt(depositTotals.amount)}</td>
+                          <td className="py-2" />
+                          <td className="tabular py-2 text-right">{fmt(depositTotals.then, depositCode)}</td>
+                          <td className="tabular py-2 text-right">{fmt(depositTotals.now, depositCode)}</td>
+                          <td className={`tabular py-2 text-right ${depositTotals.now - depositTotals.then >= 0 ? "text-positive" : "text-negative"}`}>
+                            {depositTotals.now - depositTotals.then >= 0 ? "+" : "−"}
+                            {fmt(Math.abs(depositTotals.now - depositTotals.then), depositCode)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {say(
+                      `Every transfer ever recorded, whatever period is picked above. "Rate move alone" is what the exchange rate has done to that money since the day it went in (today's rate: ${deposits.rateNow.toFixed(4)}, ${deposits.asOf}), before anything the investments did. These are the European Central Bank's reference rates; the rate your bank actually gave you will have been a little worse, because banks add a margin.`,
+                      `这里列出所有记录过的转入转出，不受上方所选区间影响。「汇率带来的差额」是从转入那天到现在，汇率本身让这笔钱变多或变少了多少（最新汇率：${deposits.rateNow.toFixed(4)}，${deposits.asOf}），不含投资的盈亏。汇率为欧洲央行参考汇率；银行实际给你的汇率会略差一些，因为银行会加点差。`,
+                    )}
+                  </p>
+                </div>
+              </details>
+            )}
           </div>
         ) : (
           <p className="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">

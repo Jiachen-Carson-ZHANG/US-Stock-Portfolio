@@ -2,7 +2,7 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { observe } from "@/lib/observe";
 import { cachedSeries, DAILY_TTL_MS } from "./series-cache";
-import { VIEW_CURRENCIES, type RateSeries } from "./fx";
+import { emptyRates, VIEW_CURRENCIES, type RateSeries } from "./fx";
 
 /**
  * Fetching the exchange rates.
@@ -29,13 +29,15 @@ const ENDPOINT = "https://api.frankfurter.dev/v1";
 export async function loadRates(from: string, to: string): Promise<RateSeries> {
   // One published number per currency per day, so asking more often than
   // that spends a round trip to learn nothing.
-  return cachedSeries(`fx:${from}:${to}`, DAILY_TTL_MS, () =>
+  // The currency list is part of the key: a series cached before a currency
+  // was added would otherwise hide the new one for half a day.
+  return cachedSeries(`fx:${VIEW_CURRENCIES.join(",")}:${from}:${to}`, DAILY_TTL_MS, () =>
     observe("analysis.fx", null, () => fetchRates(from, to)),
   );
 }
 
 async function fetchRates(from: string, to: string): Promise<RateSeries> {
-  const empty: RateSeries = { USD: [], CNY: [], SGD: [], EUR: [] };
+  const empty = emptyRates();
   if (!from || !to) return empty;
 
   const wanted = VIEW_CURRENCIES.filter((code) => code !== "USD");
@@ -50,7 +52,7 @@ async function fetchRates(from: string, to: string): Promise<RateSeries> {
     const body = (await response.json()) as FrankfurterResponse;
     const rates = body.rates ?? {};
 
-    const series: RateSeries = { USD: [], CNY: [], SGD: [], EUR: [] };
+    const series = emptyRates();
     for (const [date, row] of Object.entries(rates)) {
       // One dollar is one dollar, on every date the others have.
       series.USD.push({ date, value: 1 });
