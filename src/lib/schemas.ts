@@ -261,3 +261,10 @@ export const arenaMembershipSchema = z.object({
   portfolio: z.string().trim().min(1).max(64),
   join: z.boolean(),
 });
+
+export const stockNoteSchema = z.object({
+  symbol: symbolSchema,
+  /** The writer's own calendar day, so "today" is theirs rather than the server's. */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  body: z.string().max(20_000),
+});

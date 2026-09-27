@@ -15,6 +15,7 @@ import { visibleTo } from "@/lib/portfolios";
 import { Badge } from "@/components/ui/misc";
 import { MarketPanel } from "@/components/market/market-panel";
 import { StockChart } from "@/components/market/stock-chart";
+import { StockNotes } from "@/components/market/stock-notes";
 import { WatchButton } from "@/components/market/watch-button";
 import { quoteDetail } from "@/lib/market/detail";
 import { getQuotes } from "@/lib/portfolio/quotes";
@@ -256,6 +257,10 @@ export default async function StockPage({
           )}
         </section>
       )}
+
+      {/* The journal is about the company, so an option's page writes in
+          its underlying's. */}
+      <StockNotes symbol={underlying ?? symbol} />
 
       {optionsOnIt.length > 0 && (
         <PayoffExplorer

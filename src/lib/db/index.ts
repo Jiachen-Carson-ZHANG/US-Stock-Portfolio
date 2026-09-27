@@ -287,6 +287,17 @@ CREATE TABLE IF NOT EXISTS trophies (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trophy_period
   ON trophies(period, period_end, portfolio_id);
 
+-- A dated journal per person and share: one entry a day, private to its
+-- author like a watchlist, for reading back later what was thought when.
+CREATE TABLE IF NOT EXISTS stock_notes (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  symbol     TEXT NOT NULL,
+  note_date  TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, symbol, note_date)
+);
+
 -- Accounts entered into the Arena by their owners. Nobody competes, and
 -- nobody's returns are shown to anybody, without a row here: being able to
 -- open an account is not consent to having it ranked.
