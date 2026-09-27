@@ -323,7 +323,7 @@ const en = {
     lastChecked: "last checked",
     neverChecked: "not checked yet",
     restingNote:
-      "Orders fill only in regular hours, 9:30 to 16:00 New York, on a price that prints after they were placed. Waiting orders are checked about every ten seconds while the market is open",
+      "Orders fill only in regular hours, 9:30 to 16:00 New York, on a price that prints after they were placed. Waiting orders are checked about every three seconds while the market is open",
     perContract: "Priced per share — one contract is a hundred of them",
     quoteUnavailable: "No price for that. Pick a company from the list, or check the ticker",
     symbolPlaceholder: "Ticker or company, e.g. NVDA or Micron",
@@ -1125,7 +1125,7 @@ const zh: Dictionary = {
     lastChecked: "最近检查",
     neverChecked: "尚未检查",
     restingNote:
-      "订单只在常规交易时段（纽约时间 9:30–16:00）内、按下单之后出现的价格成交。开市期间约每十秒检查一次挂单",
+      "订单只在常规交易时段（纽约时间 9:30–16:00）内、按下单之后出现的价格成交。开市期间约每三秒检查一次挂单",
     perContract: "按每股报价——一张合约等于一百股",
     quoteUnavailable: "找不到这个代码的报价。请从下拉列表里选择公司，或检查代码",
     symbolPlaceholder: "代码或公司名，如 NVDA 或 Micron",

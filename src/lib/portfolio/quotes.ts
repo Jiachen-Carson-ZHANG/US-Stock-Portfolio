@@ -182,10 +182,18 @@ export async function getQuotes(
   // The scheduler's refresh must actually refresh. Serving the cache and
   // refreshing behind it is right for a person waiting on a page and wrong for
   // a job whose only purpose is the refresh.
-  options: { waitForFresh?: boolean } = {},
+  options: {
+    waitForFresh?: boolean;
+    /**
+     * Refresh anything older than this, however long the cache would
+     * otherwise keep it — for the pending-order check, which runs every few
+     * seconds against a cache that keeps prices for ten.
+     */
+    maxAgeMs?: number;
+  } = {},
 ): Promise<QuoteResult> {
   const cached = await readCache(db, symbols);
-  const ttlMs = cacheTtlSeconds() * 1000;
+  const ttlMs = options.maxAgeMs ?? cacheTtlSeconds() * 1000;
 
   const expired = symbols.filter((symbol) => {
     // Already asked, already told no. Not worth asking again yet.

@@ -543,6 +543,54 @@ export async function matchAllRestingOrders(
   return { accounts, orders };
 }
 
+/**
+ * Pending orders alone, every few seconds.
+ *
+ * The full refresh — every holding and watched name in every account — runs
+ * every ten seconds. An order waiting on one symbol should not wait on the
+ * rest, so between those this asks only for the symbols orders are resting
+ * on, fresh from the broker, and matches them. A fill then gets the account's
+ * full refresh, because the holdings have to be rewritten with it.
+ */
+export async function matchRestingOrdersQuickly(
+  now: Date = new Date(),
+): Promise<{ symbols: number; filled: number }> {
+  const db = await getDb();
+  const rows = await db.all<{ symbol: string; portfolio_id: string }>(
+    `SELECT DISTINCT symbol, portfolio_id FROM orders WHERE status = 'open'`,
+  );
+  if (rows.length === 0) return { symbols: 0, filled: 0 };
+
+  const waiting = new Set(rows.map((row) => row.portfolio_id));
+  const portfolios = (await listPortfolios(db)).filter(
+    (portfolio) => portfolio.kind === "mock" && waiting.has(portfolio.id),
+  );
+  if (portfolios.length === 0) return { symbols: 0, filled: 0 };
+
+  const symbols = [...new Set(rows.map((row) => row.symbol))];
+  const provider = await getMarketDataProvider(portfolios[0].id);
+  const { quotes } = await getQuotes(db, symbols, provider, now, {
+    waitForFresh: true,
+    maxAgeMs: 2_000,
+  });
+
+  let filled = 0;
+  for (const portfolio of portfolios) {
+    try {
+      const result = await matchOpenOrders(db, portfolio, quotes, now);
+      if (result.filled > 0) {
+        filled += result.filled;
+        await loadPortfolio(portfolio.id, now);
+      }
+    } catch (error) {
+      logger.error("orders.match.failure", {
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+  return { symbols: symbols.length, filled };
+}
+
 export async function loadPosition(
   portfolioId: string,
   symbol: string,

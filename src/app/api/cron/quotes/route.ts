@@ -4,7 +4,7 @@ import { isAfterMarketClose, marketDateString, marketSession } from "@/lib/marke
 import { awardCompletedPeriods } from "@/lib/arena/trophies";
 import { captureDailySnapshots } from "@/lib/portfolio/daily-capture";
 import { logger } from "@/lib/logger";
-import { matchAllRestingOrders } from "@/lib/portfolio/service";
+import { matchAllRestingOrders, matchRestingOrdersQuickly } from "@/lib/portfolio/service";
 import { fillHistoryGaps } from "@/lib/portfolio/gap-fill";
 import { warmQuotes } from "@/lib/portfolio/warm-quotes";
 
@@ -16,7 +16,8 @@ export const maxDuration = 60;
  *
  * A scheduler cannot be asked to call more often than once a minute — that is
  * the floor on every free one — so the handler does the rest itself: it wakes
- * up, and for the next minute it refreshes every ten seconds, then returns.
+ * up, and for the next minute it refreshes every ten seconds — pending orders'
+ * symbols every three — then returns.
  * One job on the outside, six refreshes on the inside.
  *
  * Ten seconds during the regular session, and once per invocation in
@@ -29,7 +30,11 @@ export const maxDuration = 60;
  * around twenty-six seconds to wake it, which was the single biggest source
  * of errors on this site. One cheap query a minute keeps it awake.
  */
-const EVERY_MS = 10_000;
+/** Pending orders are checked this often, on fresh prices for their symbols. */
+const EVERY_MS = 3_000;
+
+/** Everything else — every holding and watched name — this often. */
+const FULL_EVERY_MS = 10_000;
 
 /** Stop in time to answer before the platform cuts the function off. */
 const BUDGET_MS = 50_000;
@@ -111,22 +116,36 @@ export async function GET(request: Request) {
   }
 
   let rounds = 0;
+  let quick = 0;
   let symbols = 0;
+  let lastFull = -Infinity;
 
   while (Date.now() - started < BUDGET_MS) {
-    const result = await warmQuotes(new Date());
-    rounds += 1;
-    symbols = result.symbols;
+    if (Date.now() - lastFull >= FULL_EVERY_MS - EVERY_MS / 2) {
+      lastFull = Date.now();
+      const result = await warmQuotes(new Date());
+      rounds += 1;
+      symbols = result.symbols;
 
-    // Resting orders are checked on the prices just fetched — the warm-up
-    // includes every symbol an open order names — so a limit fills within
-    // seconds of the market reaching it, with nobody signed in. Before, that
-    // waited for somebody to open the account.
-    await matchAllRestingOrders(new Date()).catch((error: unknown) => {
-      logger.error("orders.match.failure", {
-        reason: error instanceof Error ? error.message : "unknown",
+      // Resting orders are checked on the prices just fetched — the warm-up
+      // includes every symbol an open order names — so a limit fills within
+      // seconds of the market reaching it, with nobody signed in.
+      await matchAllRestingOrders(new Date()).catch((error: unknown) => {
+        logger.error("orders.match.failure", {
+          reason: error instanceof Error ? error.message : "unknown",
+        });
       });
-    });
+    } else {
+      // Between the full refreshes, only the symbols orders are waiting on:
+      // one small request every three seconds, and nothing at all when no
+      // order is resting.
+      quick += 1;
+      await matchRestingOrdersQuickly(new Date()).catch((error: unknown) => {
+        logger.error("orders.match.failure", {
+          reason: error instanceof Error ? error.message : "unknown",
+        });
+      });
+    }
 
     const elapsed = Date.now() - started;
     const wait = EVERY_MS - (elapsed % EVERY_MS);
@@ -134,7 +153,7 @@ export async function GET(request: Request) {
     await new Promise((resolve) => setTimeout(resolve, wait));
   }
 
-  return Response.json({ awake: true, warmed: rounds > 0, rounds, symbols });
+  return Response.json({ awake: true, warmed: rounds > 0, rounds, quick, symbols });
 }
 
 const SNAPSHOT_RETRY_MS = 10 * 60_000;
