@@ -4,7 +4,7 @@ import { rejectCrossOrigin } from "@/lib/http/origin";
 import { getQuotes } from "@/lib/portfolio/quotes";
 import { defaultFor } from "@/lib/portfolios";
 import { getMarketDataProvider } from "@/providers";
-import { unwatch, watch } from "@/lib/watch";
+import { seedWatchlist, unwatch, watch } from "@/lib/watch";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,13 @@ export async function POST(request: Request) {
   if (!user) return unauthorized();
 
   const body = await request.json().catch(() => ({}));
+
+  // "Start with popular picks", for a list that is empty.
+  if (body?.starter === true) {
+    const added = await seedWatchlist(await getDb(), user.id);
+    return Response.json({ ok: true, added });
+  }
+
   const symbol = typeof body?.symbol === "string" ? body.symbol.trim().toUpperCase() : "";
   if (!SYMBOL.test(symbol)) {
     return Response.json({ error: "That does not look like a ticker." }, { status: 400 });

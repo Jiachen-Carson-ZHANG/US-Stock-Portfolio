@@ -115,6 +115,11 @@ function greeksFrom(snapshot: Snapshot): Quote["greeks"] {
 type Kline = {
   date: number;
   close: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  volume?: number;
+  turnover?: number;
 };
 
 const SNAPSHOT_BATCH = 400;
@@ -294,6 +299,11 @@ export class MoomooMarketDataProvider implements MarketDataProvider {
     return (data.kline_list ?? []).map((bar) => ({
       date: isoDate(bar.date),
       close: bar.close,
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      volume: bar.volume,
+      turnover: bar.turnover,
     }));
   }
 }

@@ -1,207 +1,265 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ChevronLeft, MessagesSquare, ShoppingCart } from "lucide-react";
 import { currentLocale } from "@/lib/i18n/server";
 import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
-import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
 import { requirePortfolio } from "@/lib/portfolios/context";
-import { loadPosition } from "@/lib/portfolio/service";
+import { loadPortfolio } from "@/lib/portfolio/service";
 import { getMarketDataProvider } from "@/providers";
 import { daysToExpiration } from "@/lib/portfolio";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { signClass } from "@/lib/utils";
 import { symbolSchema } from "@/lib/schemas";
-import { ValueLine } from "@/components/charts/value-line";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { parseSymbol } from "@/lib/moomoo/symbols";
+import { visibleTo } from "@/lib/portfolios";
 import { Badge } from "@/components/ui/misc";
-import { QuoteDetailPanel } from "@/components/market/quote-detail";
+import { MarketPanel } from "@/components/market/market-panel";
+import { PriceVolumeChart } from "@/components/market/price-volume-chart";
+import { WatchButton } from "@/components/market/watch-button";
 import { quoteDetail } from "@/lib/market/detail";
 import { getQuotes } from "@/lib/portfolio/quotes";
 import { getDb } from "@/lib/db";
 import type { PositionView } from "@/types/portfolio";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
-const HISTORY_DAYS = 180;
+/** A year of daily bars: enough for the 1Y view, and the most moomoo sends at once. */
+const HISTORY_DAYS = 380;
 
-function Facts({ position }: { position: PositionView }) {
-  const money = (value: number | undefined) =>
-    value === undefined ? "—" : formatMoney({ amount: String(value), currency: position.currency });
-
-  const shared = [
-    { label: "Quantity", value: String(position.quantity) },
-    { label: "Average cost", value: money(position.averageCost) },
-    { label: "Current price", value: money(position.currentPrice) },
-    { label: "Previous close", value: money(position.previousClose) },
-    { label: "Market value", value: formatMoney(position.marketValue) },
-    { label: "Cost basis", value: formatMoney(position.costBasis) },
-    { label: "Portfolio weight", value: `${position.weightPercent.toFixed(2)}%` },
-  ];
-
-  const optionFacts =
-    position.instrumentType === "option"
-      ? [
-          { label: "Underlying", value: position.underlyingSymbol ?? "—" },
-          { label: "Call / Put", value: position.optionType === "put" ? "Put" : "Call" },
-          { label: "Strike", value: money(position.strike) },
-          { label: "Expiration", value: position.expirationDate ?? "—" },
-          {
-            label: "Days to expiration",
-            value: position.expirationDate
-              ? String(daysToExpiration(position.expirationDate))
-              : "—",
-          },
-          { label: "Multiplier", value: String(position.contractMultiplier ?? 100) },
-        ]
-      : [{ label: "Sector", value: position.sector ?? "—" }];
-
-  return (
-    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-4 lg:grid-cols-4">
-      {[...shared, ...optionFacts].map((fact) => (
-        <div key={fact.label} className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5 sm:rounded-none sm:bg-transparent sm:p-0">
-          <dt className="text-xs text-muted-foreground">{fact.label}</dt>
-          <dd className="tabular mt-1 break-words text-sm font-medium sm:break-normal">{fact.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-export default async function PositionDetailPage({
+/**
+ * One page for any symbol — held or not.
+ *
+ * It used to exist only for things in the account, and answered anything else
+ * with "not found": a stock you searched for, or the share under an option
+ * spread, had nowhere to go. Now the same page serves all of them. Price,
+ * trading and the market's figures come first, because they apply to anyone;
+ * your own position, and any options you hold on it, follow when there are
+ * some.
+ */
+export default async function StockPage({
   params,
 }: {
   params: Promise<{ portfolio: string; symbol: string }>;
 }) {
   const routeParams = await params;
-  const { portfolio } = await requirePortfolio(routeParams.portfolio);
+  const { user, portfolio } = await requirePortfolio(routeParams.portfolio);
   const zh = (await currentLocale()) === "zh";
+  const say = (en: string, cn: string) => (zh ? cn : en);
 
-  const raw = decodeURIComponent(routeParams.symbol);
-  const parsed = symbolSchema.safeParse(raw);
+  const parsed = symbolSchema.safeParse(decodeURIComponent(routeParams.symbol).toUpperCase());
   if (!parsed.success) notFound();
+  const symbol = parsed.data;
+  const terms = parseSymbol(symbol);
+  const underlying = terms.instrumentType === "option" ? terms.underlyingSymbol : undefined;
 
-  const position = await loadPosition(portfolio.id, parsed.data);
-  if (!position) notFound();
-
+  const db = await getDb();
+  const provider = await getMarketDataProvider(portfolio.id);
   const to = new Date();
   const from = new Date(to.getTime() - HISTORY_DAYS * 86_400_000);
-  const provider = await getMarketDataProvider(portfolio.id);
 
-  // Both asked for together, and neither is allowed to take the page down.
-  // The history call used to be bare: one slow minute at the broker and the
-  // whole holding page failed, facts and all, for want of a chart.
-  const [prices, market] = await Promise.all([
+  // Asked for together, and none of them allowed to take the page down.
+  const [data, quotes, history, watched, visible] = await Promise.all([
+    loadPortfolio(portfolio.id).catch(() => null),
+    getQuotes(db, underlying ? [symbol, underlying] : [symbol], provider, to)
+      .then((result) => result.quotes)
+      .catch(() => new Map()),
     provider
-      .getHistoricalPrices(position.symbol, {
+      .getHistoricalPrices(symbol, {
         from: from.toISOString().slice(0, 10),
         to: to.toISOString().slice(0, 10),
       })
       .catch(() => []),
-    getDb()
-      .then((db) => getQuotes(db, [position.symbol], provider, to))
-      .then(({ quotes }) => quotes.get(position.symbol))
-      .catch(() => undefined),
+    db.get<{ one: number }>(`SELECT 1 AS one FROM watch_items WHERE user_id = ? AND symbol = ?`, [
+      user.id,
+      symbol,
+    ]),
+    visibleTo(db, user),
   ]);
-  const detail = quoteDetail(position.symbol, market?.raw);
 
-  const multiplier =
-    position.instrumentType === "option" ? position.contractMultiplier ?? 100 : 1;
+  const position: PositionView | null = data?.positions.find((p) => p.symbol === symbol) ?? null;
+  const quote = quotes.get(symbol);
+  const back = (
+    <Link
+      href={`/${portfolio.slug}/holdings`}
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <ChevronLeft aria-hidden="true" className="size-4" />
+      {say("Holdings", "持仓")}
+    </Link>
+  );
 
-  const unrealized = Number(position.unrealizedPnL.amount);
-  const today = Number(position.todayPnL.amount);
+  if (!position && !quote) {
+    return (
+      <div className="space-y-6">
+        {back}
+        <section className="rounded-xl border border-border bg-surface p-6">
+          <h1 className="text-lg font-semibold tracking-tight">
+            {say(`Couldn't find ${symbol}`, `找不到 ${symbol}`)}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {say(
+              "The broker has no price for it. Check the ticker, or search by the company's name at the top of the page. Shares and funds listed in the US are covered.",
+              "券商没有它的报价。请检查代码，或在页面顶部按公司名称搜索。目前支持在美国上市的股票和基金。",
+            )}
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  const detail = quoteDetail(symbol, quote?.raw);
+  const name = (zh && detail.nameZh) || quote?.name || position?.name || detail.name;
+  const price = quote?.price ?? position?.currentPrice;
+  const change = quote && quote.previousClose ? quote.price - quote.previousClose : undefined;
+  const changePercent = quote?.changePercent;
+
+  const practice = visible.find((p) => p.kind === "mock" && p.ownerUserId === user.id);
+  const optionsOnIt =
+    data?.positions.filter(
+      (p) => p.instrumentType === "option" && (p.symbol === symbol || p.underlyingSymbol === symbol),
+    ) ?? [];
+  const sharePrice = underlying ? quotes.get(underlying)?.price : price;
+  const multiplier = position?.instrumentType === "option" ? position.contractMultiplier ?? 100 : 1;
+  const paidPerShare =
+    position && position.quantity !== 0
+      ? Number(position.costBasis.amount) / position.quantity / multiplier
+      : undefined;
+  const money = (value: number | undefined) =>
+    value === undefined || !position
+      ? "—"
+      : formatMoney({ amount: String(value), currency: position.currency });
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/holdings"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft aria-hidden="true" className="size-4" />
-          Holdings
-        </Link>
-      </div>
+      {back}
 
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">{position.symbol}</h1>
-            <Badge>{position.instrumentType}</Badge>
+            <h1 className="text-lg font-semibold tracking-tight">{symbol}</h1>
+            <Badge>{terms.instrumentType === "option" ? say("option", "期权") : say("stock", "股票")}</Badge>
           </div>
-          {position.name && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{position.name}</p>
-          )}
+          {name && <p className="mt-0.5 truncate text-sm text-muted-foreground">{name}</p>}
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span className="tabular text-3xl font-semibold tracking-tight">
+              {price === undefined ? "—" : `$${price.toFixed(2)}`}
+            </span>
+            {change !== undefined && changePercent !== undefined && (
+              <span className={`tabular text-sm ${signClass(change)}`}>
+                {change >= 0 ? "+" : "−"}
+                {Math.abs(change).toFixed(2)} ({changePercent >= 0 ? "+" : ""}
+                {changePercent.toFixed(2)}%)
+              </span>
+            )}
+          </p>
         </div>
 
-        <div className="text-right">
-          <p className="text-2xl font-semibold tracking-tight">
-            {formatMoney(position.marketValue)}
-          </p>
-          <p className={`text-sm ${signClass(today)}`}>
-            {formatMoney(position.todayPnL, { signed: true })} today
-          </p>
+        <div className="flex flex-wrap gap-2">
+          <WatchButton symbol={symbol} watching={Boolean(watched)} />
+          {practice && (
+            <Link
+              href={`/${practice.slug}/trade?symbol=${encodeURIComponent(symbol)}`}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-foreground px-3 text-sm font-medium text-background hover:opacity-90"
+            >
+              <ShoppingCart className="size-4" aria-hidden="true" />
+              {say("Trade in practice", "模拟交易")}
+            </Link>
+          )}
+          <Link
+            href="/playground"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"
+          >
+            <MessagesSquare className="size-4" aria-hidden="true" />
+            {say("Discuss", "讨论")}
+          </Link>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Card>
-          <CardContent className="pt-5">
-            <CardTitle>Unrealized P&L</CardTitle>
-            <p className={`mt-2 text-xl font-semibold ${signClass(unrealized)}`}>
-              {formatMoney(position.unrealizedPnL, { signed: true })}
-            </p>
-            <p className={`text-sm ${signClass(unrealized)}`}>
-              {formatPercent(position.unrealizedPnLPercent, { signed: true })}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-5">
-            <CardTitle>Today</CardTitle>
-            <p className={`mt-2 text-xl font-semibold ${signClass(today)}`}>
-              {formatMoney(position.todayPnL, { signed: true })}
-            </p>
-            <p className={`text-sm ${signClass(today)}`}>
-              {formatPercent(position.todayPnLPercent, { signed: true })}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Position facts
-        </h2>
-        <Facts position={position} />
-      </section>
-
-      {/* What the market is doing with it, as the broker reports it — the
-          same panel the watchlist and the trade ticket use. */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {zh ? "行情" : "Market"}
-        </h2>
-        <QuoteDetailPanel detail={detail} />
-      </section>
-
-      <Link className="inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted" href="/playground">{zh ? "去讨论区聊聊这只股票" : "Talk about it in the playground"}</Link>
-      <PayoffExplorer positions={[position]} />
-      <ValueLine
-        title="Price history"
-        note={`Last ${HISTORY_DAYS} days.`}
-        valueLabel="Close"
-        data={prices.map((p) => ({ date: p.date, value: p.close }))}
+      <PriceVolumeChart
+        history={history}
+        averageCost={position && terms.instrumentType !== "option" ? paidPerShare : undefined}
       />
 
-      <ValueLine
-        title="Position value history"
-        note="Close price × quantity, at today's holding size."
-        valueLabel="Position value"
-        data={prices.map((p) => ({
-          date: p.date,
-          value: p.close * position.quantity * multiplier,
-        }))}
-      />
+      {position && (
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {say(`Your position in ${portfolio.displayName}`, `你在 ${portfolio.displayName} 的持仓`)}
+          </h2>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">{say("Worth now", "市值")}</p>
+              <p className="tabular text-2xl font-semibold tracking-tight">{formatMoney(position.marketValue)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{say("Made or lost", "浮动盈亏")}</p>
+              <p className={`tabular text-xl font-semibold ${signClass(Number(position.unrealizedPnL.amount))}`}>
+                {formatMoney(position.unrealizedPnL, { signed: true })}
+              </p>
+              <p className={`tabular text-sm ${signClass(Number(position.unrealizedPnL.amount))}`}>
+                {formatPercent(position.unrealizedPnLPercent, { signed: true })}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{say("Today", "今日")}</p>
+              <p className={`tabular text-xl font-semibold ${signClass(Number(position.todayPnL.amount))}`}>
+                {formatMoney(position.todayPnL, { signed: true })}
+              </p>
+              <p className={`tabular text-sm ${signClass(Number(position.todayPnL.amount))}`}>
+                {formatPercent(position.todayPnLPercent, { signed: true })}
+              </p>
+            </div>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4 text-sm sm:grid-cols-4">
+            {[
+              [say("Quantity", "数量"), String(position.quantity)],
+              [say("Paid per share", "每股成本"), money(paidPerShare)],
+              [say("Cost", "持仓成本"), formatMoney(position.costBasis)],
+              [say("Share of account", "占账户比例"), `${position.weightPercent.toFixed(1)}%`],
+              ...(position.instrumentType === "option"
+                ? [
+                    [say("Underlying", "正股"), position.underlyingSymbol ?? "—"],
+                    [say("Call or put", "看涨/看跌"), position.optionType === "put" ? say("Put", "看跌") : say("Call", "看涨")],
+                    [say("Strike", "行权价"), money(position.strike)],
+                    [
+                      say("Expires", "到期"),
+                      position.expirationDate
+                        ? `${position.expirationDate} · ${daysToExpiration(position.expirationDate)}${say("d", "天")}`
+                        : "—",
+                    ],
+                  ]
+                : []),
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd className="tabular font-medium">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          {underlying && (
+            <Link
+              href={`/${portfolio.slug}/holdings/${encodeURIComponent(underlying)}`}
+              className="mt-3 inline-block text-sm underline underline-offset-4"
+            >
+              {say(`Open ${underlying}`, `查看 ${underlying}`)}
+            </Link>
+          )}
+        </section>
+      )}
+
+      {optionsOnIt.length > 0 && (
+        <PayoffExplorer
+          positions={optionsOnIt}
+          greeks={data?.optionGreeks}
+          underlyingPrices={
+            sharePrice === undefined
+              ? {}
+              : { [underlying ?? symbol]: sharePrice }
+          }
+        />
+      )}
+
+      <MarketPanel detail={detail} price={price} />
     </div>
   );
 }

@@ -65,6 +65,13 @@ export type OptionContract = {
 export type HistoricalPrice = {
   date: string;
   close: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  /** Shares traded that day. */
+  volume?: number;
+  /** Money traded that day: shares times price, in the listing's currency. */
+  turnover?: number;
 };
 
 export type DateRange = {

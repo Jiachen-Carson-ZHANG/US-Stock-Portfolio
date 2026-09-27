@@ -105,6 +105,32 @@ export class MockMarketDataProvider implements MarketDataProvider {
           marketStatus: status,
           dataTimestamp: timestamp,
           source: "mock",
+          // The fields a broker snapshot carries, made up but consistent with
+          // the price, so pages can be tried without a broker.
+          raw: {
+            last_price: price,
+            prev_close_price: previousClose,
+            open_price: previousClose,
+            high_price: Math.max(price, previousClose) * 1.01,
+            low_price: Math.min(price, previousClose) * 0.99,
+            bid_price: Number((price - 0.02).toFixed(2)),
+            bid_vol: 300,
+            ask_price: Number((price + 0.02).toFixed(2)),
+            ask_vol: 200,
+            volume: 21_000_000,
+            turnover: Math.round(21_000_000 * price),
+            highest52weeks_price: price * 1.25,
+            lowest52weeks_price: price * 0.7,
+            pe_ttm_ratio: 28.4,
+            pb_ratio: 9.1,
+            total_market_val: price * 1_500_000_000,
+            earning_per_share: price / 28.4,
+            dividend_ratio_ttm: 0.5,
+            outstanding_shares: 1_500_000_000,
+            turnover_rate: 1.4,
+            volume_ratio: 1.1,
+            amplitude: 2.1,
+          },
         } as Quote;
       })
       .concat(options);
@@ -162,7 +188,15 @@ export class MockMarketDataProvider implements MarketDataProvider {
     const series: HistoricalPrice[] = [];
     let close = base.price;
     for (let i = days.length - 1; i >= 0; i--) {
-      series.unshift({ date: days[i], close: Number(close.toFixed(2)) });
+      // A made-up but plausible day's trading, so the volume chart has
+      // something to draw without a broker.
+      const shares = Math.round(2_000_000 * (0.5 + seededUnit(`${symbol}:v:${days[i]}`)));
+      series.unshift({
+        date: days[i],
+        close: Number(close.toFixed(2)),
+        volume: shares,
+        turnover: Math.round(shares * close),
+      });
       const drift = (seededUnit(`${symbol}:${days[i]}`) - 0.48) * 0.028;
       close = Math.max(0.01, close / (1 + drift));
     }

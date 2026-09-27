@@ -116,6 +116,18 @@ describe("approving an account", () => {
     ]);
   });
 
+  it("starts them with a watchlist of names most people know", async () => {
+    const owner = await addOwner();
+    const { id } = await register(db, CREDENTIALS);
+    await decideAccount(db, { userId: id, deciderId: owner, approve: true });
+
+    const { myWatchlist, STARTER_WATCHLIST } = await import("@/lib/watch");
+    const list = await myWatchlist(db, id);
+    expect([...list].sort()).toEqual([...STARTER_WATCHLIST].sort());
+    // Shown newest first, so the list reads in the order it was chosen.
+    expect(list[0]).toBe(STARTER_WATCHLIST[0]);
+  });
+
   it("does not hand over anybody else's portfolio", async () => {
     const owner = await addOwner();
     const mile = randomUUID();

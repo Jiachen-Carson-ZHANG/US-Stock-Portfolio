@@ -345,7 +345,19 @@ export function HoldingsTable({
                               isOpen && "rotate-90",
                             )}
                           />
-                          {g.underlying}
+                          {/* The share's own page, which shows these contracts
+                              together with their payoff. The row itself still
+                              opens the legs in place. */}
+                          <Link
+                            href={`${base}/holdings/${encodeURIComponent(g.underlying)}`}
+                            className="hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              recordView(g.underlying);
+                            }}
+                          >
+                            {g.underlying}
+                          </Link>
                         </span>
                         <span className="ml-1 text-xs font-normal text-muted-foreground">
                           {g.expirationDate}
@@ -574,7 +586,18 @@ export function HoldingsTable({
               {isOpen && (
                 <div className="border-t border-border">
                   {isGroup ? (
-                    <GroupDetail group={row.group} />
+                    <>
+                      <GroupDetail group={row.group} />
+                      <div className="px-4 pb-3">
+                        <Link
+                          href={`${base}/holdings/${encodeURIComponent(row.group.underlying)}`}
+                          onClick={() => recordView(row.group.underlying)}
+                          className="text-sm underline underline-offset-4"
+                        >
+                          {t.position.openShare.replace("{symbol}", row.group.underlying)}
+                        </Link>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <PositionDetail position={row.position} />

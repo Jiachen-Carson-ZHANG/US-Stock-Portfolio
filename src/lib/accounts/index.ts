@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DB } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { notify } from "@/lib/notifications";
+import { seedWatchlist } from "@/lib/watch";
 import {
   DEFAULT_SLUG,
   createPortfolio,
@@ -221,6 +222,9 @@ export async function decideAccount(
       /* approval is what matters; the portfolio can be added afterwards */
     }
   }
+
+  // Something to look at on day one, which they can prune or add to.
+  await seedWatchlist(db, input.userId, now).catch(() => 0);
 
   await notify(
     db,

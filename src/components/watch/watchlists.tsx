@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChevronRight, Plus, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, ChevronRight, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Help } from "@/components/ui/help";
 import { SymbolSearch } from "@/components/market/symbol-search";
@@ -31,12 +32,15 @@ export function Watchlists({
   everyone,
   popular,
   details,
+  stockBase,
 }: {
   me: string;
   mine: string[];
   everyone: Watcher[];
   popular: { symbol: string; watchers: number }[];
   details: Record<string, QuoteDetail>;
+  /** Where a symbol's page lives, in the account being looked at. */
+  stockBase: string;
 }) {
   const zh = useLocale() === "zh";
   const say = (en: string, cn: string) => (zh ? cn : en);
@@ -126,11 +130,24 @@ export function Watchlists({
               </span>
             </span>
           </button>
+          <Link
+            href={`${stockBase}/${encodeURIComponent(value)}`}
+            aria-label={say(`Open ${value}`, `打开 ${value}`)}
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          </Link>
           {action}
         </div>
         {expanded && detail && (
-          <div className="border-t border-border px-3 py-3">
+          <div className="space-y-3 border-t border-border px-3 py-3">
             <QuoteDetailPanel detail={detail} />
+            <Link
+              href={`${stockBase}/${encodeURIComponent(value)}`}
+              className="inline-block text-sm underline underline-offset-4"
+            >
+              {say("Open its page: chart, trading and more", "打开详情页：走势、成交等")}
+            </Link>
           </div>
         )}
       </li>
@@ -188,7 +205,7 @@ export function Watchlists({
               className="flex-1"
               value={symbol}
               onChange={(value) => setSymbol(value.toUpperCase())}
-              placeholder={say("Add a ticker or company, e.g. NVDA", "添加代码或公司名，例如 NVDA")}
+              placeholder={say("Add a ticker or company", "添加代码或公司名")}
             />
             <Button type="submit" disabled={busy || !symbol.trim()}>
               <Plus className="size-4" aria-hidden="true" />
@@ -198,12 +215,30 @@ export function Watchlists({
           {error && <p className="text-sm text-negative">{error}</p>}
 
           {mine.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-              {say(
-                "Nothing here yet. Add a ticker above, or pick one up from the Everyone tab.",
-                "还没有任何股票。在上方添加代码，或者从「大家」里挑一个。",
-              )}
-            </p>
+            <div className="space-y-3 rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              <p>
+                {say(
+                  "Nothing here yet. Add a ticker or company above, pick one up from the Everyone tab, or start with a few names most people know.",
+                  "还没有任何股票。可以在上方添加代码或公司名，从「大家」里挑一个，或者先从几只大家熟悉的开始。",
+                )}
+              </p>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await fetch("/api/watch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ starter: true }),
+                  }).catch(() => null);
+                  setBusy(false);
+                  router.refresh();
+                }}
+              >
+                {say("Start with popular picks", "从热门股票开始")}
+              </Button>
+            </div>
           ) : (
             <ul className="space-y-1.5">
               {mine.map((value) => (

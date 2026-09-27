@@ -61,7 +61,7 @@ function useVisibleItems(role: UserRole) {
  * the playground and tapping Holdings put people in their own practice
  * account.
  */
-function useCurrentSlug(portfolios: NavPortfolio[], fallback: string): string {
+export function useCurrentSlug(portfolios: NavPortfolio[], fallback: string): string {
   const pathname = usePathname();
   const [last, setLast] = useState(fallback);
   const slug = navSlug(pathname, portfolios, last);

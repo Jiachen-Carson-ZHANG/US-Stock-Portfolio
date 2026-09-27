@@ -6,6 +6,7 @@ import { getMarketDataProvider } from "@/providers";
 import { everyoneWatching, mostWatched, myWatchlist } from "@/lib/watch";
 import { quoteDetail, type QuoteDetail } from "@/lib/market/detail";
 import { Watchlists } from "@/components/watch/watchlists";
+import { lastViewedOr } from "@/lib/portfolios/last-viewed";
 
 export const dynamic = "force-dynamic";
 
@@ -58,8 +59,12 @@ export default async function WatchlistPage() {
     }
   }
 
+  // Symbol pages open in whichever account the viewer was last reading.
+  const current = await lastViewedOr(db, user);
+
   return (
     <Watchlists
+      stockBase={current ? `/${current.slug}/holdings` : "/holdings"}
       me={user.id}
       mine={mine}
       everyone={everyone}

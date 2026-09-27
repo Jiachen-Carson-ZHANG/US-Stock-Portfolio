@@ -31,6 +31,25 @@ export async function watch(
   return result.changes > 0;
 }
 
+/**
+ * What a new member's list starts with.
+ *
+ * An empty watchlist gives somebody new nothing to look at and no idea where
+ * to begin. A handful of names most people have heard of — the two big index
+ * funds and the largest companies — is a start they can prune or add to.
+ */
+export const STARTER_WATCHLIST = ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"];
+
+/** Adds the starter names to somebody's list; names already there are left alone. */
+export async function seedWatchlist(db: DB, userId: string, now: Date = new Date()): Promise<number> {
+  let added = 0;
+  // Oldest first, so the list reads in this order: newest is shown on top.
+  for (const [index, symbol] of [...STARTER_WATCHLIST].reverse().entries()) {
+    if (await watch(db, userId, symbol, new Date(now.getTime() + index))) added += 1;
+  }
+  return added;
+}
+
 export async function unwatch(db: DB, userId: string, symbol: string): Promise<boolean> {
   const result = await db.run(
     `DELETE FROM watch_items WHERE user_id = ? AND symbol = ?`,

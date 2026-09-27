@@ -154,6 +154,7 @@ const en = {
   },
 
   position: {
+    openShare: "Open {symbol} and these options",
     quantity: "Quantity",
     averageCost: "Average cost",
     currentPrice: "Current price",
@@ -956,6 +957,7 @@ const zh: Dictionary = {
   },
 
   position: {
+    openShare: "查看 {symbol} 及其期权",
     quantity: "数量",
     averageCost: "成本价",
     currentPrice: "现价",

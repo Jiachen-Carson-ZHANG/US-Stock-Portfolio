@@ -21,15 +21,20 @@ export function SymbolSearch({
   id,
   value,
   onChange,
+  onPick,
   placeholder = "NVDA",
   className,
+  autoFocus = false,
 }: {
   id: string;
   value: string;
   /** Called as it is typed, and with the ticker when one is picked. */
   onChange: (value: string) => void;
+  /** Called when a suggestion is chosen, for fields that act on a choice. */
+  onPick?: (listing: Listing) => void;
   placeholder?: string;
   className?: string;
+  autoFocus?: boolean;
 }) {
   const zh = useLocale() === "zh";
   const listId = useId();
@@ -66,6 +71,7 @@ export function SymbolSearch({
   function pick(listing: Listing) {
     setPicked(listing.symbol);
     onChange(listing.symbol);
+    onPick?.(listing);
     setResults([]);
     setOpen(false);
   }
@@ -82,6 +88,7 @@ export function SymbolSearch({
         aria-autocomplete="list"
         aria-activedescendant={showing && active >= 0 ? `${listId}-${active}` : undefined}
         autoComplete="off"
+        autoFocus={autoFocus}
         autoCapitalize="characters"
         autoCorrect="off"
         spellCheck={false}

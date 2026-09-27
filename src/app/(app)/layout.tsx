@@ -4,6 +4,7 @@ import { visibleTo } from "@/lib/portfolios";
 import { lastViewedOr } from "@/lib/portfolios/last-viewed";
 import { unreadCount } from "@/lib/notifications";
 import { NotificationBell } from "@/components/layout/notifications";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/context";
 import {
@@ -62,6 +63,7 @@ export default async function AppLayout({
               {portfolios.length < 2 ? t.appName : ""}
             </p>
             <div className="flex shrink-0 items-center gap-1">
+              <GlobalSearch portfolios={portfolios} defaultSlug={defaultSlug} variant="icon" />
               <LanguageToggle />
               {canSignOut && <NotificationBell initialUnread={unread} />}
               {canSignOut && <SignOutButton phoneIcon className="flex min-h-10 w-auto items-center justify-center px-2 py-1 sm:min-h-0" />}
@@ -71,7 +73,10 @@ export default async function AppLayout({
           {/* The desktop toolbar. The language switch used to sit alone at
               the bottom of the sidebar, below the navigation, where nobody
               looked for it. Top right is where people look. */}
-          <div className="hidden items-center justify-end gap-1 px-8 pt-4 md:flex">
+          <div className="hidden items-center justify-end gap-3 px-8 pt-4 md:flex">
+            <div className="mr-auto w-full max-w-sm">
+              <GlobalSearch portfolios={portfolios} defaultSlug={defaultSlug} variant="bar" />
+            </div>
             <LanguageToggle />
             {canSignOut && <NotificationBell initialUnread={unread} />}
           </div>
