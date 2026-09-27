@@ -85,7 +85,7 @@ export async function fillHistoryGaps(
       portfolio: portfolio.slug,
       missing: missing.length,
       written: result.written,
-      refused: result.refusals.join("; "),
+      refused: result.refusals.length,
     });
     filled.push({ slug: portfolio.slug, missing, result });
   }

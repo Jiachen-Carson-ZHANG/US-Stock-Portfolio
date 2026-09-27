@@ -1,10 +1,11 @@
-import { Eye, KeyRound, Unplug, Users } from "lucide-react";
+import { Eye, KeyRound, PlugZap, Unplug, Users } from "lucide-react";
 import { getDb } from "@/lib/db";
 import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { requirePortfolio } from "@/lib/portfolios/context";
 import { MoomooConnection, SyncButton } from "@/components/layout/settings-actions";
 import { OwnBrokerageButton } from "@/components/broker/own-brokerage";
 import { Badge } from "@/components/ui/misc";
+import { Clock } from "@/components/ui/clock";
 import { serverDictionary } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -61,14 +62,14 @@ export default async function ConnectionPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">
-            {portfolio.displayName} · {t.connection.title}
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">
+            {connection ? t.connection.headingConnected : t.connection.headingConnect}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t.connection.subtitle}</p>
+          <Badge>{connection ? connection.status : t.connection.notConnected}</Badge>
         </div>
-        <Badge>{connection ? connection.status : t.connection.notConnected}</Badge>
+        <p className="max-w-2xl text-sm text-muted-foreground">{t.connection.subtitle}</p>
       </header>
 
       {outcome && (
@@ -90,41 +91,17 @@ export default async function ConnectionPage({
         </p>
       ) : (
         <>
-          {!connection && (
-            <section className="rounded-xl border border-border bg-surface p-5">
-              <h2 className="text-sm font-medium">{t.connection.howTitle}</h2>
-              <ol className="mt-3 grid gap-3 sm:grid-cols-3">
-                {[t.connection.howStep1, t.connection.howStep2, t.connection.howStep3].map(
-                  (step, index) => (
-                    <li key={step} className="flex gap-3 rounded-lg bg-muted/40 p-3 text-sm">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background">
-                        {index + 1}
-                      </span>
-                      <span>{step}</span>
-                    </li>
-                  ),
-                )}
-              </ol>
-            </section>
-          )}
-
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <MoomooConnection
-              connected={connection !== null}
-              portfolioSlug={portfolio.slug}
-            />
-          </section>
-
           {connection && (
             <section className="rounded-xl border border-border bg-surface p-5">
-              <h2 className="text-sm font-medium">{t.connection.thisConnection}</h2>
+              <h2 className="flex items-center gap-2 text-base font-semibold">
+                <PlugZap className="size-4 text-positive" aria-hidden="true" />
+                {t.connection.thisConnection}
+              </h2>
               <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div>
                   <dt className="text-xs text-muted-foreground">{t.connection.account}</dt>
                   <dd className="mt-1 text-sm font-medium">
-                    {connection.accountId
-                      ? `••••${connection.accountId.slice(-4)}`
-                      : "—"}
+                    {connection.accountId ? `••••${connection.accountId.slice(-4)}` : "—"}
                   </dd>
                 </div>
                 <div>
@@ -134,9 +111,7 @@ export default async function ConnectionPage({
                 <div>
                   <dt className="text-xs text-muted-foreground">{t.connection.lastRefreshed}</dt>
                   <dd className="mt-1 text-sm font-medium">
-                    {connection.lastRefreshAt
-                      ? new Date(connection.lastRefreshAt).toLocaleString()
-                      : "—"}
+                    {connection.lastRefreshAt ? <Clock iso={connection.lastRefreshAt} /> : "—"}
                   </dd>
                 </div>
               </dl>
@@ -146,18 +121,47 @@ export default async function ConnectionPage({
             </section>
           )}
 
-          {/* What connecting means, in the order people ask it: is my password
-              involved, who could see the key, who sees my holdings, and how do
-              I undo it. Plain statements, including the uncomfortable one —
-              the operator could technically decrypt the key — because an
+          {!connection && (
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h2 className="text-base font-semibold">{t.connection.howTitle}</h2>
+              <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+                {[t.connection.howStep1, t.connection.howStep2, t.connection.howStep3].map((step, index) => (
+                  <li key={step} className="flex gap-3 rounded-lg bg-muted/40 p-3 text-sm">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {/* The checklist is always open, reconnecting included: it is the
+              one thing to get right on moomoo's screen, and a folded list
+              was the part people skipped. */}
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="text-base font-semibold">
+              {connection ? t.connection.reconnectChecklist : t.connection.connectCardTitle}
+            </h2>
+            {!connection && <p className="mt-1 text-sm text-muted-foreground">{t.connection.connectLead}</p>}
+            <div className="mt-4">
+              <MoomooConnection connected={connection !== null} portfolioSlug={portfolio.slug} />
+            </div>
+          </section>
+
+          {/* What connecting means, in the order people ask it: where the key
+              is, who can see the account, what the key can do, and how to
+              undo it. Including the uncomfortable part, that whoever runs the
+              server could in principle change it to read the key, because an
               assurance that leaves that out is not one worth giving. */}
           <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-sm font-medium">{t.connection.trustTitle}</h2>
+            <h2 className="text-base font-semibold">{t.connection.trustTitle}</h2>
             <ul className="mt-4 space-y-4">
               {[
                 { icon: KeyRound, title: t.connection.trustKey, body: t.connection.trustKeyBody },
-                { icon: Eye, title: t.connection.trustOwner, body: t.connection.trustOwnerBody },
                 { icon: Users, title: t.connection.trustVisible, body: t.connection.trustVisibleBody },
+                { icon: Eye, title: t.connection.trustOwner, body: t.connection.trustOwnerBody },
                 { icon: Unplug, title: t.connection.trustControl, body: t.connection.trustControlBody },
               ].map((item) => (
                 <li key={item.title} className="flex gap-3">
@@ -171,9 +175,6 @@ export default async function ConnectionPage({
                 </li>
               ))}
             </ul>
-            <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-              {t.connection.privacyAi}
-            </p>
           </section>
         </>
       )}

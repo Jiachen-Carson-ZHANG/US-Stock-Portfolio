@@ -101,7 +101,14 @@ export async function DELETE(request: Request) {
     );
   }
 
-  await db.run(`DELETE FROM users WHERE id = ?`, [id]);
+  // Everything that was theirs goes with them: their practice account (and
+  // with it its orders and history) and their trail in the activity log. Left
+  // behind, a removed person kept showing up in the family's lists.
+  await db.transaction(async (tx) => {
+    await tx.run(`DELETE FROM portfolios WHERE owner_user_id = ? AND kind = 'mock'`, [id]);
+    await tx.run(`DELETE FROM activity_events WHERE username = ?`, [target.username]);
+    await tx.run(`DELETE FROM users WHERE id = ?`, [id]);
+  });
 
   logger.info("account.removed", { username: target.username });
   await recordActivity(db, {

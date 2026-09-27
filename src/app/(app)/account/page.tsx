@@ -6,6 +6,7 @@ import { ChangePassword } from "@/components/layout/account-actions";
 import { pendingRequestsFor } from "@/lib/access";
 import { Badge } from "@/components/ui/misc";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { OwnBrokerageButton } from "@/components/broker/own-brokerage";
 import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { serverDictionary } from "@/lib/i18n/server";
@@ -83,20 +84,26 @@ export default async function AccountPage() {
           existed, only the site owner could make an account to connect. */}
       <section className="space-y-3 rounded-xl border border-border bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium">{t.account.brokerTitle}</h2>
+          <h2 className="text-base font-semibold">{t.account.brokerTitle}</h2>
           {brokerage && (
             <Badge>{connected ? t.account.brokerConnected : t.account.brokerNotConnected}</Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{t.account.brokerBody}</p>
+        <p className="text-sm text-muted-foreground">{t.account.brokerBody}</p>
+        {/* Buttons rather than underlined words: this is the main thing to
+            do on this page, and it should look like it. */}
         {brokerage ? (
-          <div className="flex flex-wrap gap-3 text-sm">
-            <Link href={`/${brokerage.slug}`} className="underline underline-offset-4">
-              {t.account.brokerOpen}
-            </Link>
-            <Link href={`/${brokerage.slug}/connection`} className="underline underline-offset-4">
-              {t.account.brokerManage}
-            </Link>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href={connected ? `/${brokerage.slug}` : `/${brokerage.slug}/connection`}>
+                {connected ? t.account.brokerOpen : t.account.brokerCreate}
+              </Link>
+            </Button>
+            {connected && (
+              <Button asChild variant="outline">
+                <Link href={`/${brokerage.slug}/connection`}>{t.account.brokerManage}</Link>
+              </Button>
+            )}
           </div>
         ) : (
           <OwnBrokerageButton />

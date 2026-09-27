@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
   const user = await getSessionUser().catch(() => null);
 
-  const path = clip(body.path, 200).split("?")[0] || "unknown";
+  const path = maskPath(clip(body.path, 200).split("?")[0]) || "unknown";
   const pageBuild = clip(body.build, 80) || "unknown";
   const serverBuild =
     process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "local";
@@ -71,4 +71,24 @@ export async function POST(request: Request) {
 
   await recordFailure(`client ${path}`, detail);
   return new Response(null, { status: 204 });
+}
+
+/** Top-level pages that are not somebody's account. */
+const PAGES = new Set([
+  "watchlist", "family", "account", "settings", "login", "no-portfolio", "api",
+  "arena", "playground", "portfolios", "logs", "register", "dashboard", "holdings",
+  "performance", "request-access", "transactions",
+]);
+
+/**
+ * The page an error happened on, without whose account or which share it was.
+ * "/manav-mock/holdings/MU" says what Manav was looking at in his own
+ * account, and the error log is read by the site's administrator.
+ */
+function maskPath(path: string): string {
+  const parts = path.split("/");
+  if (parts[1] && !PAGES.has(parts[1])) parts[1] = "[account]";
+  const at = parts.indexOf("holdings");
+  if (at > 0 && parts[at + 1]) parts[at + 1] = "[symbol]";
+  return parts.join("/");
 }

@@ -28,9 +28,12 @@ export type AdminPortfolio = {
 export function PortfolioAdmin({
   portfolios,
   people,
+  meId,
 }: {
   portfolios: AdminPortfolio[];
   people: AdminPerson[];
+  /** Whoever is signed in. Only their own accounts can be shared from here. */
+  meId: string;
 }) {
   const t = useT();
   const router = useRouter();
@@ -154,27 +157,31 @@ export function PortfolioAdmin({
                 )}
               </div>
 
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                {people
-                  .filter((person) => person.id !== portfolio.ownerUserId)
-                  .map((person) => (
-                    <label
-                      key={person.id}
-                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-                    >
-                      <input
-                        type="checkbox"
-                        className="size-3.5"
-                        disabled={busy}
-                        checked={portfolio.readers.includes(person.id)}
-                        onChange={(event) =>
-                          setAccess(portfolio.id, person.id, event.target.checked)
-                        }
-                      />
-                      {person.displayName}
-                    </label>
-                  ))}
-              </div>
+              {portfolio.ownerUserId !== null && portfolio.ownerUserId !== meId ? (
+                <p className="mt-2 text-xs text-muted-foreground">{t.portfolios.theirsToShare}</p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                  {people
+                    .filter((person) => person.id !== portfolio.ownerUserId)
+                    .map((person) => (
+                      <label
+                        key={person.id}
+                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-3.5"
+                          disabled={busy}
+                          checked={portfolio.readers.includes(person.id)}
+                          onChange={(event) =>
+                            setAccess(portfolio.id, person.id, event.target.checked)
+                          }
+                        />
+                        {person.displayName}
+                      </label>
+                    ))}
+                </div>
+              )}
             </li>
           );
         })}

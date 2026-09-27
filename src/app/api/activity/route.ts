@@ -1,5 +1,6 @@
 import { authenticateRequest, requireApiOwner, unauthorized } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
+import { visibleTo } from "@/lib/portfolios";
 import { activitySchema } from "@/lib/schemas";
 import {
   activityByMember,
@@ -43,10 +44,11 @@ export async function GET() {
   const db = await getDb();
   // Awaited rather than passed as promises: JSON.stringify turns a pending
   // promise into {}, so this endpoint was returning three empty objects.
+  const mine = (await visibleTo(db, auth.user)).filter((p) => p.ownerUserId === auth.user.id);
   const [mostViewed, byMember, recent] = await Promise.all([
-    mostViewedAssets(db),
+    mostViewedAssets(db, { accounts: mine.map((p) => p.slug), viewer: auth.user.username }),
     activityByMember(db),
-    recentActivity(db, 30),
+    recentActivity(db, 30, auth.user.username),
   ]);
   return Response.json({ mostViewed, byMember, recent });
 }

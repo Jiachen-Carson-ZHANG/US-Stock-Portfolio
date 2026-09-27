@@ -3,7 +3,8 @@ import type { AuthUser } from "@/lib/auth/session";
 import { adjustedSeries, type AdjustedPoint } from "@/lib/analysis/math";
 import { readAnalysis } from "@/lib/analysis/store";
 import { readSnapshots } from "@/lib/portfolio/snapshots";
-import { visibleTo, type Portfolio } from "@/lib/portfolios";
+import type { Portfolio } from "@/lib/portfolios";
+import { arenaAccess } from "./membership";
 
 export const PERIODS = ["day", "week", "month", "year", "max"] as const;
 export type Period = (typeof PERIODS)[number];
@@ -130,11 +131,12 @@ async function standingFor(
 }
 
 /**
- * The leaderboard for one period, over every portfolio the viewer may see.
+ * The leaderboard for one period, over the accounts entered into the Arena.
  *
- * Scoped by the same access rule as everything else: a portfolio you cannot
- * open does not appear here either, so the Arena is a view over the data
- * rather than a hole in it.
+ * Only for somebody who has entered an account of their own: seeing the
+ * others' returns is what you get for showing yours. Anybody else gets an
+ * empty board, whatever they could open elsewhere, because being able to
+ * open an account is not consent to having it ranked.
  */
 export async function leaderboard(
   db: DB,
@@ -142,7 +144,9 @@ export async function leaderboard(
   period: Period,
   now: Date = new Date(),
 ): Promise<Leaderboard> {
-  return { period, standings: await rank(db, await visibleTo(db, user), period, now) };
+  const access = await arenaAccess(db, user);
+  if (!access.canSee) return { period, standings: [] };
+  return { period, standings: await rank(db, access.members, period, now) };
 }
 
 /**

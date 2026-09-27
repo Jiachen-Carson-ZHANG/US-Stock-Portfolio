@@ -24,6 +24,27 @@ async function addUser(username: string, role: "owner" | "viewer" = "viewer") {
   return { id, username, displayName: username, role, status: "active" } satisfies AuthUser;
 }
 
+/** Every account so far, entered into the Arena by its owner. */
+async function enterAll() {
+  await db.run(
+    `INSERT INTO arena_members (portfolio_id, joined_at) SELECT id, ? FROM portfolios
+     ON CONFLICT (portfolio_id) DO NOTHING`,
+    [NOW.toISOString()],
+  );
+}
+
+async function enter(portfolioId: string) {
+  await db.run(`INSERT INTO arena_members (portfolio_id, joined_at) VALUES (?, ?)`, [
+    portfolioId,
+    NOW.toISOString(),
+  ]);
+}
+
+/** The seeded account, made somebody's own. */
+async function own(userId: string) {
+  await db.run(`UPDATE portfolios SET owner_user_id = ? WHERE id = ?`, [userId, TEST_PORTFOLIO_ID]);
+}
+
 /** A straight-line climb from `start` to `end` over `days` weekdays. */
 async function history(
   portfolioId: string,
@@ -91,6 +112,8 @@ describe("the leaderboard", () => {
     });
     await history(small.id, 10_000, 15_000);
 
+    await own(admin.id);
+    await enterAll();
     const board = await leaderboard(db, admin, "max", NOW);
     expect(board.standings.map((s) => s.slug)).toEqual(["mother-mock", "carson"]);
     expect(board.standings[0].returnPercent).toBeGreaterThan(
@@ -98,7 +121,7 @@ describe("the leaderboard", () => {
     );
   });
 
-  it("shows only the portfolios a viewer may open", async () => {
+  it("shows nothing until you enter an account, and then only accounts that were entered", async () => {
     const mile = await addUser("mile");
     const mum = await addUser("mother");
 
@@ -118,13 +141,37 @@ describe("the leaderboard", () => {
     });
     await history(mums.id, 10_000, 9_000);
 
-    expect((await leaderboard(db, mile, "max", NOW)).standings.map((s) => s.slug)).toEqual([
-      "mirat",
-    ]);
-
+    // Being able to open Mum's account is not consent to ranking it.
     await grantAccess(db, mums.id, mile.id);
+    expect((await leaderboard(db, mile, "max", NOW)).standings).toEqual([]);
+
+    // Mum enters. Mile has not, so Mile still sees nothing.
+    await enter(mums.id);
+    expect((await leaderboard(db, mile, "max", NOW)).standings).toEqual([]);
+
+    // Once Mile enters too, both appear.
+    await enter(hers.id);
     const after = await leaderboard(db, mile, "max", NOW);
     expect(after.standings.map((s) => s.slug).sort()).toEqual(["mirat", "mother-mock"]);
+  });
+
+  it("never shows an account its owner did not enter, whoever can open it", async () => {
+    const admin = await addUser("carson", "owner");
+    const mum = await addUser("mother");
+    const mums = await createPortfolio(db, {
+      slug: "mother-mock",
+      displayName: "Mum",
+      ownerUserId: mum.id,
+      kind: "mock",
+      openingCash: "10000",
+    });
+    await history(mums.id, 10_000, 9_000);
+    await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
+    await own(admin.id);
+    await enter(TEST_PORTFOLIO_ID);
+
+    const board = await leaderboard(db, admin, "max", NOW);
+    expect(board.standings.map((s) => s.slug)).toEqual(["carson"]);
   });
 
   it("puts anyone without a figure below everyone who has one", async () => {
@@ -140,6 +187,8 @@ describe("the leaderboard", () => {
       openingCash: "10000",
     }); // no history at all
 
+    await own(admin.id);
+    await enterAll();
     const board = await leaderboard(db, admin, "max", NOW);
     expect(board.standings[0].slug).toBe("carson");
     expect(board.standings[1].returnPercent).toBeNull();
@@ -150,6 +199,8 @@ describe("the leaderboard", () => {
     const admin = await addUser("carson", "owner");
     await history(TEST_PORTFOLIO_ID, 10_000, 12_000);
 
+    await own(admin.id);
+    await enterAll();
     const board = await leaderboard(db, admin, "max", NOW);
     const curve = board.standings[0].curve;
     expect(curve[0].index).toBeCloseTo(100, 6);
@@ -164,6 +215,8 @@ describe("what the Arena must never disclose", () => {
     const admin = await addUser("carson", "owner");
     await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
 
+    await own(admin.id);
+    await enterAll();
     const board = await leaderboard(db, admin, "max", NOW);
     const standing: Standing = board.standings[0];
 
@@ -213,6 +266,7 @@ describe("the trophy cabinet", () => {
     });
     await history(hers.id, 10_000, 15_000);
 
+    await enterAll();
     const first = await awardCompletedPeriods(db, NOW);
     expect(first.awarded).toBeGreaterThan(0);
 
@@ -240,6 +294,7 @@ describe("the trophy cabinet", () => {
     });
     await history(hers.id, 10_000, 14_000);
 
+    await enterAll();
     await awardCompletedPeriods(db, NOW);
     const told = await notificationsFor(db, mum.id);
     expect(told.some((n) => n.kind === "trophy")).toBe(true);
@@ -248,6 +303,7 @@ describe("the trophy cabinet", () => {
   it("awards nothing when there is nobody to compete with", async () => {
     await addUser("carson", "owner");
     await history(TEST_PORTFOLIO_ID, 20_000, 22_000);
+    await enterAll();
     expect((await awardCompletedPeriods(db, NOW)).awarded).toBe(0);
   });
 });
@@ -255,6 +311,8 @@ describe("the trophy cabinet", () => {
 it("historical rankings cannot include later valuations", async () => {
   const admin = await addUser("carson", "owner");
   await history(TEST_PORTFOLIO_ID, 10000, 12000);
+  await own(admin.id);
+  await enterAll();
   const asAt = new Date("2026-08-31T23:59:59Z");
   const before = await leaderboard(db, admin, "month", asAt);
   await db.run("UPDATE portfolio_snapshots SET total_market_value = '99999999' WHERE snapshot_date > '2026-08-31'");
@@ -265,6 +323,8 @@ it("historical rankings cannot include later valuations", async () => {
 it("does not report an old all-time return as this week's result", async () => {
   const admin = await addUser("carson", "owner");
   await history(TEST_PORTFOLIO_ID, 10000, 12000);
+  await own(admin.id);
+  await enterAll();
   const board = await leaderboard(db, admin, "week", new Date("2027-01-01T12:00:00Z"));
   expect(board.standings[0].returnPercent).toBeNull();
 });

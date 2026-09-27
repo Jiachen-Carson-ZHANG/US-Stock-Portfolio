@@ -1,7 +1,7 @@
 import type { DB } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth/session";
 import { loadPortfolio } from "@/lib/portfolio/service";
-import { visibleTo } from "@/lib/portfolios";
+import { arenaAccess } from "./membership";
 import { allLeaderboards, PERIODS, type Period } from "./index";
 import { trophiesFor } from "./trophies";
 
@@ -12,9 +12,9 @@ import { trophiesFor } from "./trophies";
  * for the same reason: everyone in the family can read what comes out of
  * here, and how much each of them has is not part of the competition.
  *
- * Holdings themselves are included — Carson asked for them — because which
- * shares you picked is the thing worth arguing about, and it says nothing
- * about the size of your account.
+ * Holdings are included as shares of each account, because which shares you
+ * picked is the thing worth arguing about, and a share of the account says
+ * nothing about its size.
  */
 function percent(numerator: number, denominator: number): number | null {
   if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
@@ -66,7 +66,9 @@ export async function buildArenaContext(
   period: Period,
   now: Date = new Date(),
 ): Promise<{ text: string; symbols: string[] }> {
-  const portfolios = await visibleTo(db, user);
+  // The members, and only for a member: the same rule as the board itself.
+  const access = await arenaAccess(db, user);
+  const portfolios = access.canSee ? access.members : [];
   const boards = await allLeaderboards(db, user, now);
   const trophies = await trophiesFor(db, portfolios.map((p) => p.id), 30);
 

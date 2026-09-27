@@ -1,4 +1,5 @@
 import { requirePortfolio } from "@/lib/portfolios/context";
+import { canWrite } from "@/lib/portfolios";
 import { loadHistory, loadPortfolio, portfolioStart } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { AssetClassSplit } from "@/components/dashboard/asset-class-split";
@@ -81,7 +82,7 @@ export default async function PerformancePage({
         portfolioSlug={current.slug}
         snapshots={snapshots}
         initial={analysis}
-        owner={user.role === "owner"}
+        owner={canWrite(user, current)}
         currency={portfolio.summary.totalMarketValue.currency}
         benchmarks={benchmarks}
         rates={rates}

@@ -372,14 +372,15 @@ const en = {
 
   register: {
     hint: "Password hint",
-    hintHelp: "A reminder only you would understand, shown if you forget your password. It must not contain the password itself",
+    hintHelp:
+      "A reminder only you would understand, shown if you forget your password. It must not contain the password itself.",
     hintWhyTitle: "Why a hint, and what if I forget?",
     hintWhyBody:
-      "This site does not send email, so there is no reset link. If you forget your password, tap “Forgot your password?” on the sign-in page and this hint is shown to you. If the hint does not help, ask {owner} to reset it: you get a temporary password, sign in with it, then change it on your Account page.",
+      "This site does not send email, so there is no reset link. If you forget your password, tap “Forgot your password?” on the sign-in page and this hint is shown to you. If that does not help, ask {owner} to reset it, and you will get a temporary password to sign in with and change on your Account page.",
     passwordSafetyTitle: "How your password is kept",
     passwordSafetyBody:
-      "It is stored scrambled (hashed), so nobody can read it — not {owner}, not the server. That is also why a forgotten password is reset, never sent back. Use one you do not use anywhere else. Length beats symbols: a short sentence is strong and easy to remember.",
-    passwordShort: "{n} more to go — at least 8 characters",
+      "Your password is stored in a scrambled form that nobody can read, which is why a forgotten one is reset rather than sent back. Choose one you do not use anywhere else, and a short sentence makes a strong one.",
+    passwordShort: "{n} more to go, at least 8 characters",
     passwordOk: "Long enough",
     passwordIsUsername: "Pick something other than your username",
     confirm: "Type it again",
@@ -416,18 +417,17 @@ const en = {
     title: "Your account",
     brokerTitle: "Your real brokerage account",
     brokerBody:
-      "Connect your own moomoo account to see your real holdings here, kept up to date by themselves. It is private: only you can open it, and the site owner, who can open every account here. Share it with others yourself if you want to.",
+      "Connect your own moomoo account to see your real holdings here, updated automatically. Only you can open it, and nobody else sees it unless you share it with them.",
     brokerCreate: "Connect my moomoo account",
     brokerCreating: "Setting it up…",
     brokerOpen: "Open my real account",
-    brokerManage: "Connection",
+    brokerManage: "Manage connection",
     brokerConnected: "connected",
     brokerNotConnected: "not connected yet",
-    brokerOthers:
-      "Only moomoo can be connected for now. Interactive Brokers and Tiger are being looked into.",
+    brokerOthers: "Only moomoo can be connected for now.",
     password: "Password",
     passwordNote:
-      "Only you can change this. Passwords are stored as Argon2id hashes, which cannot be read back — not by another family member, and not by whoever runs the server. Changing it signs out your other devices.",
+      "Only you can change this. It is stored in a scrambled form that nobody can read back, and changing it signs you out on your other devices.",
     openAccess: "This deployment runs without sign-in, so there is no password to change.",
     currentPassword: "Current password",
     newPassword: "New password",
@@ -605,6 +605,7 @@ const en = {
     note: "A person sees a portfolio if they own it or if it is ticked for them here. Owners see everything regardless.",
     owner: "owner",
     remove: "Remove",
+    theirsToShare: "Only the person whose account this is can share it.",
     confirmRemove:
       "Remove /{slug}? Its practice trades and order history go with it, and this cannot be undone.",
     removeFailed: "That portfolio could not be removed.",
@@ -626,7 +627,8 @@ const en = {
 
   connection: {
     title: "Broker connection",
-    subtitle: "Links this portfolio to a moomoo account so holdings load by themselves.",
+    subtitle:
+      "Once connected, your real holdings and trades show up here and stay up to date on their own. The connection can only read your account, so it can never trade.",
     notConnected: "not connected",
     mockAccount:
       "This is a mock account. It trades practice money at real prices, so there is no brokerage to connect.",
@@ -639,47 +641,32 @@ const en = {
     marketDataWhy: "Prices, so your holdings are worth what they are worth today.",
     accountsOrders: "Accounts & Orders",
     accountsOrdersWhy:
-      "What you hold and what you have traded. Read-only — it cannot place an order.",
+      "What you hold and what you have traded. It can only read, so it cannot place an order.",
     watchlists: "Watchlists",
     watchlistsWhy:
-      "Would let this app edit the watchlist inside moomoo. It keeps its own instead.",
+      "Would let this site edit the watchlist inside moomoo. It keeps its own instead.",
     tradeExecution: "Trade Execution",
     tradeExecutionWhy:
-      "Would let this app buy and sell. It never needs to, so it refuses the permission.",
-    thisConnection: "This connection",
+      "Would let this site buy and sell. It never needs to, so it refuses this permission.",
+    thisConnection: "Connection details",
     account: "Account",
     permissionsHeld: "Permissions held",
     lastRefreshed: "Last refreshed",
-    privacyTitle: "What this means for your privacy",
-    privacyPassword: "Your moomoo password never reaches this app.",
-    privacyPasswordBody:
-      "You sign in on moomoo's own page and it hands back a key that only reads.",
-    privacyOperator: "Whoever runs this server can read your portfolio.",
-    privacyOperatorBody:
-      "The key is encrypted in the database, but the encryption key lives on the server. There is no arrangement where the app can refresh your holdings while you are away and the operator cannot look.",
-    privacyNoTrading: "It can never trade.",
-    privacyNoTradingBody:
-      "Trade Execution is refused at the door, so the worst case is someone seeing what you hold, not moving it.",
-    privacyAi:
-      "AI commentary sends your holdings and percentages to the configured AI provider. Arena news search sends ticker names to Tavily, and only when a key is set.",
-    privacyRevoke: "You can end it at any time.",
-    privacyRevokeBody:
-      "Disconnect removes the stored key; imported history stays. To be certain, also revoke this app inside moomoo — that works whether or not you trust this page.",
     outcomeConnected: "Connected. Your holdings are loading. Next, record your deposits on the Records page, so returns are measured against what you paid in.",
     outcomeSyncFailed:
       "Connected, but the first sync did not complete. Press “Sync holdings now”.",
     outcomeWriteScope:
       "That grant included a permission this app refuses to hold, so nothing was saved. Tick only Market Data and Accounts & Orders.",
     outcomeSaveFailed:
-      "moomoo approved the connection but this app could not store it. Nothing is wrong with your permissions — try again, and if it repeats it is a bug here.",
+      "moomoo approved the connection but this site could not store it. Your permissions are fine, so please try again, and if it happens again it is a fault on this site.",
     outcomeStateMismatch:
       "The connection could not be verified. Start it again from this page.",
     outcomeDenied: "You cancelled on moomoo's screen. Nothing changed.",
     outcomeFailed: "The connection did not complete. Try again.",
     outcomeMissingScope:
-      "moomoo sent back only part of what is needed. Tick both Market Data and Accounts & Orders — nothing else — and connect again.",
+      "moomoo sent back only part of what is needed. Tick Market Data and Accounts & Orders and nothing else, then connect again.",
     enforced:
-      "This is enforced, not just advised: if what moomoo sends back includes anything but these two, this site refuses it and stores nothing. You would simply connect again.",
+      "This is enforced as well as advised. If moomoo sends back anything more than these two, the site refuses it, stores nothing, and you simply connect again.",
     consent: "I will tick only Market Data and Accounts & Orders",
     connectButton: "Connect moomoo",
     reconnectButton: "Reconnect moomoo",
@@ -687,7 +674,7 @@ const en = {
     disconnect: "Disconnect",
     startFailed: "Could not start the moomoo connection.",
     disconnectFailed: "Could not disconnect. Please try again.",
-    reconnectChecklist: "What to tick when reconnecting",
+    reconnectChecklist: "Before you reconnect, tick only these two on moomoo's screen",
     mockSetUp:
       "To see your real holdings here, set up your own real account and connect moomoo to it.",
     howTitle: "How connecting works",
@@ -695,27 +682,32 @@ const en = {
     howStep2: "moomoo gives this site a read-only key. Your password never comes here.",
     howStep3: "Your holdings and trades then update here by themselves.",
     trustTitle: "What you are trusting this site with",
-    trustKey: "A read-only key, stored encrypted.",
+    trustKey: "A read-only key, kept encrypted.",
     trustKeyBody:
-      "It is kept encrypted in this site's database and used for one thing: fetching your holdings and trades so this account updates by itself.",
-    trustOwner: "Carson could technically read it.",
+      "It is stored encrypted in this site's database and used only to fetch your holdings and trades, so this account updates by itself.",
+    trustOwner: "The key can only read.",
     trustOwnerBody:
-      "The encryption key sits on the same server, so the site's owner can technically decrypt the stored key. He has committed not to — it is there only for the automatic updates. And it is read-only either way: it cannot place a trade, move money, or change anything in your moomoo account. The worst case is someone seeing what you hold, never moving it.",
-    trustVisible: "Your holdings stay private.",
+      "It cannot place a trade, move money or change anything in your moomoo account. Because the site updates your account while you are away, its server has to be able to unlock the key, so whoever runs the server could in principle change the site to read it. A change like that would leave a record in the site's code history.",
+    trustVisible: "Nobody here can open your account.",
     trustVisibleBody:
-      "Nobody else here can see this account unless you share it — apart from Carson, who as the site owner can open every account.",
+      "That includes other members and the site's owner. The only people who can see it are the ones you choose to share it with.",
     trustControl: "You stay in control.",
     trustControlBody:
-      "Disconnect and the key is deleted from the database straight away; updates stop, and what was already imported stays. You can also revoke this app inside moomoo at any time, which works whether or not you trust this page.",
+      "Press Disconnect and the key is deleted from the database straight away. Updates stop, and what was already imported stays. You can also cut this site off from inside moomoo at any time, which works whether or not you trust this page.",
+    headingConnect: "Connect your moomoo account",
+    headingConnected: "Your moomoo connection",
+    connectLead:
+      "It takes about a minute. You sign in on moomoo's own page, tick two boxes, and come straight back here.",
+    connectCardTitle: "Connect now",
   },
 
   arena: {
     title: "Arena",
     subtitle:
-      "Ranked by return, so a bigger account does not simply win. Deposits are neutralised — adding money never looks like skill.",
+      "Ranked by return, so a bigger account does not simply win. Money paid in is taken out of the sums, so adding money never looks like skill.",
     emptyTitle: "Nobody to compete with yet",
     emptyBody:
-      "The Arena ranks every portfolio you can see. It appears once there is more than one.",
+      "You are in. The standings appear as soon as somebody else enters an account too.",
     day: "Day",
     week: "Week",
     month: "Month",
@@ -1180,11 +1172,10 @@ const zh: Dictionary = {
     hintHelp: "一句只有你自己看得懂的提示，忘记密码时会显示给你。不能包含密码本身",
     hintWhyTitle: "为什么要写提示？忘了密码怎么办？",
     hintWhyBody:
-      "本站不发送邮件，所以没有重置链接。如果忘记密码，在登录页点“忘记密码？”，就会看到这条提示。如果提示也帮不上忙，请联系 {owner} 重置：你会拿到一个临时密码，用它登录后，在“账户”页面改成新密码。",
+      "本站不发送邮件，所以没有重置链接。如果忘记密码，在登录页点“忘记密码？”就会看到这条提示。如果提示也帮不上忙，请联系 {owner} 重置，你会拿到一个临时密码，用它登录后在“账户”页面改成新密码。",
     passwordSafetyTitle: "密码是怎么保存的",
-    passwordSafetyBody:
-      "密码经过不可逆的加密（哈希）后才保存，任何人都看不到原文——{owner} 看不到，服务器也看不到。所以忘记密码只能重置，不会把原密码发还给你。请不要用在别处用过的密码。长度比符号更重要：一句简短的话既安全又好记。",
-    passwordShort: "还差 {n} 个字符——至少需要 8 个",
+    passwordSafetyBody: "你的密码以打乱后的形式保存，任何人都无法读取，所以忘记密码只能重设，不会发还给你。请用一个在别处没用过的密码，一句简短的话就很安全。",
+    passwordShort: "还差 {n} 个字符，至少需要 8 个",
     passwordOk: "长度够了",
     passwordIsUsername: "请不要用用户名当密码",
     confirm: "再输入一次",
@@ -1219,18 +1210,16 @@ const zh: Dictionary = {
   account: {
     title: "我的账户",
     brokerTitle: "你的真实券商账户",
-    brokerBody:
-      "连接你自己的 moomoo 账户，就能在这里看到真实持仓，并自动保持更新。它是私密的：只有你能打开，另外站主可以打开这里的所有账户。想给别人看，由你自己分享。",
+    brokerBody: "连接你自己的 moomoo 账户，就能在这里看到真实持仓，并自动更新。只有你能打开它，除非你主动分享，其他人都看不到。",
     brokerCreate: "连接我的 moomoo 账户",
     brokerCreating: "正在建立…",
     brokerOpen: "打开我的真实账户",
-    brokerManage: "连接设置",
+    brokerManage: "管理连接",
     brokerConnected: "已连接",
     brokerNotConnected: "尚未连接",
-    brokerOthers: "目前只能连接 moomoo。盈透证券（IBKR）和老虎证券正在评估中。",
+    brokerOthers: "目前只能连接 moomoo。",
     password: "密码",
-    passwordNote:
-      "只有你本人可以修改。密码以 Argon2id 哈希保存，无法被还原读取——家人看不到，运行服务器的人也看不到。修改后会登出你的其他设备。",
+    passwordNote: "只有你本人可以修改。密码以打乱后的形式保存，任何人都无法还原读取。修改后会登出你的其他设备。",
     openAccess: "此部署未启用登录，因此没有密码需要修改。",
     currentPassword: "当前密码",
     newPassword: "新密码",
@@ -1397,6 +1386,7 @@ const zh: Dictionary = {
     note: "只有拥有者本人，或在此处被勾选的人，才能查看某个组合。管理员始终可见全部。",
     owner: "归属",
     remove: "删除",
+    theirsToShare: "只有账户本人可以把它分享给别人。",
     confirmRemove: "确定删除 /{slug} 吗？它的模拟交易和订单记录会一并删除，且无法恢复。",
     removeFailed: "无法删除该组合。",
     unassigned: "未指定",
@@ -1417,7 +1407,7 @@ const zh: Dictionary = {
 
   connection: {
     title: "券商连接",
-    subtitle: "把该组合与 moomoo 账户关联，持仓就会自动同步。",
+    subtitle: "连接后，你的真实持仓和交易会显示在这里，并自动保持更新。这个连接只能读取你的账户，永远不能交易。",
     notConnected: "未连接",
     mockAccount: "这是模拟账户，使用模拟资金与真实报价，无需连接券商。",
     notYours: "只有该组合的拥有者可以在此连接或断开券商。",
@@ -1428,39 +1418,25 @@ const zh: Dictionary = {
     marketData: "行情数据",
     marketDataWhy: "获取报价，让持仓按当日价格计算市值。",
     accountsOrders: "账户与订单",
-    accountsOrdersWhy: "读取你的持仓与成交记录。只读，无法下单。",
+    accountsOrdersWhy: "读取你的持仓与成交记录。它只能读取，无法下单。",
     watchlists: "自选列表",
-    watchlistsWhy: "会允许本应用修改 moomoo 内的自选列表。本应用自行维护自选，不需要它。",
+    watchlistsWhy: "会允许本站修改 moomoo 里的自选列表。本站自己维护自选，不需要它。",
     tradeExecution: "交易执行",
-    tradeExecutionWhy: "会允许本应用买入卖出。本应用永远不需要，因此拒绝该权限。",
-    thisConnection: "当前连接",
+    tradeExecutionWhy: "会允许本站买入卖出。本站永远不需要，因此拒绝这个权限。",
+    thisConnection: "连接详情",
     account: "账户",
     permissionsHeld: "已授予权限",
     lastRefreshed: "最近刷新",
-    privacyTitle: "这对你的隐私意味着什么",
-    privacyPassword: "你的 moomoo 密码不会进入本应用。",
-    privacyPasswordBody: "你在 moomoo 自己的页面登录，它只回传一个只读凭证。",
-    privacyOperator: "运行本服务器的人可以看到你的组合。",
-    privacyOperatorBody:
-      "凭证在数据库中是加密的，但加密密钥保存在服务器上。只要还需要在你离线时自动刷新持仓，就不存在“管理者也看不到”的方案。",
-    privacyNoTrading: "它永远无法交易。",
-    privacyNoTradingBody: "交易执行权限在授权阶段就被拒绝，最坏的情况是被人看到持仓，而不是被动用资金。",
-    privacyAi:
-      "AI 点评会把你的持仓与百分比发送给所配置的 AI 服务商；竞技场的新闻检索只在配置了密钥时，向 Tavily 发送股票代码。",
-    privacyRevoke: "你随时可以终止。",
-    privacyRevokeBody:
-      "断开连接会删除已保存的凭证，导入的历史记录会保留。为稳妥起见，也请在 moomoo 中撤销本应用的授权——无论你是否信任本页面，那都有效。",
-    outcomeConnected: "已连接，正在加载持仓。下一步：在「记录」页面录入你的入金，这样收益才会按你实际投入的钱来计算。",
+    outcomeConnected: "已连接，正在加载持仓。下一步请在「记录」页面录入你的入金，这样收益才会按你实际投入的钱来计算。",
     outcomeSyncFailed: "已连接，但首次同步未完成。请点击“立即同步持仓”。",
     outcomeWriteScope:
       "该授权包含了本应用拒绝持有的权限，因此没有保存任何内容。请只勾选“行情数据”和“账户与订单”。",
-    outcomeSaveFailed:
-      "moomoo 已通过授权，但本应用未能保存。你的权限没有问题——请重试；若反复出现，那是本应用的缺陷。",
+    outcomeSaveFailed: "moomoo 已经同意连接，但本站没能保存。你的权限没有问题，请再试一次，如果还是不行就是本站的故障。",
     outcomeStateMismatch: "无法验证此次连接，请从本页面重新发起。",
     outcomeDenied: "你在 moomoo 页面取消了授权，没有任何改动。",
     outcomeFailed: "连接未完成，请重试。",
-    outcomeMissingScope: "moomoo 返回的权限不完整。请同时勾选「行情数据」和「账户与订单」——不要勾其他——然后重新连接。",
-    enforced: "这是强制执行的，不只是建议：只要 moomoo 返回的权限里有这两项以外的内容，本站就会拒绝，不保存任何东西。你只需重新连接即可。",
+    outcomeMissingScope: "moomoo 返回的权限不完整。请只勾选「行情数据」和「账户与订单」，然后重新连接。",
+    enforced: "这是强制执行的，而不只是提醒。如果 moomoo 返回的权限超出这两项，本站会拒绝，不保存任何内容，你只需重新连接即可。",
     consent: "我只会勾选「行情数据」和「账户与订单」",
     connectButton: "连接 moomoo",
     reconnectButton: "重新连接 moomoo",
@@ -1468,7 +1444,7 @@ const zh: Dictionary = {
     disconnect: "断开连接",
     startFailed: "无法开始连接 moomoo。",
     disconnectFailed: "断开失败，请重试。",
-    reconnectChecklist: "重新连接时要勾选什么",
+    reconnectChecklist: "重新连接前，请在 moomoo 页面上只勾选这两项",
     mockSetUp: "想在这里看到你的真实持仓，请先建立你自己的真实账户，再把 moomoo 连接上去。",
     howTitle: "连接是怎么运作的",
     howStep1: "你在 moomoo 自己的页面登录，只勾选两项只读权限。",
@@ -1476,22 +1452,26 @@ const zh: Dictionary = {
     howStep3: "之后你的持仓和交易会在这里自动更新。",
     trustTitle: "你交给本站的是什么",
     trustKey: "一把只读密钥，加密保存。",
-    trustKeyBody: "它加密保存在本站的数据库里，只用来做一件事：获取你的持仓和交易，让这个账户自动更新。",
-    trustOwner: "Carson 在技术上可以读取它。",
+    trustKeyBody: "它加密保存在本站的数据库里，只用来获取你的持仓和交易，让这个账户自动更新。",
+    trustOwner: "这把密钥只能读取。",
     trustOwnerBody:
-      "加密用的密钥放在同一台服务器上，所以站主在技术上能解密这把密钥。他承诺不会去看——它存在那里只是为了自动更新。而且无论如何它都是只读的：不能下单、不能转钱，也不能改动你 moomoo 账户里的任何东西。最坏的情况是有人看到你持有什么，但绝不可能动它。",
-    trustVisible: "你的持仓保持私密。",
-    trustVisibleBody: "除非你主动分享，这里没有其他人能看到这个账户——站主 Carson 除外，他作为站主可以打开所有账户。",
+      "它不能下单、不能转钱，也不能改动你 moomoo 账户里的任何东西。因为本站要在你不在的时候自动更新账户，服务器必须能够解开这把密钥，所以理论上运行服务器的人可以修改网站去读取它。任何这样的修改都会在网站的代码记录里留下痕迹。",
+    trustVisible: "这里没有人能打开你的账户。",
+    trustVisibleBody: "其他成员和站主都不能。只有你主动分享的人才能看到。",
     trustControl: "控制权在你手里。",
     trustControlBody:
-      "点「断开连接」，密钥会立刻从数据库删除，更新随之停止，已经导入的记录会保留。你也可以随时在 moomoo 里撤销对本应用的授权——无论你是否信任这个页面，这样做都有效。",
+      "点击「断开连接」，密钥会立刻从数据库删除。更新随之停止，已经导入的记录会保留。你也可以随时在 moomoo 里取消对本站的授权，无论你是否信任这个页面，这样做都有效。",
+    headingConnect: "连接你的 moomoo 账户",
+    headingConnected: "你的 moomoo 连接",
+    connectLead: "大约一分钟就能完成。你在 moomoo 自己的页面登录，勾选两项，然后直接回到这里。",
+    connectCardTitle: "现在连接",
   },
 
   arena: {
     title: "竞技场",
-    subtitle: "按收益率排名，账户更大并不会因此获胜。转入资金已被剔除——加钱不会被当成本事。",
+    subtitle: "按收益率排名，账户更大并不会因此获胜。转入的资金不计入收益，加钱不会被当成本事。",
     emptyTitle: "暂时还没有对手",
-    emptyBody: "竞技场会为你可见的每个组合排名，出现两个以上组合后即会显示。",
+    emptyBody: "你已加入。等到其他人也有账户参赛，排名就会出现。",
     day: "日",
     week: "周",
     month: "月",

@@ -7,6 +7,7 @@ import {
   createPortfolio,
   DEFAULT_SLUG,
   findBySlug,
+  findById,
   grantAccess,
   listPortfolios,
   readersOf,
@@ -119,6 +120,18 @@ export async function PATCH(request: Request) {
 
   const db = await getDb();
   const { portfolioId, userId, grant } = parsed.data;
+
+  // Sharing an account is its owner's decision, and the administrator is no
+  // exception: this used to let the site's owner give anybody, himself
+  // included, a view of anybody else's money.
+  const target = await findById(db, portfolioId);
+  if (!target) return Response.json({ error: "No such portfolio" }, { status: 404 });
+  if (target.ownerUserId !== null && target.ownerUserId !== auth.user.id) {
+    return Response.json(
+      { error: "Only the person whose account it is can share it." },
+      { status: 403 },
+    );
+  }
 
   if (grant) await grantAccess(db, portfolioId, userId);
   else await revokeAccess(db, portfolioId, userId);

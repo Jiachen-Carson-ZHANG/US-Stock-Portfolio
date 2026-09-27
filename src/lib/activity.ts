@@ -62,11 +62,22 @@ export async function recordActivity(
 // Postgres folds unquoted identifiers to lower case, so a bare `AS createdAt`
 // would arrive as `createdat` and read as undefined. Camel-cased aliases are
 // therefore double-quoted throughout this file.
-export async function recentActivity(db: DB, limit = 50): Promise<ActivityEvent[]> {
+/** What somebody opened or watched: private to them, like their accounts. */
+const BROWSING = ["view_position", "view_page", "watchlist_add", "watchlist_remove"];
+
+/**
+ * The recent log, as the person reading it may see it: sign-ins, approvals
+ * and the like for everybody, but what others opened or put on a watchlist
+ * only for the reader themselves. Those name holdings, and holdings are no
+ * business of the site's administrator.
+ */
+export async function recentActivity(db: DB, limit = 50, viewer?: string): Promise<ActivityEvent[]> {
   return db.all<ActivityEvent>(
     `SELECT username, kind, target, detail, created_at AS "createdAt"
-       FROM activity_events ORDER BY created_at DESC LIMIT ?`,
-    [limit],
+       FROM activity_events
+      WHERE kind NOT IN (${BROWSING.map(() => "?").join(", ")}) OR username = ?
+      ORDER BY created_at DESC LIMIT ?`,
+    [...BROWSING, viewer ?? "", limit],
   );
 }
 
@@ -76,8 +87,20 @@ export type AssetInterest = {
   viewers: number;
 };
 
-/** Which holdings the family opens most — the "what are they watching" view. */
-export async function mostViewedAssets(db: DB, limit = 12): Promise<AssetInterest[]> {
+/**
+ * What other people open in your accounts, most first.
+ *
+ * Only views inside the accounts named, which are the reader's own, and only
+ * other people's. Everybody's views pooled together said which shares each
+ * person was looking at in their own account, which is as private as what
+ * they hold.
+ */
+export async function mostViewedAssets(
+  db: DB,
+  scope: { accounts: string[]; viewer: string },
+  limit = 12,
+): Promise<AssetInterest[]> {
+  if (scope.accounts.length === 0) return [];
   // COUNT returns bigint, which the driver hands back as a string to protect
   // precision. These counts are small, so casting to int in SQL keeps the
   // declared `number` type honest.
@@ -87,10 +110,12 @@ export async function mostViewedAssets(db: DB, limit = 12): Promise<AssetInteres
             COUNT(DISTINCT username)::int AS viewers
        FROM activity_events
       WHERE kind = 'view_position' AND target IS NOT NULL
+        AND detail IN (${scope.accounts.map(() => "?").join(", ")})
+        AND username <> ?
       GROUP BY target
       ORDER BY views DESC
       LIMIT ?`,
-    [limit],
+    [...scope.accounts, scope.viewer, limit],
   );
 }
 
@@ -101,14 +126,20 @@ export type MemberActivity = {
   lastSeen: string | null;
 };
 
+/**
+ * Each member's logins and views — members who still have an account only.
+ * The list was built from the activity log alone, so somebody removed kept
+ * appearing in it for as long as their old logins did.
+ */
 export async function activityByMember(db: DB): Promise<MemberActivity[]> {
   return db.all<MemberActivity>(
-    `SELECT username,
-            SUM(CASE WHEN kind = 'login' THEN 1 ELSE 0 END)::int AS logins,
-            SUM(CASE WHEN kind = 'view_position' THEN 1 ELSE 0 END)::int AS views,
-            MAX(created_at) AS "lastSeen"
-       FROM activity_events
-      GROUP BY username
+    `SELECT a.username,
+            SUM(CASE WHEN a.kind = 'login' THEN 1 ELSE 0 END)::int AS logins,
+            SUM(CASE WHEN a.kind = 'view_position' THEN 1 ELSE 0 END)::int AS views,
+            MAX(a.created_at) AS "lastSeen"
+       FROM activity_events a
+       JOIN users u ON u.username = a.username
+      GROUP BY a.username
       ORDER BY "lastSeen" DESC`,
   );
 }

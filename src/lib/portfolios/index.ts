@@ -70,14 +70,15 @@ export async function findById(db: DB, id: string): Promise<Portfolio | null> {
 /**
  * The one access rule, expressed once.
  *
- * You may read a portfolio if you own it, if someone granted you a row in
- * portfolio_access, or if you hold the owner role. Everything else — the
- * switcher, the nav, the Arena — is a view over this, never a substitute for
- * it. A hidden link is not access control, so every loader re-asks.
+ * You may read a portfolio if you own it, or if its owner shared it with you
+ * (a row in portfolio_access). Nobody else may, and that includes whoever runs
+ * the site. The administrator role used to open every account; it now decides
+ * who has an account here and nothing about what is inside one. Everything
+ * else, the switcher, the nav and the Arena, is a view over this and never a
+ * substitute for it. A hidden link is not access control, so every loader
+ * asks again.
  */
 export async function visibleTo(db: DB, user: AuthUser): Promise<Portfolio[]> {
-  if (user.role === "owner") return listPortfolios(db);
-
   const rows = await db.all<Row>(
     `SELECT DISTINCT ${COLUMNS.split(", ").map((c) => `p.${c}`).join(", ")}
        FROM portfolios p
@@ -128,8 +129,7 @@ export async function directoryFor(
   return rows.map((row) => ({
     ...toPortfolio(row),
     ownerName: row.owner_name,
-    readable:
-      user.role === "owner" || row.owner_user_id === user.id || row.granted === true,
+    readable: row.owner_user_id === user.id || row.granted === true,
     requested: row.requested === true,
   }));
 }
@@ -139,8 +139,6 @@ export async function canRead(
   user: AuthUser,
   portfolioId: string,
 ): Promise<boolean> {
-  if (user.role === "owner") return true;
-
   const row = await db.get<{ ok: boolean }>(
     `SELECT TRUE AS ok
        FROM portfolios p
@@ -172,8 +170,8 @@ export function canWrite(user: AuthUser, portfolio: Portfolio): boolean {
  * Ordering by creation date made that look random; it was only ever a
  * question of which row came back first.
  *
- * Own it, then be able to read it: an administrator can see everybody's
- * portfolios, and theirs should still be the one that opens.
+ * Own it, then be able to read it: somebody who has been shared other
+ * accounts should still land on their own.
  */
 export async function defaultFor(db: DB, user: AuthUser): Promise<Portfolio | null> {
   const visible = await visibleTo(db, user);

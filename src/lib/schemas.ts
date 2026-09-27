@@ -256,3 +256,8 @@ export const aiSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
   draft: z.string().trim().max(2000).optional(),
 });
+
+export const arenaMembershipSchema = z.object({
+  portfolio: z.string().trim().min(1).max(64),
+  join: z.boolean(),
+});

@@ -18,11 +18,16 @@ export type HoldingRow =
   | { kind: "group"; id: string; group: OptionGroupDTO; weight: number }
   | { kind: "position"; id: string; position: PositionView; weight: number };
 
+/**
+ * Notes that a holding was opened, and in whose account: the account's owner
+ * sees what others look at in it, and nobody sees what you look at in yours.
+ */
 export function recordView(target: string) {
+  const account = window.location.pathname.split("/")[1] ?? "";
   void fetch("/api/activity", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ kind: "view_position", target }),
+    body: JSON.stringify({ kind: "view_position", target, detail: account }),
   }).catch(() => {});
 }
 

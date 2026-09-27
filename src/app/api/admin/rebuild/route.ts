@@ -1,7 +1,7 @@
 import { requireApiOwner } from "@/lib/auth/guards";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logger } from "@/lib/logger";
-import { rebuildEveryPortfolio } from "@/lib/portfolio/rebuild-accounts";
+import { rebuildPortfoliosFor } from "@/lib/portfolio/rebuild-accounts";
 
 export const dynamic = "force-dynamic";
 // The hosting plan caps this at 60 seconds whatever is asked for.
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if ("response" in auth) return auth.response;
 
   try {
-    const results = await rebuildEveryPortfolio();
+    const results = await rebuildPortfoliosFor(auth.user);
     const written = results.reduce((total, row) => total + row.written, 0);
     logger.info("portfolio.rebuild.requested", { by: auth.user.username, written });
     return Response.json({ ok: true, written, results });

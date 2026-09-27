@@ -83,7 +83,9 @@ describe("who can see what", () => {
     expect(await canRead(db, carson, hers.id)).toBe(false);
   });
 
-  it("gives the owner role sight of everything", async () => {
+  // Running the site does not open anybody's account. The administrator is
+  // held to the same rule as everyone: yours, or shared with you.
+  it("gives the owner role no sight of an account that was not shared", async () => {
     const mile = await addUser("mile");
     const admin = await addUser("carson", "owner");
     const hers = await createPortfolio(db, {
@@ -93,8 +95,11 @@ describe("who can see what", () => {
       kind: "broker",
     });
 
+    expect(await canRead(db, admin, hers.id)).toBe(false);
+    expect((await visibleTo(db, admin)).map((p) => p.slug)).not.toContain("mirat");
+
+    await grantAccess(db, hers.id, admin.id);
     expect(await canRead(db, admin, hers.id)).toBe(true);
-    expect((await visibleTo(db, admin)).map((p) => p.slug)).toContain("mirat");
   });
 
   // The distinction Carson asked for: he can look at his sister's portfolio
@@ -109,6 +114,7 @@ describe("who can see what", () => {
       kind: "broker",
     });
 
+    await grantAccess(db, hers.id, admin.id);
     expect(await canRead(db, admin, hers.id)).toBe(true);
     expect(canWrite(admin, hers)).toBe(false);
     expect(canWrite(mile, hers)).toBe(true);
@@ -335,7 +341,7 @@ describe("the directory", () => {
     );
   });
 
-  it("shows an administrator everything as readable", async () => {
+  it("shows an administrator somebody else's account as locked, like anyone", async () => {
     const admin = await addUser("carson", "owner");
     const mile = await addUser("mile");
     await createPortfolio(db, {
@@ -345,6 +351,7 @@ describe("the directory", () => {
       kind: "broker",
     });
 
-    expect((await directoryFor(db, admin)).every((entry) => entry.readable)).toBe(true);
+    const entry = (await directoryFor(db, admin)).find((row) => row.slug === "mirat");
+    expect(entry?.readable).toBe(false);
   });
 });

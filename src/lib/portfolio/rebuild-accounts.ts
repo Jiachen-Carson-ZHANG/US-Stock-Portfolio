@@ -1,7 +1,8 @@
 import "server-only";
 import { getDb, type DB } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { listPortfolios, type Portfolio } from "@/lib/portfolios";
+import { listPortfolios, visibleTo, type Portfolio } from "@/lib/portfolios";
+import type { AuthUser } from "@/lib/auth/session";
 import { rebuildHistory, type PriceLoader } from "@/lib/portfolio/rebuild";
 import { getMarketDataProvider } from "@/providers";
 
@@ -53,6 +54,21 @@ export async function rebuildEveryPortfolio(): Promise<RebuildResult[]> {
   const db = await getDb();
   const results: RebuildResult[] = [];
   for (const portfolio of await listPortfolios(db)) {
+    results.push(await rebuildPortfolio(db, portfolio));
+  }
+  return results;
+}
+
+/**
+ * The accounts one person may open, rebuilt, for the button in settings. Its
+ * results name the account and say why one was refused, which can mention a
+ * holding or a dollar figure, so nobody is shown them for an account that is
+ * not theirs to see. Everybody else's history fills itself in each evening.
+ */
+export async function rebuildPortfoliosFor(user: AuthUser): Promise<RebuildResult[]> {
+  const db = await getDb();
+  const results: RebuildResult[] = [];
+  for (const portfolio of await visibleTo(db, user)) {
     results.push(await rebuildPortfolio(db, portfolio));
   }
   return results;
@@ -114,10 +130,12 @@ export async function rebuildPortfolio(
         : null,
   });
 
+  // How many reasons, not what they say: a reason can name a holding or a
+  // dollar figure, and the server's logs are not the place for either.
   if (report.refusals.length > 0) {
     logger.warn("portfolio.rebuild.refused", {
       portfolio: portfolio.slug,
-      reason: report.refusals.join("; "),
+      reasons: report.refusals.length,
     });
   } else {
     logger.info("portfolio.rebuild.done", {

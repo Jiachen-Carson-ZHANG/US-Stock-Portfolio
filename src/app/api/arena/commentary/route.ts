@@ -7,6 +7,7 @@ import { currentLocale } from "@/lib/i18n/server";
 import { ARENA_RULES, buildArenaContext } from "@/lib/arena/context";
 import { writeCommentary } from "@/lib/arena/commentary";
 import { PERIODS, type Period } from "@/lib/arena";
+import { arenaAccess } from "@/lib/arena/membership";
 
 // The hosting plan caps this at 60 seconds whatever is asked for.
 export const maxDuration = 60;
@@ -22,12 +23,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "DEEPSEEK_API_KEY is not configured." }, { status: 503 });
   }
 
+  // Members only, like the board: the commentary talks about everybody who
+  // entered, and only people who entered may read about them.
+  if (!(await arenaAccess(await getDb(), user)).canSee) {
+    return Response.json({ error: "Enter one of your accounts to see the Arena." }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const period: Period = PERIODS.includes(body?.period) ? body.period : "week";
 
   try {
-    // Built from what this viewer may see, so the commentary can never
-    // describe a portfolio they are not allowed to open.
+    // Built from the members alone, so the commentary can never describe an
+    // account whose owner did not enter it.
     const { text: context, symbols } = await buildArenaContext(
       await getDb(),
       user,

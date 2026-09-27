@@ -90,7 +90,11 @@ export default async function SettingsPage({
   const db = await getDb();
   const users = await readUsers();
   const connection = await readConnectionStatus(db, portfolio.id);
-  const mostViewed = await mostViewedAssets(db);
+  const mine = (await listPortfolios(db)).filter((p) => p.ownerUserId === me.id);
+  const mostViewed = await mostViewedAssets(db, {
+    accounts: mine.map((p) => p.slug),
+    viewer: me.username,
+  });
   const byMember = await activityByMember(db);
   const outcome = CONNECT_OUTCOME[(await searchParams).moomoo ?? ""];
 
@@ -219,6 +223,7 @@ export default async function SettingsPage({
       <PendingAccounts pending={pending} />
 
       <PortfolioAdmin
+        meId={me.id}
         portfolios={portfolios}
         people={users.map((user) => ({
           id: user.id,
@@ -230,11 +235,11 @@ export default async function SettingsPage({
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">Daily history</h2>
         <p className="mt-1 mb-4 text-xs text-muted-foreground">
-          Every account&apos;s value is recorded each evening after the US close.
-          If an evening is missed, the next evening fills it in by replaying the
-          trades — you don&apos;t need to do anything. This button does the same
-          straight away, for every account, and rewrites their whole history from
-          the trades. Safe to run at any time, and safe to run twice.
+          Every account&apos;s value is recorded each evening after the US close,
+          and a missed evening is filled in the next evening by replaying the
+          trades, so there is nothing you need to do. This button does the same
+          straight away for the accounts you can open, rewriting their history
+          from the trades. It is safe to run at any time.
         </p>
         <RebuildHistory />
       </section>

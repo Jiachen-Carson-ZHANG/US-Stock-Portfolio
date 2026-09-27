@@ -48,7 +48,7 @@ function when(iso: string): string {
  * news, not a broken page.
  */
 export default async function LogsPage() {
-  await requireOwner();
+  const owner = await requireOwner();
 
   const db = await getDb();
   // Trimmed on the way in rather than by a job nobody remembers to set up.
@@ -58,7 +58,7 @@ export default async function LogsPage() {
     recentErrors(24),
     slowestPaths(24),
     recentTimings(60),
-    recentActivity(db, 60),
+    recentActivity(db, 60, owner.username),
   ]);
 
   const SOURCE: Record<ErrorGroup["source"], { label: string; hint: string }> = {

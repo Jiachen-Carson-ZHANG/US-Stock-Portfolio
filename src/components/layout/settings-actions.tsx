@@ -93,20 +93,11 @@ export function MoomooConnection({ connected, portfolioSlug }: { connected: bool
     router.refresh();
   }
 
-  const checklist = <MoomooPermissionChecklist />;
-
   return (
     <div className="space-y-4">
-      {connected ? (
-        <details className="rounded-lg border border-border p-3 text-sm">
-          <summary className="cursor-pointer text-muted-foreground">
-            {t.connection.reconnectChecklist}
-          </summary>
-          <div className="mt-3">{checklist}</div>
-        </details>
-      ) : (
-        checklist
-      )}
+      {/* Open whether connecting or reconnecting: folded away, it was the
+          part people skipped, and it is the one thing to get right. */}
+      <MoomooPermissionChecklist />
 
       <label className="flex items-start gap-2 text-sm">
         <input
@@ -124,7 +115,7 @@ export function MoomooConnection({ connected, portfolioSlug }: { connected: bool
         </Button>
 
         {connected && (
-          <Button variant="ghost" onClick={disconnect} disabled={pending}>
+          <Button variant="outline" onClick={disconnect} disabled={pending}>
             {t.connection.disconnect}
           </Button>
         )}

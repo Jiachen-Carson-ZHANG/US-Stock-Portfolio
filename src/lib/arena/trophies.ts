@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DB } from "@/lib/db";
 import { notify } from "@/lib/notifications";
-import { listPortfolios } from "@/lib/portfolios";
+import { arenaMembers } from "./membership";
 import { rank, type Period } from "./index";
 
 export type Trophy = {
@@ -65,7 +65,8 @@ export async function awardCompletedPeriods(
   db: DB,
   now: Date = new Date(),
 ): Promise<{ awarded: number }> {
-  const portfolios = await listPortfolios(db);
+  // Among those who entered. A trophy names its winner to every member.
+  const portfolios = await arenaMembers(db);
   if (portfolios.length < 2) return { awarded: 0 };
 
   let awarded = 0;

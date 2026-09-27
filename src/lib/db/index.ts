@@ -287,6 +287,14 @@ CREATE TABLE IF NOT EXISTS trophies (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trophy_period
   ON trophies(period, period_end, portfolio_id);
 
+-- Accounts entered into the Arena by their owners. Nobody competes, and
+-- nobody's returns are shown to anybody, without a row here: being able to
+-- open an account is not consent to having it ranked.
+CREATE TABLE IF NOT EXISTS arena_members (
+  portfolio_id TEXT PRIMARY KEY REFERENCES portfolios(id) ON DELETE CASCADE,
+  joined_at    TEXT NOT NULL
+);
+
 -- Asking for access, and being told about it.
 CREATE TABLE IF NOT EXISTS access_requests (
   id           TEXT PRIMARY KEY,
