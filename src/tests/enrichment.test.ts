@@ -171,6 +171,7 @@ describe("snapshot timestamp integrity", () => {
     const db = await createTestDb();
     const summary = {
       isStale: false,
+      positionCount: 1,
       dataTimestamp: "2026-09-15T19:45:00Z",
       totalMarketValue: { amount: "100", currency: "USD" },
       totalCostBasis: { amount: "100", currency: "USD" },

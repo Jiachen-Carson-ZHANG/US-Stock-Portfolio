@@ -83,6 +83,13 @@ const en = {
     asAt: "as at",
     sessionOf: "trading day of",
     since: "since",
+    allTimeFrom: "all time, from",
+    transfersFrom: "transfers from",
+    notRecorded: "Not recorded",
+    notRecordedBody: "No deposits recorded for this account yet",
+    addTransfers: "Record deposits",
+    fromHoldingsOnly: "from holdings only — deposits not recorded",
+    fromTransfers: "the deposits and withdrawals on the Records page",
   },
 
   charts: {
@@ -91,7 +98,7 @@ const en = {
     assetType: "Asset type",
     sector: "Sector",
     concentration: "Concentration",
-    concentrationNote: "Share of invested capital, excluding cash.",
+    concentrationNote: "Share of what is invested, at today's prices. Cash left out",
     topHolding: "Top holding",
     top3: "Top 3 holdings",
     top5: "Top 5 holdings",
@@ -499,7 +506,7 @@ const en = {
       "Everything made or lost since this account started, in one number. It adds the profit still sitting inside things that are owned to the profit already taken from things that were sold.",
     totalInvested: "Total invested",
     totalInvestedBody:
-      "Real money put in, less anything taken back out. Profit that was made and left in the account is not counted here, because it was never paid in. That is why cash plus holdings usually does not equal this number.",
+      "The money paid into this account, less anything taken back out: the sum of the deposits and withdrawals recorded on the Records page. Nothing is estimated — a transfer that is not recorded is not counted, and a brokerage does not tell this site about your transfers, so they are entered by hand. Profit made and left in the account is not in this number, because it was never paid in.",
     unrealized: "Profit on paper",
     unrealizedBody:
       "Profit on something still owned. It changes every day and is not yours until it is sold. A holding can show a large number here and end up with none of it.",
@@ -559,6 +566,11 @@ const en = {
   },
 
   records: {
+    stepsTitle: "Recording deposits, step by step",
+    step1: "In the moomoo app, open your account's transfer history — every deposit and withdrawal, with its date.",
+    step2: "Add each one here: the date the money arrived and the amount. A withdrawal is money out.",
+    step3: "When the list is complete, confirm it as reviewed further down. From then on, returns and the Arena measure against exactly what you paid in.",
+    stepsNote: "Until then, Total invested shows “Not recorded” and returns are worked out from your holdings alone. Nothing is guessed.",
     title: "Records",
     subtitle: "The few things this site cannot work out on its own.",
     whyTitle: "Why this page has to exist",
@@ -649,7 +661,7 @@ const en = {
     privacyRevoke: "You can end it at any time.",
     privacyRevokeBody:
       "Disconnect removes the stored key; imported history stays. To be certain, also revoke this app inside moomoo — that works whether or not you trust this page.",
-    outcomeConnected: "Connected. Your holdings are loading.",
+    outcomeConnected: "Connected. Your holdings are loading. Next, record your deposits on the Records page, so returns are measured against what you paid in.",
     outcomeSyncFailed:
       "Connected, but the first sync did not complete. Press “Sync holdings now”.",
     outcomeWriteScope:
@@ -674,6 +686,23 @@ const en = {
     reconnectChecklist: "What to tick when reconnecting",
     mockSetUp:
       "To see your real holdings here, set up your own real account and connect moomoo to it.",
+    howTitle: "How connecting works",
+    howStep1: "You sign in on moomoo's own page and tick two read-only permissions.",
+    howStep2: "moomoo gives this site a read-only key. Your password never comes here.",
+    howStep3: "Your holdings and trades then update here by themselves.",
+    trustTitle: "What you are trusting this site with",
+    trustKey: "A read-only key, stored encrypted.",
+    trustKeyBody:
+      "It is kept encrypted in this site's database and used for one thing: fetching your holdings and trades so this account updates by itself.",
+    trustOwner: "Carson could technically read it.",
+    trustOwnerBody:
+      "The encryption key sits on the same server, so the site's owner can technically decrypt the stored key. He has committed not to — it is there only for the automatic updates. And it is read-only either way: it cannot place a trade, move money, or change anything in your moomoo account. The worst case is someone seeing what you hold, never moving it.",
+    trustVisible: "Your holdings stay private.",
+    trustVisibleBody:
+      "Nobody else here can see this account unless you share it — apart from Carson, who as the site owner can open every account.",
+    trustControl: "You stay in control.",
+    trustControlBody:
+      "Disconnect and the key is deleted from the database straight away; updates stop, and what was already imported stays. You can also revoke this app inside moomoo at any time, which works whether or not you trust this page.",
   },
 
   arena: {
@@ -858,6 +887,13 @@ const zh: Dictionary = {
     asAt: "数据截至",
     sessionOf: "交易日",
     since: "起算日",
+    allTimeFrom: "累计，自",
+    transfersFrom: "转账起始",
+    notRecorded: "未记录",
+    notRecordedBody: "这个账户还没有记录任何入金",
+    addTransfers: "记录入金",
+    fromHoldingsOnly: "仅按持仓计算——未记录入金",
+    fromTransfers: "来自「记录」页面里的入金和出金",
   },
 
   charts: {
@@ -866,7 +902,7 @@ const zh: Dictionary = {
     assetType: "资产类型",
     sector: "行业分布",
     concentration: "集中度",
-    concentrationNote: "占已投入成本的比例，不含现金。",
+    concentrationNote: "按今天的价格计算、占已投资部分的比例，不含现金",
     topHolding: "第一大持仓",
     top3: "前三大持仓",
     top5: "前五大持仓",
@@ -1260,7 +1296,7 @@ const zh: Dictionary = {
       "从开户至今赚到或亏掉的全部金额，合成一个数字。它把还握在手里的持仓的浮动盈亏，和已经卖出落袋的盈亏加在一起。",
     totalInvested: "累计投入",
     totalInvestedBody:
-      "真正转进来的钱，减去转出去的钱。赚到之后留在账户里的利润不算在这里，因为那不是投入的本金。所以「现金加持仓」通常不等于这个数字。",
+      "转入这个账户的钱，减去转出的钱：也就是「记录」页面里所有入金和出金的合计。这里没有任何估算——没记录的转账就不计入，而券商不会把你的转账告诉本站，所以需要手动录入。赚到后留在账户里的利润不在这个数字里，因为那不是你投入的本金。",
     unrealized: "浮动盈亏",
     unrealizedBody:
       "还没卖出的持仓上的盈亏。它每天都在变，卖出之前都不算真正到手。一只股票可以在这里显示一大笔浮盈，最后一分也没落袋。",
@@ -1319,6 +1355,11 @@ const zh: Dictionary = {
   },
 
   records: {
+    stepsTitle: "记录入金的步骤",
+    step1: "在 moomoo App 里打开你账户的转账记录——每一笔入金和出金，以及日期。",
+    step2: "在这里逐笔添加：钱到账的日期和金额。出金记为转出。",
+    step3: "全部录完后，在下方确认「已核对」。从那以后，收益和竞技场排名都会按你实际投入的钱来计算。",
+    stepsNote: "在此之前，「累计投入」会显示「未记录」，收益只按持仓计算。这里不做任何猜测。",
     title: "记录",
     subtitle: "少数几件这个网站自己算不出来的事。",
     whyTitle: "为什么需要这一页",
@@ -1401,7 +1442,7 @@ const zh: Dictionary = {
     privacyRevoke: "你随时可以终止。",
     privacyRevokeBody:
       "断开连接会删除已保存的凭证，导入的历史记录会保留。为稳妥起见，也请在 moomoo 中撤销本应用的授权——无论你是否信任本页面，那都有效。",
-    outcomeConnected: "已连接，正在加载持仓。",
+    outcomeConnected: "已连接，正在加载持仓。下一步：在「记录」页面录入你的入金，这样收益才会按你实际投入的钱来计算。",
     outcomeSyncFailed: "已连接，但首次同步未完成。请点击“立即同步持仓”。",
     outcomeWriteScope:
       "该授权包含了本应用拒绝持有的权限，因此没有保存任何内容。请只勾选“行情数据”和“账户与订单”。",
@@ -1421,6 +1462,21 @@ const zh: Dictionary = {
     disconnectFailed: "断开失败，请重试。",
     reconnectChecklist: "重新连接时要勾选什么",
     mockSetUp: "想在这里看到你的真实持仓，请先建立你自己的真实账户，再把 moomoo 连接上去。",
+    howTitle: "连接是怎么运作的",
+    howStep1: "你在 moomoo 自己的页面登录，只勾选两项只读权限。",
+    howStep2: "moomoo 给本站一把只读密钥。你的密码永远不会传到这里。",
+    howStep3: "之后你的持仓和交易会在这里自动更新。",
+    trustTitle: "你交给本站的是什么",
+    trustKey: "一把只读密钥，加密保存。",
+    trustKeyBody: "它加密保存在本站的数据库里，只用来做一件事：获取你的持仓和交易，让这个账户自动更新。",
+    trustOwner: "Carson 在技术上可以读取它。",
+    trustOwnerBody:
+      "加密用的密钥放在同一台服务器上，所以站主在技术上能解密这把密钥。他承诺不会去看——它存在那里只是为了自动更新。而且无论如何它都是只读的：不能下单、不能转钱，也不能改动你 moomoo 账户里的任何东西。最坏的情况是有人看到你持有什么，但绝不可能动它。",
+    trustVisible: "你的持仓保持私密。",
+    trustVisibleBody: "除非你主动分享，这里没有其他人能看到这个账户——站主 Carson 除外，他作为站主可以打开所有账户。",
+    trustControl: "控制权在你手里。",
+    trustControlBody:
+      "点「断开连接」，密钥会立刻从数据库删除，更新随之停止，已经导入的记录会保留。你也可以随时在 moomoo 里撤销对本应用的授权——无论你是否信任这个页面，这样做都有效。",
   },
 
   arena: {

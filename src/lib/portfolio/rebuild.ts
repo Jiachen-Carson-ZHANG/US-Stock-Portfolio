@@ -43,6 +43,13 @@ export async function rebuildHistory(options: {
   tolerance?: number;
   write?: boolean;
   now?: Date;
+  /**
+   * A practice account's opening balance and the day it was made. It is the
+   * account's first deposit in all but name — nothing records it as one — so
+   * without it the rebuild found "no cash flows" and refused, and a practice
+   * account's history could never be filled in.
+   */
+  opening?: { date: string; amount: number } | null;
 }): Promise<RebuildReport> {
   const {
     db,
@@ -52,6 +59,7 @@ export async function rebuildHistory(options: {
     tolerance = 250,
     write = false,
     now = new Date(),
+    opening = null,
   } = options;
 
   const empty: RebuildReport = {
@@ -64,16 +72,24 @@ export async function rebuildHistory(options: {
   };
 
   const fills = (await readTransactions(db, portfolioId, 5000)).slice().reverse();
-  if (fills.length === 0) {
-    return { ...empty, refusals: ["No fills on record"] };
-  }
 
-  const flows = (
+  const recorded = (
     await db.all<{ date: string; amount: number }>(
       `SELECT date, amount FROM analysis_flows WHERE portfolio_id = ? ORDER BY date`,
       [portfolioId],
     )
   ).map((row): CashFlow => ({ date: row.date, amount: Number(row.amount) }));
+  const flows =
+    opening && opening.amount > 0 ? [{ date: opening.date, amount: opening.amount }, ...recorded] : recorded;
+
+  // A practice account that has never traded is worth its cash every day:
+  // no prices to fetch, nothing to replay.
+  if (fills.length === 0 && opening && opening.amount > 0) {
+    return untradedHistory({ db, portfolioId, flows, from: opening.date, now, write });
+  }
+  if (fills.length === 0) {
+    return { ...empty, refusals: ["No fills on record"] };
+  }
   if (flows.length === 0) {
     return {
       ...empty,
@@ -165,4 +181,77 @@ export async function rebuildHistory(options: {
   }
 
   return { days: days.length, written, from, to, refusals: [], finalValue };
+}
+
+/** Each weekday from `from` to yesterday, New York's calendar. */
+function weekdaysFrom(from: string, now: Date): string[] {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  const days: string[] = [];
+  const cursor = new Date(`${from}T16:00:00Z`);
+  while (true) {
+    const date = cursor.toISOString().slice(0, 10);
+    if (date >= today) break;
+    const weekday = cursor.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) days.push(date);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+/**
+ * The history of an account that has only ever held cash: its opening
+ * balance plus whatever was paid in, each weekday up to yesterday. Today is
+ * left to the evening capture, which knows today's value for certain.
+ */
+async function untradedHistory(options: {
+  db: DB;
+  portfolioId: string;
+  flows: CashFlow[];
+  from: string;
+  now: Date;
+  write: boolean;
+}): Promise<RebuildReport> {
+  const { db, portfolioId, flows, from, now, write } = options;
+  const dates = weekdaysFrom(from, now);
+  const currency = process.env.PORTFOLIO_BASE_CURRENCY ?? "USD";
+  const money = (value: number) => ({ amount: value.toFixed(2), currency });
+
+  let written = 0;
+  let finalValue: number | null = null;
+  for (const date of dates) {
+    const cash = flows.filter((flow) => flow.date <= date).reduce((sum, flow) => sum + flow.amount, 0);
+    finalValue = cash;
+    if (!write) continue;
+    await writeSnapshot(
+      db,
+      portfolioId,
+      date,
+      {
+        totalMarketValue: money(cash),
+        totalCostBasis: money(cash),
+        totalUnrealizedPnL: money(0),
+        cashValue: money(cash),
+        realizedPnL: money(0),
+        netDeposits: money(cash),
+      },
+      "[]",
+      now,
+      "reconstructed",
+    );
+    written += 1;
+  }
+
+  return {
+    days: dates.length,
+    written,
+    from: dates[0] ?? null,
+    to: dates[dates.length - 1] ?? null,
+    refusals: [],
+    finalValue,
+  };
 }

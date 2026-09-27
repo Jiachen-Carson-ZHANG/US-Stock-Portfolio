@@ -121,16 +121,22 @@ export async function maybeCreateSnapshot(
   positionsJson: string,
   now: Date = new Date(),
 ): Promise<boolean> {
-  if (!isAfterMarketClose(now) || summary.isStale || !summary.dataTimestamp)
-    return false;
-  const timestamp = new Date(summary.dataTimestamp);
-  if (
-    !Number.isFinite(timestamp.getTime()) ||
-    timestamp > now ||
-    !isAfterMarketClose(timestamp) ||
-    marketDateString(timestamp) !== marketDateString(now)
-  )
-    return false;
+  if (!isAfterMarketClose(now) || summary.isStale) return false;
+  // Prices have to be from this evening — unless nothing needs a price. An
+  // account holding only cash has no quotes and so no timestamp, and
+  // insisting on one meant a practice account that had not traded yet was
+  // never recorded at all.
+  if (summary.positionCount > 0) {
+    if (!summary.dataTimestamp) return false;
+    const timestamp = new Date(summary.dataTimestamp);
+    if (
+      !Number.isFinite(timestamp.getTime()) ||
+      timestamp > now ||
+      !isAfterMarketClose(timestamp) ||
+      marketDateString(timestamp) !== marketDateString(now)
+    )
+      return false;
+  }
   const date = marketDateString(now);
   if (await hasSnapshot(db, portfolioId, date)) return false;
   await writeSnapshot(db, portfolioId, date, summary, positionsJson, now);

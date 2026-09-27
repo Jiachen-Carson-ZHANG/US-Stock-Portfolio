@@ -67,6 +67,26 @@ export default async function RecordsPage({
         </div>
       </section>
 
+      {/* The procedure for a real account, whose brokerage never tells this
+          site about transfers. A practice account's opening balance is
+          already counted, so it has nothing to follow. */}
+      {portfolio.kind === "broker" && (
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <h2 className="text-sm font-medium">{t.records.stepsTitle}</h2>
+          <ol className="mt-3 space-y-2">
+            {[t.records.step1, t.records.step2, t.records.step3].map((step, index) => (
+              <li key={step} className="flex gap-3 text-sm">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background">
+                  {index + 1}
+                </span>
+                <span className="pt-0.5">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-xs text-muted-foreground">{t.records.stepsNote}</p>
+        </section>
+      )}
+
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">{t.records.transfer}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t.records.transferHint}</p>

@@ -1,3 +1,4 @@
+import { Eye, KeyRound, Unplug, Users } from "lucide-react";
 import { getDb } from "@/lib/db";
 import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { requirePortfolio } from "@/lib/portfolios/context";
@@ -89,6 +90,24 @@ export default async function ConnectionPage({
         </p>
       ) : (
         <>
+          {!connection && (
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h2 className="text-sm font-medium">{t.connection.howTitle}</h2>
+              <ol className="mt-3 grid gap-3 sm:grid-cols-3">
+                {[t.connection.howStep1, t.connection.howStep2, t.connection.howStep3].map(
+                  (step, index) => (
+                    <li key={step} className="flex gap-3 rounded-lg bg-muted/40 p-3 text-sm">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background">
+                        {index + 1}
+                      </span>
+                      <span>{step}</span>
+                    </li>
+                  ),
+                )}
+              </ol>
+            </section>
+          )}
+
           <section className="rounded-xl border border-border bg-surface p-5">
             <MoomooConnection
               connected={connection !== null}
@@ -127,37 +146,34 @@ export default async function ConnectionPage({
             </section>
           )}
 
+          {/* What connecting means, in the order people ask it: is my password
+              involved, who could see the key, who sees my holdings, and how do
+              I undo it. Plain statements, including the uncomfortable one —
+              the operator could technically decrypt the key — because an
+              assurance that leaves that out is not one worth giving. */}
           <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-sm font-medium">{t.connection.privacyTitle}</h2>
-            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li>
-                <strong className="font-medium text-foreground">
-                  {t.connection.privacyPassword}
-                </strong>{" "}
-                {t.connection.privacyPasswordBody}
-              </li>
-              <li>
-                <strong className="font-medium text-foreground">
-                  {t.connection.privacyOperator}
-                </strong>{" "}
-                {t.connection.privacyOperatorBody}
-              </li>
-              <li>
-                <strong className="font-medium text-foreground">
-                  {t.connection.privacyNoTrading}
-                </strong>{" "}
-                {t.connection.privacyNoTradingBody}
-              </li>
-              <li>
-                {t.connection.privacyAi}
-              </li>
-              <li>
-                <strong className="font-medium text-foreground">
-                  {t.connection.privacyRevoke}
-                </strong>{" "}
-                {t.connection.privacyRevokeBody}
-              </li>
+            <h2 className="text-sm font-medium">{t.connection.trustTitle}</h2>
+            <ul className="mt-4 space-y-4">
+              {[
+                { icon: KeyRound, title: t.connection.trustKey, body: t.connection.trustKeyBody },
+                { icon: Eye, title: t.connection.trustOwner, body: t.connection.trustOwnerBody },
+                { icon: Users, title: t.connection.trustVisible, body: t.connection.trustVisibleBody },
+                { icon: Unplug, title: t.connection.trustControl, body: t.connection.trustControlBody },
+              ].map((item) => (
+                <li key={item.title} className="flex gap-3">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <item.icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{item.body}</p>
+                  </div>
+                </li>
+              ))}
             </ul>
+            <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+              {t.connection.privacyAi}
+            </p>
           </section>
         </>
       )}

@@ -56,7 +56,7 @@ export async function readAnalysis(
   // Flows and the review attestation belong to one portfolio; benchmark and
   // FX series are market data and stay shared, which is the point of keeping
   // them in their own table.
-  const [configRows, flows, benchmark, fx] = await Promise.all([
+  const [configRows, flows, benchmark, fx, owner] = await Promise.all([
     db.all<{ key: string; value: string }>(
       "SELECT key,value FROM analysis_config WHERE portfolio_id=?",
       [portfolioId],
@@ -73,11 +73,21 @@ export async function readAnalysis(
       "SELECT date,value FROM analysis_observations WHERE kind=? ORDER BY date",
       ["fx"],
     ),
+    db.get<{ kind: string }>("SELECT kind FROM portfolios WHERE id=?", [portfolioId]),
   ]);
   const config = Object.fromEntries(configRows.map((r) => [r.key, r.value]));
   return {
     flows,
-    coverage: config.review ? JSON.parse(config.review) : null,
+    // A practice account's money only ever moves through this app — its
+    // opening balance and any transfer recorded here — so its ledger is
+    // complete by construction and needs nobody to sign it off. Waiting for a
+    // review nobody would ever do meant no practice account could be shown on
+    // the performance page or ranked in the arena at all.
+    coverage: config.review
+      ? JSON.parse(config.review)
+      : owner?.kind === "mock"
+        ? { from: "1970-01-01", to: "9999-12-31" }
+        : null,
     benchmark,
     fx,
     sources: { benchmark: config.benchmark ?? "", fx: config.fx ?? "" },

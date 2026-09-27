@@ -249,14 +249,25 @@ export function concentration(positions: Position[], currency: string): Concentr
     return { top1Percent: 0, top3Percent: 0, top5Percent: 0 };
   }
 
-  const sorted = invested
-    .map(marketValue)
-    .sort((a, b) => b.amount.comparedTo(a.amount));
+  const ranked = invested
+    .map((position) => ({ symbol: position.symbol, value: marketValue(position) }))
+    .sort((a, b) => b.value.amount.comparedTo(a.value.amount));
+  const sorted = ranked.map((entry) => entry.value);
 
   const topN = (n: number) =>
     percentOf(sum(sorted.slice(0, n), currency), total) ?? 0;
 
-  return { top1Percent: topN(1), top3Percent: topN(3), top5Percent: topN(5) };
+  return {
+    top1Percent: topN(1),
+    top3Percent: topN(3),
+    top5Percent: topN(5),
+    // Named, so the card says which holdings it means — and visibly moves
+    // with the prices, which "34.5%" on its own does not show.
+    top: ranked.slice(0, 5).map((entry) => ({
+      symbol: entry.symbol,
+      percent: percentOf(entry.value, total) ?? 0,
+    })),
+  };
 }
 
 function toSlices(

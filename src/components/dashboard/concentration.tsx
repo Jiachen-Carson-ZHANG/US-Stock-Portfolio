@@ -37,6 +37,18 @@ export function ConcentrationTiles({ data }: { data: Concentration }) {
           </div>
         ))}
       </dl>
+      {data.top && data.top.length > 0 && (
+        <ol className="mt-4 space-y-1 border-t border-border pt-3 text-xs">
+          {data.top.map((holding, index) => (
+            <li key={holding.symbol} className="flex justify-between gap-3">
+              <span className="text-muted-foreground">
+                {index + 1}. <span className="font-medium text-foreground">{holding.symbol}</span>
+              </span>
+              <span className="tabular">{holding.percent.toFixed(1)}%</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { signClass } from "@/lib/utils";
@@ -7,7 +8,7 @@ import { useLocale, useT } from "@/lib/i18n/context";
 import { currentSessionDate, marketDateString } from "@/lib/market-hours";
 import { Help } from "@/components/ui/help";
 import { formatDay } from "@/lib/local-time";
-import type { MoneyDTO, PortfolioSummary } from "@/types/portfolio";
+import type { PortfolioSummary } from "@/types/portfolio";
 
 /**
  * A figure is meaningless without the window it covers. "Total return
@@ -78,13 +79,14 @@ function Stat({
 
 export function SummaryCards({
   summary,
-  totalInvested,
   since,
+  recordsHref,
 }: {
   summary: PortfolioSummary;
-  totalInvested: MoneyDTO;
   /** First day on record — what "total" is measured from. */
   since?: string | null;
+  /** Where deposits are recorded, for whoever may record them. */
+  recordsHref?: string | null;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -140,57 +142,43 @@ export function SummaryCards({
         label={t.summary.totalReturn}
         help={{ title: t.help.totalReturn, body: t.help.totalReturnBody }}
         value={formatMoney(summary.totalReturn, { signed: true })}
-        sub={formatPercent(summary.totalReturnPercent, { signed: true })}
+        sub={
+          summary.netDeposits
+            ? formatPercent(summary.totalReturnPercent, { signed: true })
+            : `${formatPercent(summary.totalReturnPercent, { signed: true })} · ${t.summary.fromHoldingsOnly}`
+        }
         tone={signClass(totalReturn)}
-        period={when(since, t.summary.since, locale)}
+        // A running total, not a stale date: everything since the first day
+        // on record.
+        period={when(since, t.summary.allTimeFrom, locale)}
       />
 
-      {/* "Invested" is the money actually paid in. Cash and cost of holdings
-          sit beside it and do not add up to it, which reads as a mistake
-          until you see the missing term: profit already taken went back into
-          cash without ever having been paid in. The arithmetic is shown
-          rather than asserted, because "why does 6,807 + 17,398 not make
-          22,100?" is the first thing anyone asks. */}
+      {/* Paid in, and only that. This card used to show cash plus holdings
+          at cost less profit taken "adding up" to it — but the cost it used
+          was not the one the balance uses (sold options count as a credit in
+          one and not the other), so on the real account it came to $22,877
+          beside a stated $22,100, and nobody could say why. A sum that does
+          not add up is worse than none. With no deposits recorded it says so,
+          rather than showing the cost of the holdings under this name. */}
       <Stat
         label={t.summary.totalInvested}
         compactOnPhone
         help={{ title: t.help.totalInvested, body: t.help.totalInvestedBody }}
-        value={formatMoney(summary.netDeposits ?? totalInvested)}
-        sub={summary.netDeposits ? t.summary.paidIn : undefined}
-        period={when(since, t.summary.since, locale)}
+        value={summary.netDeposits ? formatMoney(summary.netDeposits) : t.summary.notRecorded}
+        sub={summary.netDeposits ? t.summary.paidIn : t.summary.notRecordedBody}
+        period={summary.netDeposits ? when(since, t.summary.transfersFrom, locale) : undefined}
       >
         {summary.netDeposits ? (
-          <dl className="mt-3 space-y-1 text-xs">
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">{t.summary.cash}</dt>
-              <dd className="tabular">{formatMoney(summary.cashValue)}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">{t.summary.costBasis}</dt>
-              <dd className="tabular">{formatMoney(totalInvested)}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
-                {realized >= 0 ? t.summary.lessProfitTaken : t.summary.plusLossTaken}
-              </dt>
-              <dd className={`tabular ${signClass(realized)}`}>
-                {formatMoney(
-                  { ...summary.realizedPnL, amount: String(-realized) },
-                  { signed: true },
-                )}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2 border-t border-border pt-1">
-              <dt className="text-muted-foreground">{t.summary.totalInvested}</dt>
-              <dd className="tabular font-medium">
-                {formatMoney(summary.netDeposits)}
-              </dd>
-            </div>
-          </dl>
+          <p className="mt-1.5 text-xs text-muted-foreground">{t.summary.fromTransfers}</p>
         ) : (
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {t.summary.cash} {formatMoney(summary.cashValue)}
-          </p>
+          recordsHref && (
+            <Link
+              href={recordsHref}
+              className="mt-2 inline-block text-xs underline underline-offset-4"
+            >
+              {t.summary.addTransfers}
+            </Link>
+          )
         )}
       </Stat>
     </div>

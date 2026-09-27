@@ -1,6 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "@/lib/db";
-import { marketSession } from "@/lib/market-hours";
+import { isAfterMarketClose, marketDateString, marketSession } from "@/lib/market-hours";
+import { awardCompletedPeriods } from "@/lib/arena/trophies";
+import { captureDailySnapshots } from "@/lib/portfolio/daily-capture";
 import { logger } from "@/lib/logger";
 import { matchAllRestingOrders } from "@/lib/portfolio/service";
 import { warmQuotes } from "@/lib/portfolio/warm-quotes";
@@ -61,6 +63,19 @@ export async function GET(request: Request) {
     [new Date().toISOString()],
   );
 
+  // The evening's snapshot of every account. Tried every ten minutes after
+  // the close until each account has one, then left alone until tomorrow —
+  // this job already runs every minute, so the day no longer depends on a
+  // second scheduler nobody set up, or on somebody opening the site at 4am
+  // Singapore time.
+  if (isAfterMarketClose(new Date())) {
+    await recordEveningSnapshots(db).catch((error: unknown) => {
+      logger.error("snapshot.capture.failed", {
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    });
+  }
+
   const session = marketSession(new Date());
   if (session === "closed") {
     return Response.json({ awake: true, warmed: false, reason: "Market closed" });
@@ -108,4 +123,35 @@ export async function GET(request: Request) {
   }
 
   return Response.json({ awake: true, warmed: rounds > 0, rounds, symbols });
+}
+
+const SNAPSHOT_RETRY_MS = 10 * 60_000;
+
+async function recordEveningSnapshots(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  const now = new Date();
+  const today = marketDateString(now);
+  const mark = await db.get<{ payload: string; fetched_at: string }>(
+    `SELECT payload, fetched_at FROM series_cache WHERE key = 'cron:snapshot'`,
+  );
+  let state: { date?: string; complete?: boolean } = {};
+  try {
+    state = mark ? JSON.parse(mark.payload) : {};
+  } catch {
+    state = {};
+  }
+  if (state.date === today && state.complete) return;
+  if (mark && Date.now() - Date.parse(mark.fetched_at) < SNAPSHOT_RETRY_MS) return;
+
+  const { results } = await captureDailySnapshots(now);
+  const complete = results.every(
+    (row) => row.captured || row.reason === "Already recorded" || row.reason === "Not connected",
+  );
+  // A period is only measurable once its last close is in.
+  if (complete) await awardCompletedPeriods(db, now);
+
+  await db.run(
+    `INSERT INTO series_cache (key, payload, fetched_at) VALUES ('cron:snapshot', ?, ?)
+     ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, fetched_at = excluded.fetched_at`,
+    [JSON.stringify({ date: today, complete }), now.toISOString()],
+  );
 }

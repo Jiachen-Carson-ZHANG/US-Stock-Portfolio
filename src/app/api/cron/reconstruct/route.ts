@@ -105,6 +105,20 @@ export async function rebuildEveryPortfolio(): Promise<
       loadPrices: loaderFor(portfolio.id),
       liveValue: liveValue && liveValue > 0 ? liveValue : null,
       write: true,
+      // A practice account starts from its opening balance on the day it was
+      // made; that is its first deposit.
+      opening:
+        portfolio.kind === "mock"
+          ? {
+              date: new Intl.DateTimeFormat("en-CA", {
+                timeZone: "America/New_York",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              }).format(new Date(portfolio.createdAt)),
+              amount: Number(portfolio.openingCash ?? 0),
+            }
+          : null,
     });
 
     if (report.refusals.length > 0) {

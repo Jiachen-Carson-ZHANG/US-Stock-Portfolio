@@ -28,13 +28,21 @@ import { parseSymbol } from "@/lib/moomoo/symbols";
  * own page — pulling every account's positions on a timer would spend the
  * broker's rate limit on data nobody is looking at.
  */
-export async function warmQuotes(now: Date = new Date()): Promise<{
+export async function warmQuotes(
+  now: Date = new Date(),
+  /**
+   * Fetch even with the market shut. The evening's snapshot is taken until
+   * midnight in New York, and after 8pm the session reads as closed — but the
+   * snapshot still needs prices fetched that evening, not the afternoon's.
+   */
+  options: { force?: boolean } = {},
+): Promise<{
   warmed: boolean;
   symbols: number;
   reason?: string;
 }> {
   const session = marketSession(now);
-  if (session === "closed") {
+  if (session === "closed" && !options.force) {
     return { warmed: false, symbols: 0, reason: "Market closed" };
   }
 
