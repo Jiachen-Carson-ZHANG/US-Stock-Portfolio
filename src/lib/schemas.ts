@@ -229,6 +229,11 @@ export const optionScreenSchema = z.object({
     .optional(),
   /** For income trades: how likely keeping the money has to be, at least. */
   sure: z.coerce.number().min(0).max(0.95).optional(),
+  /** An optional strike range to search within. */
+  min: z.coerce.number().positive().optional(),
+  max: z.coerce.number().positive().optional(),
+  /** How many strikes around the share price to show, for the chain view. */
+  strikes: z.coerce.number().int().min(4).max(150).optional(),
 });
 
 /** What somebody typed into a symbol field: a ticker, or part of a name in any language. */

@@ -18,7 +18,6 @@ import {
   SeriesLegend,
   seriesColor,
 } from "@/components/charts/chart-kit";
-import { Input } from "@/components/ui/field";
 import { Help } from "@/components/ui/help";
 import { expirationPayoff, payoffProfile } from "@/lib/analysis/math";
 import {
@@ -41,8 +40,16 @@ export function PayoffExplorer({
   positions,
   underlyingPrices = {},
   greeks = {},
+  hypothetical = false,
 }: {
   positions: PositionView[];
+  /**
+   * A trade being considered rather than one that is held. There is nothing
+   * to compare against yet, so the "what you paid, what it is worth now"
+   * list becomes the prices you would trade at — "opened 6.40, now 6.40,
+   * made $0.00" said nothing and looked like a mistake.
+   */
+  hypothetical?: boolean;
   /** Live share price per underlying, needed to price the contracts. */
   underlyingPrices?: Record<string, number>;
   /**
@@ -70,8 +77,9 @@ export function PayoffExplorer({
     ),
   ];
   const [group, setGroup] = useState(keys[0] ?? "");
-  const [premiums, setPremiums] = useState<Record<string, string>>({});
-  const [fees, setFees] = useState("0");
+  // Fees are not modelled: they are a few dollars against positions worth
+  // thousands, and the field for them confused more people than it helped.
+  const fees = "0";
   const [price, setPrice] = useState<number | null>(null);
   /** How many days from now to value the position at. 0 is today. */
   const [daysAhead, setDaysAhead] = useState(0);
@@ -80,21 +88,15 @@ export function PayoffExplorer({
     (p) => `${p.underlyingSymbol}|${p.expirationDate}|${p.currency}` === group,
   );
   const anchor = Math.max(...chosen.map((p) => p.strike!));
-  const parsedPremium = (p: PositionView) =>
-    Number(premiums[p.id] ?? String(Math.max(0, p.averageCost ?? 0)));
-  const valid =
-    chosen.every(
-      (p) =>
-        (premiums[p.id] ?? String(p.averageCost ?? "")).trim() !== "" &&
-        Number.isFinite(parsedPremium(p)) &&
-        parsedPremium(p) >= 0 &&
-        Number.isFinite(p.quantity) &&
-        Number.isFinite(p.contractMultiplier ?? 100) &&
-        (p.contractMultiplier ?? 100) > 0,
-    ) &&
-    fees.trim() !== "" &&
-    Number.isFinite(Number(fees)) &&
-    Number(fees) >= 0;
+  const parsedPremium = (p: PositionView) => Math.max(0, p.averageCost ?? 0);
+  const valid = chosen.every(
+    (p) =>
+      p.averageCost !== undefined &&
+      Number.isFinite(parsedPremium(p)) &&
+      Number.isFinite(p.quantity) &&
+      Number.isFinite(p.contractMultiplier ?? 100) &&
+      (p.contractMultiplier ?? 100) > 0,
+  );
   const legs = chosen.map((p) => ({
     type: p.optionType!,
     strike: p.strike!,
@@ -144,10 +146,6 @@ export function PayoffExplorer({
           : null),
     };
   });
-
-  const fromBroker = chosen.some(
-    (p) => (greeks[p.symbol]?.impliedVolatility ?? 0) > 0,
-  );
 
   /**
    * The position's overall sensitivity, added up across the legs.
@@ -276,7 +274,7 @@ export function PayoffExplorer({
     <section className="space-y-5 rounded-xl border border-border bg-surface p-5">
       <header className="space-y-1">
         <h2 className="flex items-center gap-1 font-medium">
-          {say("Option position", "期权持仓")}
+          {hypothetical ? say("What this trade could make or lose", "这笔交易可能的盈亏") : say("Option position", "期权持仓")}
           <Help title={say("How to read this", "怎么看这一块")}>
             {say(
               "The table is what you paid for each contract and what it is worth now, per share — one contract is 100 shares, so 43.80 is $4,380 a contract. Below it: where the share has to finish for the position to break even, the best and worst it can do if held to the last day, and how it moves today. The chart shows profit or loss at every share price: the solid line is holding to the last day, the dashed line is selling on the day you pick instead, and the gap between them is time value — what somebody will pay for the chance it keeps going. That gap shrinks every day and is gone at expiry, which the faint lines show. Only contracts on the same share, expiring the same day, are combined. Held to expiry; no early assignment, no tax.",
@@ -285,10 +283,12 @@ export function PayoffExplorer({
           </Help>
         </h2>
         <p className="text-xs text-muted-foreground">
-          {say(
-            "What you paid, what it is worth now, and what it could make or lose",
-            "你付了多少、现在值多少、之后可能赚多少亏多少",
-          )}
+          {hypothetical
+            ? say("If you placed it now, at these prices", "如果现在按这些价格下单")
+            : say(
+                "What you paid, what it is worth now, and what it could make or lose",
+                "你付了多少、现在值多少、之后可能赚多少亏多少",
+              )}
         </p>
       </header>
 
@@ -330,56 +330,79 @@ export function PayoffExplorer({
       {/* A list, not a table. Four columns of money do not fit a phone:
           they either ran into each other or scrolled sideways, and a contract
           name wrapped to four lines. Two lines per leg read at any width. */}
-      <div>
-        <p className="flex items-center gap-0.5 text-xs text-muted-foreground">
-          {say("What you paid, and what it is worth now", "买入价与现价")}
-          <Help title={say("Opened at, and now", "开仓价与现价")}>
-            {say(
-              "\"Opened\" is what one share's worth of the contract cost when you bought it — or brought in when you sold it. \"Now\" is the broker's latest price for it; for a contract you sold, that is what buying it back would cost. Both are per share: a contract is 100 shares, so 43.80 is $4,380 a contract. The opening price comes from the broker and can be changed under Adjust.",
-              "「开仓」是买入时每股付出的价格，或卖出时每股收到的价格。「现价」是券商给出的最新价格；对于你卖出的合约，这是现在把它买回来要花的钱。两者都是每股价格：一张合约是 100 股，所以 43.80 就是每张 4,380 美元。开仓价来自券商，可在「调整」里修改。",
-            )}
-          </Help>
-        </p>
-        <ul className="mt-1 divide-y divide-border border-y border-border text-sm">
-          {rows.map((row) => (
-            <li key={row.p.id} className="flex items-start justify-between gap-3 py-2.5">
-              <div className="min-w-0">
-                <p className="font-medium">{contract(row.p)}</p>
-                <p className="tabular text-xs text-muted-foreground">
-                  {say("opened", "开仓")} {row.opened.toFixed(2)} → {say("now", "现价")}{" "}
-                  {row.now === undefined ? "—" : row.now.toFixed(2)}
-                </p>
-              </div>
-              <div className={`tabular shrink-0 text-right ${row.change === null ? "" : tone(row.change)}`}>
-                <p className="font-medium">{row.change === null ? "—" : signed(row.change)}</p>
-                {row.percent !== null && (
-                  <p className="text-xs text-muted-foreground">
-                    {row.percent >= 0 ? "+" : ""}
-                    {row.percent.toFixed(1)}%
-                  </p>
-                )}
-              </div>
+      {hypothetical ? (
+        // A trade being considered: the prices you would trade at, and what
+        // the whole thing would bring in or cost. Nothing is "now" yet.
+        <ul className="divide-y divide-border border-y border-border text-sm">
+          {chosen.map((p) => (
+            <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+              <span className="font-medium">{contract(p)}</span>
+              <span className="tabular text-muted-foreground">
+                {say("at", "价格")} {parsedPremium(p).toFixed(2)} {say("a share", "每股")}
+              </span>
             </li>
           ))}
-          <li className="flex items-start justify-between gap-3 py-2.5">
-            <div className="min-w-0">
-              <p className="font-medium">
-                {netOpened >= 0 ? say("Paid in total", "合计付出") : say("Received in total", "合计收到")}{" "}
-                <span className="tabular">{money(Math.abs(netOpened))}</span>
-              </p>
-              <p className="tabular text-xs text-muted-foreground">
-                {netNow !== null && netNow < 0
-                  ? say("costs to close now", "现在平仓需付")
-                  : say("worth now", "现值")}{" "}
-                {netNow === null ? "—" : money(Math.abs(netNow))}
-              </p>
-            </div>
-            <p className={`tabular shrink-0 text-right font-semibold ${netNow === null ? "" : tone(netNow - netOpened)}`}>
-              {netNow === null ? "—" : signed(netNow - netOpened)}
-            </p>
+          <li className="flex items-center justify-between gap-3 py-2.5">
+            <span className="font-medium">
+              {netOpened >= 0 ? say("You would pay", "你需支付") : say("You would receive", "你将收到")}
+            </span>
+            <span className={`tabular font-semibold ${netOpened < 0 ? "text-positive" : ""}`}>
+              {money(Math.abs(netOpened))}
+            </span>
           </li>
         </ul>
-      </div>
+      ) : (
+      <div>
+          <p className="flex items-center gap-0.5 text-xs text-muted-foreground">
+            {say("What you paid, and what it is worth now", "买入价与现价")}
+            <Help title={say("Opened at, and now", "开仓价与现价")}>
+              {say(
+                "\"Opened\" is what one share's worth of the contract cost when you bought it — or brought in when you sold it. \"Now\" is the broker's latest price for it; for a contract you sold, that is what buying it back would cost. Both are per share: a contract is 100 shares, so 43.80 is $4,380 a contract. The opening price comes from the broker and can be changed under Adjust.",
+                "「开仓」是买入时每股付出的价格，或卖出时每股收到的价格。「现价」是券商给出的最新价格；对于你卖出的合约，这是现在把它买回来要花的钱。两者都是每股价格：一张合约是 100 股，所以 43.80 就是每张 4,380 美元。开仓价来自券商，可在「调整」里修改。",
+              )}
+            </Help>
+          </p>
+          <ul className="mt-1 divide-y divide-border border-y border-border text-sm">
+            {rows.map((row) => (
+              <li key={row.p.id} className="flex items-start justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="font-medium">{contract(row.p)}</p>
+                  <p className="tabular text-xs text-muted-foreground">
+                    {say("opened", "开仓")} {row.opened.toFixed(2)} → {say("now", "现价")}{" "}
+                    {row.now === undefined ? "—" : row.now.toFixed(2)}
+                  </p>
+                </div>
+                <div className={`tabular shrink-0 text-right ${row.change === null ? "" : tone(row.change)}`}>
+                  <p className="font-medium">{row.change === null ? "—" : signed(row.change)}</p>
+                  {row.percent !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      {row.percent >= 0 ? "+" : ""}
+                      {row.percent.toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+            <li className="flex items-start justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {netOpened >= 0 ? say("Paid in total", "合计付出") : say("Received in total", "合计收到")}{" "}
+                  <span className="tabular">{money(Math.abs(netOpened))}</span>
+                </p>
+                <p className="tabular text-xs text-muted-foreground">
+                  {netNow !== null && netNow < 0
+                    ? say("costs to close now", "现在平仓需付")
+                    : say("worth now", "现值")}{" "}
+                  {netNow === null ? "—" : money(Math.abs(netNow))}
+                </p>
+              </div>
+              <p className={`tabular shrink-0 text-right font-semibold ${netNow === null ? "" : tone(netNow - netOpened)}`}>
+                {netNow === null ? "—" : signed(netNow - netOpened)}
+              </p>
+            </li>
+          </ul>
+        </div>
+      )}
 
       {profile && (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -534,7 +557,7 @@ export function PayoffExplorer({
           </div>
         ) : (
           <output className="block text-sm text-muted-foreground">
-            {say("Enter valid prices and fees under Adjust", "请在「调整」里输入有效的价格和费用")}
+            {say("The broker has not reported what these contracts cost.", "券商没有提供这些合约的成本。")}
           </output>
         )}
       </div>
@@ -628,65 +651,6 @@ export function PayoffExplorer({
         </ChartFrame>
       )}
 
-      {/* Out of the way, because almost nobody needs it: the broker's cost is
-          right for the position as held. It is here for asking "what if I had
-          paid less", and for fees the broker does not report. */}
-      <details className="rounded-lg border border-border p-4 text-sm">
-        <summary className="cursor-pointer text-muted-foreground">
-          {say("Adjust the prices used (optional)", "调整所用价格（可选）")}
-        </summary>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {chosen.map((p) => (
-            <label key={p.id} className="text-sm">
-              {contract(p)} · {say("opened at, per share", "开仓价（每股）")}
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={premiums[p.id] ?? String(Math.max(0, p.averageCost ?? 0))}
-                onChange={(e) => setPremiums({ ...premiums, [p.id]: e.target.value })}
-              />
-              <span className="block text-xs text-muted-foreground">
-                {greeks[p.symbol]?.impliedVolatility !== undefined && (
-                  <>
-                    {say("Implied volatility", "隐含波动率")}{" "}
-                    {(greeks[p.symbol]!.impliedVolatility! * 100).toFixed(1)}%
-                  </>
-                )}
-                {greeks[p.symbol]?.delta !== undefined && (
-                  <> · Delta {greeks[p.symbol]!.delta!.toFixed(3)}</>
-                )}
-                {greeks[p.symbol]?.theta !== undefined && (
-                  <> · Theta {greeks[p.symbol]!.theta!.toFixed(3)}</>
-                )}
-              </span>
-            </label>
-          ))}
-          <label className="text-sm">
-            {say("Fees, in total", "总费用")}
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={fees}
-              onChange={(e) => setFees(e.target.value)}
-            />
-          </label>
-        </div>
-        {hasToday && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {fromBroker
-              ? say(
-                  "The \"sold\" line uses the implied volatility the broker publishes with each contract's price.",
-                  "「卖出」曲线使用券商随合约价格一并发布的隐含波动率。",
-                )
-              : say(
-                  "The broker did not publish an implied volatility for these contracts, so the \"sold\" line works it back out of each one's own market price.",
-                  "券商没有提供这些合约的隐含波动率，因此「卖出」曲线由每张合约自己的市场价格反推得出。",
-                )}
-          </p>
-        )}
-      </details>
     </section>
   );
 }

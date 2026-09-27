@@ -8,7 +8,8 @@ import { buyingPower, recentOrders } from "@/lib/trading/orders";
 import { OrderList, Ticket } from "@/components/trading/ticket";
 import { Help } from "@/components/ui/help";
 import { BackLink } from "@/components/ui/back-link";
-import { OptionFinder } from "@/components/options/option-finder";
+import Link from "next/link";
+import { Layers } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function TradePage({
   searchParams,
 }: {
   params: Promise<{ portfolio: string }>;
-  /** Filled in by the option finder's "Trade this". */
+  /** Filled in by "Trade in practice" on a stock or option page. */
   searchParams: Promise<{ symbol?: string; side?: string }>;
 }) {
   const { user, portfolio } = await requirePortfolio((await params).portfolio);
@@ -59,7 +60,13 @@ export default async function TradePage({
           <p className="mt-1 text-sm text-muted-foreground">{t.trade.subtitle}</p>
         </div>
         {mine && (
-          <OptionFinder portfolioSlug={portfolio.slug} tradeSlug={portfolio.slug} />
+          <Link
+            href={`/${portfolio.slug}/options${initialSymbol ? `?symbol=${encodeURIComponent(initialSymbol)}` : ""}`}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"
+          >
+            <Layers className="size-4" aria-hidden="true" />
+            {t.nav.overview === "总览" ? "期权链与策略" : "Option chain & finder"}
+          </Link>
         )}
       </header>
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, MessagesSquare, ShoppingCart } from "lucide-react";
+import { ChevronLeft, Layers, MessagesSquare, ShoppingCart } from "lucide-react";
 import { currentLocale } from "@/lib/i18n/server";
 import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
 import { requirePortfolio } from "@/lib/portfolios/context";
@@ -166,6 +166,13 @@ export default async function StockPage({
               {say("Trade in practice", "模拟交易")}
             </Link>
           )}
+          <Link
+            href={`/${portfolio.slug}/options?symbol=${encodeURIComponent(underlying ?? symbol)}`}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"
+          >
+            <Layers className="size-4" aria-hidden="true" />
+            {underlying ? say(`Options on ${underlying}`, `${underlying} 的期权`) : say("Options", "期权")}
+          </Link>
           <Link
             href="/playground"
             className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"

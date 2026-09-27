@@ -10,8 +10,8 @@ import { Help } from "@/components/ui/help";
 import { loadBenchmarks } from "@/lib/analysis/benchmarks-server";
 import { loadRates } from "@/lib/analysis/fx-server";
 import { getMarketDataProvider } from "@/providers";
-import { OptionFinder } from "@/components/options/option-finder";
-import { visibleTo } from "@/lib/portfolios";
+import Link from "next/link";
+import { Layers } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 /**
@@ -30,19 +30,13 @@ export default async function PerformancePage({
   // Three independent reads, asked for together rather than one after
   // another. Each is a round trip, and round trips are the whole cost.
   const db = await getDb();
-  const [{ t }, portfolio, snapshots, analysis, openedOn, visible] = await Promise.all([
+  const [{ t }, portfolio, snapshots, analysis, openedOn] = await Promise.all([
     serverDictionary(),
     loadPortfolio(current.id),
     loadHistory(current.id),
     readAnalysis(db, current.id),
     portfolioStart(db, current.id),
-    visibleTo(db, user),
   ]);
-  // Where a result from the option finder can be tried: the viewer's own
-  // practice account, whichever account they happen to be reading.
-  const practice = visible.find(
-    (item) => item.kind === "mock" && item.ownerUserId === user.id,
-  );
   // The funds the account is measured against, fetched from the day the first
   // money went in rather than the first day a snapshot happens to exist.
   // "What would this have done in VOO instead" is a question about your money,
@@ -91,17 +85,22 @@ export default async function PerformancePage({
         benchmarks={benchmarks}
         rates={rates}
       />
+      {/* What you could hold, next to what you do: the chain and the finder
+          have a page of their own, so the analysis of the real position stays
+          where it is. */}
+      <div className="flex justify-end">
+        <Link
+          href={`/${current.slug}/options${
+            portfolio.optionGroups[0] ? `?symbol=${encodeURIComponent(portfolio.optionGroups[0].underlying)}` : ""
+          }`}
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"
+        >
+          <Layers className="size-4" aria-hidden="true" />
+          {t.nav.overview === "总览" ? "期权链与策略" : "Option chain & finder"}
+        </Link>
+      </div>
       {/* The share price each option group hangs off, so the explorer can read
           volatility out of the contracts' own quotes instead of assuming one. */}
-      {/* What you could hold, next to what you do. The finder opens as a
-          pop-up so the analysis of the real position stays where it is. */}
-      <div className="flex justify-end">
-        <OptionFinder
-          portfolioSlug={current.slug}
-          tradeSlug={practice?.slug ?? null}
-          initialSymbol={portfolio.optionGroups[0]?.underlying ?? ""}
-        />
-      </div>
       <PayoffExplorer
         positions={portfolio.positions}
         greeks={portfolio.optionGreeks}
