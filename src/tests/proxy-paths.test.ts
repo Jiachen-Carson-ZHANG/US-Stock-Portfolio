@@ -25,7 +25,14 @@ describe("paths the middleware lets through", () => {
   });
 
   it("allows signing up and signing in, which happen before a session exists", () => {
-    for (const path of ["/login", "/api/auth/login", "/register", "/api/auth/register"]) {
+    for (const path of [
+      "/login",
+      "/api/auth/login",
+      "/register",
+      "/api/auth/register",
+      "/api/auth/google/start",
+      "/api/auth/google/callback",
+    ]) {
       expect(source).toContain(`"${path}"`);
     }
   });

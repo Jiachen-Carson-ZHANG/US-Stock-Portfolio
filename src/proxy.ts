@@ -8,6 +8,11 @@ const PUBLIC_PATHS = new Set([
   // Signing up necessarily happens before there is a session to check.
   "/register",
   "/api/auth/register",
+  // Signing in with Google starts and finishes before there is a session.
+  // Each route checks its own sealed state; linking requires a signed-in
+  // user inside the route.
+  "/api/auth/google/start",
+  "/api/auth/google/callback",
   // Forgetting a password happens, by definition, without a session.
   "/forgot",
   "/api/auth/hint",
