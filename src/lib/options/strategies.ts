@@ -294,3 +294,53 @@ function rank(
       (b.maxProfit ?? Infinity) / (b.maxLoss ?? 1) - (a.maxProfit ?? Infinity) / (a.maxLoss ?? 1),
   );
 }
+
+export type ScreenSort = "best" | "chance" | "income" | "cheapest";
+
+/** A candidate found on some expiry, labelled with it. */
+export type DatedCandidate = Candidate & { expiry: string; days: number };
+
+/** Strategies that collect money now and are judged by how reliably they keep it. */
+function collects(strategy: StrategyKey): boolean {
+  return rankingFor(strategy) === "income" || strategy === "bull-put-spread" || strategy === "bear-call-spread";
+}
+
+/**
+ * The least chance of profit a search starts from. Money collected now is
+ * judged by how reliably it is kept; a bet on a move is expected to be
+ * less likely and to pay more when it comes off.
+ */
+export function defaultSure(strategy: StrategyKey): number {
+  return collects(strategy) ? 0.7 : 0.35;
+}
+
+/**
+ * What "best" means for each goal, across every expiry at once.
+ *
+ * Collecting money: the most income per year for the cash tied up. A spread
+ * bought for a move: the most it can make for each dollar it can lose. A
+ * single bought option: the cheapest one, because the chance filter has
+ * already said how likely it must be. Every ranking only sees trades at
+ * least as likely to profit as the person asked for.
+ */
+function score(strategy: StrategyKey, c: Candidate, sort: ScreenSort): number {
+  if (sort === "chance") return c.chance ?? 0;
+  if (sort === "income") return c.annualReturn ?? -Infinity;
+  if (sort === "cheapest") return -c.capital;
+  if (collects(strategy)) return c.annualReturn ?? -Infinity;
+  if (rankingFor(strategy) === "reward") return (c.maxProfit ?? 0) / (c.maxLoss ?? Infinity);
+  return -c.capital;
+}
+
+export function rankAcross<T extends Candidate>(
+  strategy: StrategyKey,
+  list: T[],
+  sort: ScreenSort,
+  minChance: number,
+  limit = 12,
+): T[] {
+  return list
+    .filter((c) => c.chance === null || c.chance >= minChance)
+    .sort((a, b) => score(strategy, b, sort) - score(strategy, a, sort))
+    .slice(0, limit);
+}

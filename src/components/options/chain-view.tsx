@@ -6,8 +6,18 @@ import { PayoffExplorer } from "@/components/analysis/payoff-explorer";
 import { Help } from "@/components/ui/help";
 import { useLocale } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
+import { yearsUntil } from "@/lib/analysis/options-pricing";
+import { candidates, type Candidate } from "@/lib/options/strategies";
 import type { OptionExpiration } from "@/types/market";
 import type { PositionView } from "@/types/portfolio";
+import { CandidateCard } from "./candidate-card";
+import { STRATEGY } from "./strategy-text";
+
+type Spread = "bull-call-spread" | "bear-put-spread" | "bull-put-spread" | "bear-call-spread";
+const SPREADS: Spread[] = ["bull-call-spread", "bear-put-spread", "bull-put-spread", "bear-call-spread"];
+
+const legGap = (c: Candidate) => Math.round(Math.abs(c.legs[0].strike - (c.legs[1]?.strike ?? c.legs[0].strike)) * 100) / 100;
+const lowStrike = (c: Candidate) => Math.min(...c.legs.map((l) => l.strike));
 
 type Contract = {
   symbol: string;
@@ -64,6 +74,10 @@ export function ChainView({
   const [chain, setChain] = useState<Contract[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Contract | null>(null);
+  // Single contracts, or a two-legged strategy priced from the same chain.
+  const [mode, setMode] = useState<"single" | Spread>("single");
+  const [gap, setGap] = useState<number | null>(null);
+  const [combo, setCombo] = useState<Candidate | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +115,16 @@ export function ChainView({
         }))
     : [];
   const splitAt = rows.findIndex((row) => row.strike >= spot);
+
+  // Every spread the chain allows on this date, priced at the prices you
+  // would trade at, grouped by how far apart its strikes are.
+  const combos = mode === "single" || !chain || !expiry ? [] : candidates(mode, chain, spot, yearsUntil(expiry), 1000, 0);
+  const gaps = [...new Set(combos.map(legGap))].sort((a, b) => a - b);
+  const activeGap = gap !== null && gaps.includes(gap) ? gap : (gaps[0] ?? null);
+  const shownCombos = combos.filter((c) => legGap(c) === activeGap).sort((a, b) => lowStrike(a) - lowStrike(b));
+  const credit = mode === "bull-put-spread" || mode === "bear-call-spread";
+  const money = (n: number) =>
+    new Intl.NumberFormat(zh ? "zh-CN" : "en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
   const COLUMNS: (keyof Contract)[] = ["bid", "ask", "delta", "iv", "openInterest"];
   // On a phone one side is shown at a time, with bid, ask and delta; the rest
@@ -195,6 +219,43 @@ export function ChainView({
         </div>
       </div>
 
+      <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          {say("Strategy", "策略")}
+          <Help title={say("Strategies in the chain", "期权链里的策略")}>
+            {say(
+              "A single contract is one call or one put. The others are spreads of two contracts on the same date, priced here from the chain at the prices you would actually trade at, so each row is a whole trade with its cost, best case, worst case and break-even.",
+              "单个合约就是一张看涨或看跌期权。其他选项是同一到期日两张合约组成的价差，按你实际能成交的价格从期权链计算，所以每一行都是一笔完整的交易，列出成本、最多赚、最多亏和保本价。",
+            )}{" "}
+            {SPREADS.map((key) => {
+              const [, jargon, why] = zh ? STRATEGY[key].zh : STRATEGY[key].en;
+              return (
+                <span key={key} className="mt-2 block">
+                  <strong className="font-medium text-foreground">{jargon}.</strong> {why}
+                </span>
+              );
+            })}
+          </Help>
+        </span>
+        <select
+          aria-label={say("Strategy", "策略")}
+          value={mode}
+          onChange={(event) => {
+            setMode(event.target.value as "single" | Spread);
+            setCombo(null);
+            setPicked(null);
+          }}
+          className="min-h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+        >
+          <option value="single">{say("Single contract", "单个合约")}</option>
+          {SPREADS.map((key) => (
+            <option key={key} value={key}>
+              {(zh ? STRATEGY[key].zh : STRATEGY[key].en)[1]}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1" role="group" aria-label={say("Strikes shown", "显示的行权价")}>
           {WIDTHS.map((option) => (
@@ -234,6 +295,78 @@ export function ChainView({
         <p className="text-sm text-negative">{error}</p>
       ) : chain === null ? (
         <p className="text-sm text-muted-foreground">{say("Pricing the chain…", "正在给期权链报价…")}</p>
+      ) : mode !== "single" ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" role="group">
+            <span>{say("Strikes apart", "行权价间距")}</span>
+            {gaps.map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={activeGap === value}
+                onClick={() => {
+                  setGap(value);
+                  setCombo(null);
+                }}
+                className={cn(
+                  "min-h-8 rounded-md px-2.5",
+                  activeGap === value ? "bg-muted font-medium text-foreground" : "hover:bg-muted",
+                )}
+              >
+                ${value}
+              </button>
+            ))}
+          </div>
+          {shownCombos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {say("No spread of this kind has a usable price on this date.", "这一天没有可用报价的这类价差。")}
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left font-normal">{say("Trade", "交易")}</th>
+                    <th className="px-2 py-1.5 text-right font-normal">{credit ? say("You get", "收入") : say("You pay", "支出")}</th>
+                    <th className="px-2 py-1.5 text-right font-normal">{say("Best case", "最多赚")}</th>
+                    <th className="px-2 py-1.5 text-right font-normal">{say("Worst case", "最多亏")}</th>
+                    <th className="hidden px-2 py-1.5 text-right font-normal sm:table-cell">{say("Break-even", "保本价")}</th>
+                    <th className="px-2 py-1.5 text-right font-normal">{say("Chance", "概率")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shownCombos.map((c) => {
+                    const key = c.legs.map((l) => l.symbol).join("+");
+                    const chosen = combo !== null && combo.legs.map((l) => l.symbol).join("+") === key;
+                    return (
+                      <tr
+                        key={key}
+                        onClick={() => setCombo(c)}
+                        className={cn("cursor-pointer border-b border-border last:border-0 hover:bg-muted/40", chosen && "bg-(--chart-1)/20 font-semibold")}
+                      >
+                        <td className="px-2 py-2">
+                          <button type="button" className="text-left">
+                            {c.legs
+                              .map((l) => `${l.side === "buy" ? say("Buy", "买") : say("Sell", "卖")} ${l.strike}`)
+                              .join(" · ")}
+                          </button>
+                        </td>
+                        <td className="tabular px-2 py-2 text-right">{money(Math.abs(c.net) * c.multiplier)}</td>
+                        <td className="tabular px-2 py-2 text-right text-positive">{c.maxProfit === null ? "—" : `+${money(c.maxProfit)}`}</td>
+                        <td className="tabular px-2 py-2 text-right text-negative">{c.maxLoss === null ? "—" : `−${money(c.maxLoss)}`}</td>
+                        <td className="tabular hidden px-2 py-2 text-right sm:table-cell">${c.breakEven.toFixed(2)}</td>
+                        <td className="tabular px-2 py-2 text-right">{c.chance === null ? "—" : `${Math.round(c.chance * 100)}%`}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {combo && expiry && (
+            <CandidateCard candidate={combo} symbol={symbol} spot={spot} expiry={expiry} income={credit} tradeSlug={tradeSlug} />
+          )}
+        </div>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{say("No contracts with prices on this date.", "这一天没有带报价的合约。")}</p>
       ) : (

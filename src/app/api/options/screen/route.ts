@@ -2,7 +2,8 @@ import { getDb } from "@/lib/db";
 import { yearsUntil } from "@/lib/analysis/options-pricing";
 import { logger } from "@/lib/logger";
 import { loadExpirations, loadPricedChain, NoOptionsError } from "@/lib/options/chain-server";
-import { candidates, rankingFor } from "@/lib/options/strategies";
+import { candidates, defaultSure, rankingFor } from "@/lib/options/strategies";
+import { screenAll } from "@/lib/options/screen";
 import { requirePortfolioApi } from "@/lib/portfolios/context";
 import { portfolioSlugFrom } from "@/lib/portfolios/request";
 import { optionScreenSchema } from "@/lib/schemas";
@@ -13,10 +14,11 @@ export const maxDuration = 60;
 /**
  * The strategy finder.
  *
- * Without an expiry: the share's price and the expiries listed for it.
- * With an expiry and a strategy: the contracts on that expiry — near the
- * share price, or inside the strike range asked for — priced and turned into
- * ranked candidates (see lib/options/strategies). A request names the
+ * Without an expiry, the share's price and the expiries listed for it. With
+ * "all", every expiry within the horizon searched and ranked together (see
+ * lib/options/screen). With one expiry and a strategy, that expiry's
+ * contracts near the share price, or inside the strike range asked for,
+ * priced and turned into ranked candidates (see lib/options/strategies). A request names the
  * portfolio only because a price is fetched with somebody's connection.
  */
 export async function GET(request: Request) {
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
   if (!parsed.success) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
-  const { symbol, expiry, strategy, sure, min, max } = parsed.data;
+  const { symbol, expiry, strategy, sure, min, max, days, sort } = parsed.data;
 
   const db = await getDb();
   const provider = await getMarketDataProvider(context.portfolio.id);
@@ -43,6 +45,24 @@ export async function GET(request: Request) {
       );
     }
     if (!expiry || !strategy) return Response.json({ symbol, spot, expirations });
+
+    // Every expiry within the horizon, ranked together.
+    if (expiry === "all") {
+      const result = await screenAll(db, provider, {
+        symbol,
+        spot,
+        expirations,
+        strategy,
+        horizonDays: days ?? 60,
+        minChance: sure ?? defaultSure(strategy),
+        sort: sort ?? "best",
+        min,
+        max,
+        now,
+      });
+      return Response.json({ symbol, spot, strategy, ...result });
+    }
+
     if (!expirations.some((row) => row.date === expiry)) {
       return Response.json({ error: "That expiry is not listed." }, { status: 400 });
     }

@@ -213,10 +213,13 @@ export const optionScreenSchema = z.object({
     .trim()
     .toUpperCase()
     .regex(/^[A-Z][A-Z0-9.]{0,9}$/, "Give a share or fund ticker"),
+  /** A date, or "all" to search every expiry within `days`. */
   expiry: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .regex(/^(\d{4}-\d{2}-\d{2}|all)$/)
     .optional(),
+  days: z.coerce.number().int().min(1).max(800).optional(),
+  sort: z.enum(["best", "chance", "income", "cheapest"]).optional(),
   strategy: z
     .enum([
       "sell-put",
