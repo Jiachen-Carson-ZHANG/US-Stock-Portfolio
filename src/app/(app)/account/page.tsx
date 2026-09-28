@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { OwnBrokerageButton } from "@/components/broker/own-brokerage";
 import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { serverDictionary } from "@/lib/i18n/server";
+import { googleConfigured, googleFor } from "@/lib/auth/google";
+import { GoogleButton } from "@/components/layout/google-button";
+import { GoogleUnlink } from "@/components/account/google-unlink";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +30,11 @@ type SecurityEvent = {
   created_at: string;
 };
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ google?: string }>;
+}) {
   const user = await requireUser();
   const { t } = await serverDictionary();
   const open = isOpenAccess();
@@ -62,6 +69,15 @@ export default async function AccountPage() {
     [user.id],
   );
   const connected = brokerage ? (await readConnectionStatus(db, brokerage.id)) !== null : false;
+
+  // Signing in with Google, once the site has been set up for it.
+  const google = !open && googleConfigured() ? await googleFor(db, user.id) : undefined;
+  const googleStatus = {
+    linked: t.account.googleLinkedNow,
+    taken: t.account.googleTaken,
+    failed: t.account.googleFailedLink,
+    unavailable: t.login.googleUnavailable,
+  }[(await searchParams).google ?? ""];
 
   const eventLabel: Record<string, string> = {
     login: t.account.signedIn,
@@ -110,6 +126,26 @@ export default async function AccountPage() {
         )}
         <p className="text-xs text-muted-foreground">{t.account.brokerOthers}</p>
       </section>
+
+      {google !== undefined && (
+        <section className="space-y-3 rounded-xl border border-border bg-surface p-5">
+          <h2 className="text-base font-semibold">{t.account.googleTitle}</h2>
+          <p className="text-sm text-muted-foreground">{t.account.googleBody}</p>
+          {googleStatus && <p role="status" className="text-sm">{googleStatus}</p>}
+          {google ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-medium">
+                {google.email ? t.account.googleLinked.replace("{email}", google.email) : t.account.googleLinkedNoEmail}
+              </p>
+              <GoogleUnlink label={t.account.googleUnlink} confirm={t.account.googleUnlinkConfirm} />
+            </div>
+          ) : (
+            <div className="max-w-xs">
+              <GoogleButton label={t.account.googleLink} intent="link" />
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">{t.account.displayName}</h2>

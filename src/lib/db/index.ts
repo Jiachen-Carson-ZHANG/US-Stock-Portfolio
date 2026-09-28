@@ -287,6 +287,19 @@ CREATE TABLE IF NOT EXISTS trophies (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trophy_period
   ON trophies(period, period_end, portfolio_id);
 
+-- Ways to sign in besides a password, by the provider's permanent id for the
+-- person. Linked by the account's owner while signed in, never by matching
+-- an email address.
+CREATE TABLE IF NOT EXISTS user_identities (
+  provider   TEXT NOT NULL,
+  subject    TEXT NOT NULL,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email      TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (provider, subject)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_identity_user ON user_identities(provider, user_id);
+
 -- A dated journal per person and share: one entry a day, private to its
 -- author like a watchlist, for reading back later what was thought when.
 CREATE TABLE IF NOT EXISTS stock_notes (

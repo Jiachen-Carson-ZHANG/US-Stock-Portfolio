@@ -6,6 +6,8 @@ import { LocaleProvider } from "@/lib/i18n/context";
 import { RegisterForm } from "@/components/layout/register-form";
 import { LanguageToggle } from "@/components/layout/nav";
 import { BrandMark } from "@/components/layout/brand-mark";
+import { GoogleButton } from "@/components/layout/google-button";
+import { googleConfigured } from "@/lib/auth/google";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,13 @@ export default async function RegisterPage() {
               {t.register.subtitle}
             </p>
           </div>
+
+          {googleConfigured() && (
+            <div className="mb-4 space-y-3">
+              <GoogleButton label={t.login.googleButton} />
+              <p className="text-center text-xs text-muted-foreground">{t.login.googleOr}</p>
+            </div>
+          )}
 
           <RegisterForm ownerName={ownerName ?? t.register.theOwner} />
 

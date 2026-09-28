@@ -48,6 +48,13 @@ const en = {
     unreachable: "Cannot reach the server. Check your connection.",
     showPassword: "Show password",
     hidePassword: "Hide password",
+    googleButton: "Continue with Google",
+    googleOr: "or with your username",
+    googleCancelled: "Google sign-in was cancelled. Nothing changed.",
+    googleFailed: "Google sign-in did not complete. Please try again.",
+    googleUnavailable: "Google sign-in is not set up on this site yet.",
+    googleNote:
+      "A Google account signs in only after you link it from your Account page. A new one asks to join and waits for approval.",
   },
 
   market: {
@@ -455,6 +462,18 @@ const en = {
     signedIn: "Signed in",
     signedOut: "Signed out",
     passwordChangedEvent: "Password changed",
+    googleTitle: "Sign in with Google",
+    googleBody:
+      "Link your Google account and you can sign in with it instead of typing your password. The site only learns your name and email address from Google, nothing else.",
+    googleLink: "Link my Google account",
+    googleLinked: "Linked to {email}",
+    googleLinkedNoEmail: "A Google account is linked",
+    googleUnlink: "Unlink",
+    googleUnlinkConfirm:
+      "Unlink Google? Make sure you know your password first, or you will need it reset to sign in.",
+    googleLinkedNow: "Your Google account is linked. You can sign in with it from now on.",
+    googleTaken: "That Google account is already linked to another account here.",
+    googleFailedLink: "Linking Google did not complete. Please try again.",
   },
 
   access: {
@@ -865,6 +884,12 @@ const zh: Dictionary = {
     unreachable: "无法连接服务器，请检查网络。",
     showPassword: "显示密码",
     hidePassword: "隐藏密码",
+    googleButton: "使用 Google 登录",
+    googleOr: "或使用用户名登录",
+    googleCancelled: "已取消 Google 登录，没有任何改动。",
+    googleFailed: "Google 登录没有完成，请再试一次。",
+    googleUnavailable: "本站还没有设置 Google 登录。",
+    googleNote: "Google 账号要先在「账户」页面关联后才能登录。未关联的新账号会提交加入申请，等待批准。",
   },
 
   market: {
@@ -1261,6 +1286,16 @@ const zh: Dictionary = {
     signedIn: "登录",
     signedOut: "退出登录",
     passwordChangedEvent: "修改密码",
+    googleTitle: "使用 Google 登录",
+    googleBody: "关联你的 Google 账号后，就可以用它登录，不必输入密码。本站只从 Google 获取你的名字和邮箱，不会获取其他任何信息。",
+    googleLink: "关联我的 Google 账号",
+    googleLinked: "已关联 {email}",
+    googleLinkedNoEmail: "已关联一个 Google 账号",
+    googleUnlink: "取消关联",
+    googleUnlinkConfirm: "确定取消关联 Google 吗？请先确认你记得密码，否则需要请人重置密码才能登录。",
+    googleLinkedNow: "你的 Google 账号已关联，以后可以用它登录。",
+    googleTaken: "这个 Google 账号已经关联到本站的另一个账户。",
+    googleFailedLink: "关联 Google 没有完成，请再试一次。",
   },
 
   access: {
