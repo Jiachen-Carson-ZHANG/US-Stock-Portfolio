@@ -129,7 +129,7 @@ export function StrategyFinder({
                 const [title, jargon, why] = zh ? STRATEGY[key].zh : STRATEGY[key].en;
                 return (
                   <span key={key} className="mb-2 block">
-                    <strong className="font-medium text-foreground">{title}</strong> ({jargon}) — {why}
+                    <strong className="font-medium text-foreground">{title}</strong> ({jargon}). {why}
                   </span>
                 );
               })}
@@ -166,7 +166,7 @@ export function StrategyFinder({
         </p>
         <div className="mt-1.5 flex items-center gap-2">
           <Input inputMode="decimal" placeholder={say("from", "从")} value={min} onChange={(event) => setMin(event.target.value)} />
-          <span className="text-muted-foreground">–</span>
+          <span className="text-muted-foreground">{say("to", "至")}</span>
           <Input inputMode="decimal" placeholder={say("to", "到")} value={max} onChange={(event) => setMax(event.target.value)} />
         </div>
       </div>
@@ -181,8 +181,8 @@ export function StrategyFinder({
           <div className="mt-3 space-y-2">
             <p className="text-xs text-muted-foreground">
               {say(
-                "Only show trades at least this likely to keep the money — judged from today's option prices, assuming you hold to expiry. Asking for more certainty means less income: the market pays more for more risk.",
-                "只显示至少有这么大把握能保住这笔钱的交易——按今天的期权价格推算，并假设持有到期。要求的把握越大，收入就越少：市场只为更高的风险付更多的钱。",
+                "Only show trades at least this likely to keep the money, judged from today's option prices and assuming you hold to expiry. Asking for more certainty means less income, because the market pays more for more risk.",
+                "只显示至少有这么大把握能保住这笔钱的交易，按今天的期权价格推算，并假设持有到期。要求的把握越大，收入就越少，因为市场只为更高的风险付更多的钱。",
               )}
             </p>
             <div className="flex gap-1.5">

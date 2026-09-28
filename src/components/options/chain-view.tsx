@@ -224,8 +224,8 @@ export function ChainView({
         </div>
         <Help title={say("Reading the chain", "怎么看期权链")}>
           {say(
-            "Each row is a strike price. Calls are on the left, puts on the right. Bid is what you would get selling one now; ask is what buying one costs — per share, and a contract is 100 shares. Delta: how many shares one share's worth of the contract moves like (0.50 on a call moves about 50 cents for each dollar on the share). IV, implied volatility: how much movement the price assumes — higher means dearer. OI, open interest: how many contracts are open, a guide to how easy it is to trade. Shaded contracts would be worth something if exercised right now. Tap any contract for its payoff and to trade it.",
-            "每一行是一个行权价，左边是看涨，右边是看跌。买一价是现在卖出能拿到的价格，卖一价是现在买入要付的价格——都是每股价格，一张合约是 100 股。Delta：合约每一股大约相当于多少股正股的涨跌（看涨 0.50 表示正股每涨 1 美元，它涨约 50 美分）。IV（隐含波动率）：价格里假设的波动幅度，越高越贵。OI（未平仓）：还持有着的合约数量，可以看出好不好成交。带阴影的合约如果现在行权就有价值。点任意合约可以看盈亏图并交易。",
+            "Each row is a strike price. Calls are on the left, puts on the right. Bid is what you would get selling one now, and ask is what buying one costs, both per share, and a contract is 100 shares. Delta says how many shares one share's worth of the contract moves like, so 0.50 on a call moves about 50 cents for each dollar on the share. IV, the implied volatility, is how much movement the price assumes, and higher means dearer. OI, the open interest, is how many contracts are open, which shows how easy it is to trade. Shaded contracts would be worth something if exercised right now. Tap any contract for its payoff and to trade it.",
+            "每一行是一个行权价，左边是看涨，右边是看跌。买一价是现在卖出能拿到的价格，卖一价是现在买入要付的价格，都是每股价格，一张合约是 100 股。Delta 表示合约每一股大约相当于多少股正股的涨跌，看涨 0.50 表示正股每涨 1 美元，它涨约 50 美分。IV 是隐含波动率，也就是价格里假设的波动幅度，越高越贵。OI 是未平仓合约数，可以看出好不好成交。带阴影的合约如果现在行权就有价值。点任意合约可以看盈亏图并交易。",
           )}
         </Help>
       </div>

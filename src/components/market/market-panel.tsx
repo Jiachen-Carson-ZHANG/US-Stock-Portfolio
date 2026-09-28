@@ -146,8 +146,8 @@ export function MarketPanel({ detail, price }: { detail: QuoteDetail; price?: nu
             label: say("Gap", "买卖价差"),
             value: spread === undefined ? undefined : usd(spread),
             help: say(
-              "Ask minus bid: what trading straight away costs on top of the price. Smaller is better.",
-              "卖一减买一：立刻成交要额外付出的成本，越小越好。",
+              "Ask minus bid, which is what trading straight away costs on top of the price. Smaller is better.",
+              "卖一减买一，也就是立刻成交要额外付出的成本，越小越好。",
             ),
           },
         ]}
@@ -162,15 +162,15 @@ export function MarketPanel({ detail, price }: { detail: QuoteDetail; price?: nu
             label: "P/E (TTM)",
             value: fixed(detail.peTtm, 2),
             help: say(
-              "Price divided by the last twelve months' profit per share: how many years of today's profit the price pays for. Negative means the company lost money.",
-              "股价除以过去十二个月的每股盈利：股价相当于多少年的当前利润。为负表示公司在亏损。",
+              "Price divided by the last twelve months' profit per share, which says how many years of today's profit the price pays for. Negative means the company lost money.",
+              "股价除以过去十二个月的每股盈利，也就是股价相当于多少年的当前利润。为负表示公司在亏损。",
             ),
           },
           {
             label: "P/B",
             value: fixed(detail.pb, 2),
             help: say(
-              "Price divided by the company's book value per share — what it owns less what it owes. Negative means it owes more than it owns.",
+              "Price divided by the company's book value per share, which is what it owns less what it owes. Negative means it owes more than it owns.",
               "股价除以每股净资产（资产减负债）。为负表示负债超过资产。",
             ),
           },

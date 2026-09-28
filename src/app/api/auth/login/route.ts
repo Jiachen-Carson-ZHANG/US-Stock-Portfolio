@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       {
         error: "Sign-in is unavailable right now.",
         reason:
-          "This copy of the site cannot reach its database. It is not your password — nothing you type will work until the connection is fixed.",
+          "This copy of the site cannot reach its database. It is not your password, and nothing you type will work until the connection is fixed.",
       },
       { status: 503 },
     );

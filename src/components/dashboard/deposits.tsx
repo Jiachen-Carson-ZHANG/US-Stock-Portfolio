@@ -179,8 +179,8 @@ export function ReconciliationBanner({
     >
       <strong className="font-medium">{amount}</strong> {t.transfers.unexplained}
       {residual > 0
-        ? ` — ${t.transfers.moreThanExpected}. `
-        : ` — ${t.transfers.lessThanExpected}. `}
+        ? `, ${t.transfers.moreThanExpected}. `
+        : `, ${t.transfers.lessThanExpected}. `}
       {t.transfers.unexplainedHint}
     </p>
   );

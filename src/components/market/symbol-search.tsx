@@ -190,7 +190,7 @@ export function SymbolSearch({
                   : `Can't find “${answered}”. Only shares and funds listed in the US are covered so far; ones listed only in Singapore, Hong Kong or elsewhere aren't yet.`
                 : zh
                   ? `美国市场没有代码为“${answered?.toUpperCase()}”的股票，以上结果只是名称里含有它。只在新加坡、香港等市场上市的股票暂不支持。`
-                  : `No US ticker “${answered?.toUpperCase()}” — the results above only have it in their names. Shares listed only in Singapore, Hong Kong or elsewhere aren't covered yet.`}
+                  : `No US ticker is called “${answered?.toUpperCase()}”, and the results above only have it in their names. Shares listed only in Singapore, Hong Kong or elsewhere aren't covered yet.`}
             </p>
           )}
         </div>

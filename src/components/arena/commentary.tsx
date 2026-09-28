@@ -3,13 +3,22 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useT } from "@/lib/i18n/context";
+import { useLocale, useT } from "@/lib/i18n/context";
 import type { Period } from "@/lib/arena";
 
 type Result = {
   text: string;
   sources: { title: string; url: string }[];
 };
+
+const PERIOD_EN: Record<Period, string> = {
+  day: "today",
+  week: "this week",
+  month: "this month",
+  year: "this year",
+  max: "all time",
+};
+const PERIOD_ZH: Record<Period, string> = { day: "今天", week: "本周", month: "本月", year: "今年", max: "全部时间" };
 
 /**
  * The commentator's write-up for the selected period.
@@ -20,6 +29,7 @@ type Result = {
  */
 export function ArenaCommentary({ period }: { period: Period }) {
   const t = useT();
+  const zh = useLocale() === "zh";
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +65,7 @@ export function ArenaCommentary({ period }: { period: Period }) {
         </div>
         <Button size="sm" variant="outline" onClick={write} disabled={busy}>
           <Sparkles className="size-3.5" aria-hidden="true" />
-          {busy ? t.arena.writing : result ? t.arena.again : `${t.arena.report} ${period}`}
+          {busy ? t.arena.writing : result ? t.arena.again : t.arena.report.replace("{period}", (zh ? PERIOD_ZH : PERIOD_EN)[period])}
         </Button>
       </div>
 

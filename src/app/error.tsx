@@ -62,7 +62,7 @@ function categorise(message: string): { title: string; body: string } {
   if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|database|DATABASE_URL|pg|pool/i.test(message)) {
     return {
       title: "Cannot reach the database",
-      body: "This copy of the site is running, but it cannot talk to the database that holds the data. That is a configuration problem on the server, not anything you did — most often a missing or wrong DATABASE_URL on this deployment.",
+      body: "This copy of the site is running, but it cannot talk to the database that holds the data. That is a configuration problem on the server, not anything you did. Most often it is a missing or wrong DATABASE_URL on this deployment.",
     };
   }
 
@@ -76,7 +76,7 @@ function categorise(message: string): { title: string; body: string } {
   if (/fetch|network|timeout|abort/i.test(message)) {
     return {
       title: "Something did not answer in time",
-      body: "A service this page depends on took too long. It is usually momentary — try again in a few seconds.",
+      body: "A service this page depends on took too long. It is usually momentary, so try again in a few seconds.",
     };
   }
 

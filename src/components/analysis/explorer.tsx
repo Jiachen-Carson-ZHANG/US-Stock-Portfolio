@@ -439,7 +439,7 @@ export function PerformanceExplorer({
               />
             </label>
             <label className="block text-sm">
-              {say("CSV: date,value", "CSV：日期,数值")}
+              {say("CSV with a date and a value on each line", "CSV 格式，每行一个日期和一个数值")}
               <textarea
                 name="csv"
                 required
@@ -487,8 +487,8 @@ export function PerformanceExplorer({
           </span>
           <Help title={say("What these figures cover", "这些数字算的是什么")}>
             {say(
-              "Money paid in or taken out is removed before the sum, so these show how the investments did rather than how much was added — put in ten thousand and the account gets bigger, not better. Transfers count as arriving at the end of their day. The worst fall is measured between days that were actually priced",
-              "计算前会先把转入转出的钱剔除，所以这些数字反映的是投资做得怎么样，而不是往里放了多少钱——转进一万块，账户变大了，但没有变好。转账按当天收盘时到账。最大回撤只在有估值记录的日子之间衡量",
+              "Money paid in or taken out is removed before the sum, so these show how the investments did rather than how much was added. Put in ten thousand and the account gets bigger, not better. Transfers count as arriving at the end of their day. The worst fall is measured between days that were actually priced",
+              "计算前会先把转入转出的钱剔除，所以这些数字反映的是投资做得怎么样，而不是往里放了多少钱。转进一万块，账户变大了，但没有变好。转账按当天收盘时到账。最大回撤只在有估值记录的日子之间衡量",
             )}
             {gaps > 0 && (
               <>
@@ -820,8 +820,8 @@ export function PerformanceExplorer({
           {say("What it is worth in your currency", "换成你的货币是多少")}
           <Help title={say("How this is worked out", "这是怎么算的")}>
             {say(
-              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate — money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. Below the table, every transfer is listed one by one. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went: a rate that weakens can take money away from a yuan holder in a period the account did well. Rates: European Central Bank daily reference rates`,
-              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算——你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。表格下方可以逐笔查看每一笔转入转出。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关：即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来源：欧洲央行每日参考汇率`,
+              `The account is kept in ${currency}, but not everybody spends that. Each row converts every day's value, and every deposit or withdrawal, at that day's exchange rate, so money you sent in at 7.10 yuan to the dollar counts as 7.10 yuan a dollar, whatever the rate is now. Below the table, every transfer is listed one by one. "Return" is then worked out day by day in that currency, so a deposit is never counted as a gain. "What the rate move did" is the part of the result that comes from the exchange rate alone, nothing to do with how the investments went. A rate that weakens can take money away from a yuan holder in a period the account did well. The rates are the European Central Bank's daily reference rates`,
+              `账户以 ${currency} 计价，但不是每个人都花这种货币。每一行都把每天的账户价值、以及每一笔转入转出，按当天的汇率换算，你按 7.10 转进来的钱，就按每美元 7.10 元计算，不管现在汇率是多少。表格下方可以逐笔查看每一笔转入转出。「收益率」按该货币逐日计算，所以转入资金永远不会被算成收益。「汇率变动的影响」只统计汇率本身带来的那部分盈亏，与投资做得好不好无关。即使账户表现不错，汇率走弱也可能让持人民币的人少赚一截。汇率来自欧洲央行每日参考汇率`,
             )}
           </Help>
         </h2>
@@ -983,8 +983,8 @@ export function PerformanceExplorer({
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {say(
-                      `Every transfer ever recorded, whatever period is picked above. "Rate move alone" is what the exchange rate has done to that money since the day it went in (today's rate: ${deposits.rateNow.toFixed(4)}, ${deposits.asOf}), before anything the investments did. These are the European Central Bank's reference rates; the rate your bank actually gave you will have been a little worse, because banks add a margin.`,
-                      `这里列出所有记录过的转入转出，不受上方所选区间影响。「汇率带来的差额」是从转入那天到现在，汇率本身让这笔钱变多或变少了多少（最新汇率：${deposits.rateNow.toFixed(4)}，${deposits.asOf}），不含投资的盈亏。汇率为欧洲央行参考汇率；银行实际给你的汇率会略差一些，因为银行会加点差。`,
+                      `Every transfer ever recorded, whatever period is picked above. "Rate move alone" is what the exchange rate has done to that money since the day it went in (today's rate is ${deposits.rateNow.toFixed(4)}, as of ${deposits.asOf}), before anything the investments did. These are the European Central Bank's reference rates, and the rate your bank actually gave you will have been a little worse, because banks add a margin.`,
+                      `这里列出所有记录过的转入转出，不受上方所选区间影响。「汇率带来的差额」是从转入那天到现在，汇率本身让这笔钱变多或变少了多少（最新汇率为 ${deposits.rateNow.toFixed(4)}，日期 ${deposits.asOf}），不含投资的盈亏。汇率为欧洲央行参考汇率，银行实际给你的汇率会略差一些，因为银行会加点差。`,
                     )}
                   </p>
                 </div>

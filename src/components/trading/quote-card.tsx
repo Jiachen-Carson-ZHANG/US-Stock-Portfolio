@@ -172,8 +172,8 @@ export function QuoteCard({ quote, session }: { quote: CardQuote; session: Marke
               {say("Moves like", "相当于")}
               <Help title={say("Delta", "Delta")} align="right">
                 {say(
-                  "How many shares one contract behaves like today: a delta of 0.60 on a contract of 100 shares moves about $60 for each dollar the share moves. It changes as the share moves and as expiry nears.",
-                  "一张合约今天大约相当于多少股：Delta 为 0.60、每张 100 股的合约，正股每动 1 美元，它大约动 60 美元。它会随股价和到期日临近而变化。",
+                  "How many shares one contract behaves like today. A delta of 0.60 on a contract of 100 shares moves about $60 for each dollar the share moves. It changes as the share moves and as expiry nears.",
+                  "一张合约今天大约相当于多少股。Delta 为 0.60、每张 100 股的合约，正股每动 1 美元，它大约动 60 美元。它会随股价和到期日临近而变化。",
                 )}
               </Help>
             </dt>
@@ -188,8 +188,8 @@ export function QuoteCard({ quote, session }: { quote: CardQuote; session: Marke
               {say("Per day", "每天损耗")}
               <Help title={say("Theta", "Theta")}>
                 {say(
-                  "What one contract loses in value each day if nothing else changes — the cost of waiting when you own an option. Shown for a whole contract.",
-                  "如果其他条件不变，一张合约每天会损失多少价值——持有期权时「等待」的成本。按整张合约计算。",
+                  "What one contract loses in value each day if nothing else changes, which is the cost of waiting when you own an option. Shown for a whole contract.",
+                  "如果其他条件不变，一张合约每天会损失多少价值，也就是持有期权时「等待」的成本。按整张合约计算。",
                 )}
               </Help>
             </dt>

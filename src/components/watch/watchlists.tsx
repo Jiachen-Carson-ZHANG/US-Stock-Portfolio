@@ -162,8 +162,8 @@ export function Watchlists({
           {say("Watchlist", "自选")}
           <Help title={say("What this is", "这是什么")}>
             {say(
-              "Your own list of names to keep an eye on, priced the way the broker prices them. Tap a row for everything the broker publishes about it. The Everyone tab shows what other members are watching — only the list, never what anybody owns.",
-              "你自己想关注的股票列表，价格与券商一致。点开任意一行可以看到券商提供的全部数据。「大家」标签页显示其他成员在关注什么——只显示关注列表，不会显示任何人的持仓。",
+              "Your own list of names to keep an eye on, priced the way the broker prices them. Tap a row for everything the broker publishes about it. The Everyone tab shows what other members are watching, which is only the list and never what anybody owns.",
+              "你自己想关注的股票列表，价格与券商一致。点开任意一行可以看到券商提供的全部数据。「大家」标签页显示其他成员在关注什么，只显示关注列表，不会显示任何人的持仓。",
             )}
           </Help>
         </h1>

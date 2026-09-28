@@ -389,7 +389,7 @@ export function RebuildHistory() {
             <li key={row.slug} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3 py-2">
               <span className="font-medium">{row.name}</span>
               {row.refusals.length > 0 ? (
-                <span className="text-negative">Not rebuilt — {row.refusals.join(" ")}</span>
+                <span className="text-negative">Not rebuilt. {row.refusals.join(" ")}</span>
               ) : (
                 <span className="text-muted-foreground">
                   {row.written === 0

@@ -29,7 +29,7 @@ const en = {
     show: "Show my hint",
     yourHint: "Your hint",
     noHint: "There is no hint on file for that name.",
-    askOwner: "Still stuck? Ask {owner} to reset your password — you will get a temporary one to sign in with, and can change it straight after.",
+    askOwner: "Still stuck? Ask {owner} to reset your password. You will get a temporary one to sign in with, and can change it straight after.",
     back: "Back to sign in",
     tooMany: "Too many tries. Wait a few minutes and try again.",
   },
@@ -44,7 +44,7 @@ const en = {
     invalid: "Invalid username or password",
     tooMany: "Too many attempts. Try again in a few minutes.",
     unavailable:
-      "Sign-in is unavailable: this copy of the site cannot reach its database. Nothing you type will work until that is fixed, so it is not your password.",
+      "Sign-in is unavailable because this copy of the site cannot reach its database. Nothing you type will work until that is fixed, so it is not your password.",
     unreachable: "Cannot reach the server. Check your connection.",
     showPassword: "Show password",
     hidePassword: "Hide password",
@@ -57,8 +57,8 @@ const en = {
     closed: "Market closed",
     lastUpdated: "Last updated",
     refreshing: "refreshing…",
-    stale: "Prices are a little behind — a refresh is on its way",
-    retrying: "Could not reach the price feed — trying again shortly",
+    stale: "Prices are a little behind, and a refresh is on its way",
+    retrying: "Could not reach the price feed. Trying again shortly",
     backingOff:
       "Still cannot reach the price feed, so we are asking less often. Everything below is the last known price",
     refresh: "Refresh",
@@ -88,7 +88,7 @@ const en = {
     notRecorded: "Not recorded",
     notRecordedBody: "No deposits recorded for this account yet",
     addTransfers: "Record deposits",
-    fromHoldingsOnly: "from holdings only — deposits not recorded",
+    fromHoldingsOnly: "from holdings only, as deposits are not recorded",
     fromTransfers: "the deposits and withdrawals on the Records page",
   },
 
@@ -117,7 +117,7 @@ const en = {
     closedPositions: "closed",
     unattributed: "Dividends, interest and gifts",
     noMovementToday:
-      "Nothing moved today — the market is closed or prices have not changed since the last close.",
+      "Nothing moved today. The market is closed or prices have not changed since the last close.",
     other: "Other",
   },
 
@@ -191,7 +191,7 @@ const en = {
     subtitle: "How the money itself has done, with deposits taken out of the sum",
     sinceStart: "What these two cards measure",
     sinceStartBody:
-      "Everything ever made or lost on this kind of holding, since the account opened, priced at this moment — the profit still sitting in what is held, plus the profit already banked from what was sold. The percentage is that against what those holdings cost. The chart lower down measures something else: how the account itself moved between two dates, with deposits removed. A green card above a red chart is not a contradiction — it usually means the money arrived after the bad stretch and only rode the good one",
+      "Everything ever made or lost on this kind of holding since the account opened, priced at this moment. That is the profit still sitting in what is held plus the profit already banked from what was sold, and the percentage is that against what those holdings cost. The chart lower down measures something else, which is how the account itself moved between two dates with deposits removed. A green card above a red chart is not a contradiction. It usually means the money arrived after the bad stretch and only rode the good one",
     snapshots: "daily snapshots",
     notEnough: "Not enough history yet",
     notEnoughHint: "A snapshot is recorded once per trading day after the US close.",
@@ -325,7 +325,7 @@ const en = {
     neverChecked: "not checked yet",
     restingNote:
       "Orders fill only in regular hours, 9:30 to 16:00 New York, on a price that prints after they were placed. Waiting orders are checked about every three seconds while the market is open",
-    perContract: "Priced per share — one contract is a hundred of them",
+    perContract: "Priced per share, and one contract is a hundred of them",
     quoteUnavailable: "No price for that. Pick a company from the list, or check the ticker",
     symbolPlaceholder: "Ticker or company, e.g. NVDA or Micron",
     gettingPrice: "Getting the price…",
@@ -408,7 +408,7 @@ const en = {
     pendingTitle: "Waiting to be approved",
     pending: "People waiting for an account",
     pendingNote:
-      "Approving lets them sign in. They get their own mock portfolio and can see the family one — nobody else's.",
+      "Approving lets them sign in. They get their own practice account and can see the family portfolio, but nobody else's.",
     nobodyWaiting: "Nobody is waiting.",
     approve: "Approve",
     decline: "Decline",
@@ -438,7 +438,7 @@ const en = {
     changing: "Changing…",
     displayName: "Your name",
     displayNameNote:
-      "The name everybody else sees — in the sidebar, on the leaderboard, and above your portfolio. Your username stays as it is, because web addresses are built from it.",
+      "The name everybody else sees in the sidebar, on the leaderboard and above your portfolio. Your username stays as it is, because web addresses are built from it.",
     saveName: "Save name",
     nameSaved: "Saved. Your name is updated everywhere it appears.",
     nameFailed: "That name could not be saved.",
@@ -475,7 +475,7 @@ const en = {
     askFailed: "Could not send the request.",
     noPortfolioTitle: "Nothing to show yet",
     noPortfolioBody:
-      "Ask whoever set this up to share one with you, or to create your own. Your sign-in works — there is just nothing attached to it.",
+      "Ask whoever set this up to share one with you, or create your own. Your sign-in works, and there is simply nothing attached to it yet.",
   },
 
   notifications: {
@@ -502,7 +502,7 @@ const en = {
   help: {
     portfolioValue: "Portfolio value",
     portfolioValueBody:
-      "What the whole account is worth right now: everything owned, priced at today's market, plus the cash sitting in it. Sell the lot today and this is roughly the cheque.",
+      "What the whole account is worth right now, which is everything owned at today's prices plus the cash sitting in it. Sell the lot today and this is roughly the cheque.",
     today: "Today",
     todayBody:
       "How much the account moved since yesterday's closing price. Only today counts here. Something you have held for a year and are well ahead on still shows only what it did since yesterday.",
@@ -511,7 +511,7 @@ const en = {
       "Everything made or lost since this account started, in one number. It adds the profit still sitting inside things that are owned to the profit already taken from things that were sold.",
     totalInvested: "Total invested",
     totalInvestedBody:
-      "The money paid into this account, less anything taken back out: the sum of the deposits and withdrawals recorded on the Records page. Nothing is estimated — a transfer that is not recorded is not counted, and a brokerage does not tell this site about your transfers, so they are entered by hand. Profit made and left in the account is not in this number, because it was never paid in.",
+      "The money paid into this account, less anything taken back out, which is the sum of the deposits and withdrawals recorded on the Records page. Nothing is estimated. A transfer that is not recorded is not counted, and a brokerage does not tell this site about your transfers, so they are entered by hand. Profit made and left in the account is not in this number, because it was never paid in.",
     unrealized: "Profit on paper",
     unrealizedBody:
       "Profit on something still owned. It changes every day and is not yours until it is sold. A holding can show a large number here and end up with none of it.",
@@ -532,13 +532,13 @@ const en = {
       "Cash that can actually be spent right now. It is lower than the cash balance whenever orders are waiting, because that money is already promised to them. Without this, ten waiting orders could each spend the same dollars.",
     orderKinds: "Order types",
     orderKindsBody:
-      "A market order buys or sells at the current price. A limit order waits until the price is at least as good as the one you name, and may never fill. A stop order waits for the price to move through the level you name, then trades at market: a sell stop below the price caps a loss, a buy stop above it catches a breakout. To buy a dip, use a limit, not a stop. Every order here fills only in regular hours, 9:30 to 16:00 New York time, as at a broker: outside them the feed's price is the last close, which nobody can trade at.",
+      "A market order buys or sells at the current price. A limit order waits until the price is at least as good as the one you name, and may never fill. A stop order waits for the price to move through the level you name and then trades at market. A sell stop below the price caps a loss, and a buy stop above it catches a breakout. To buy a dip, use a limit rather than a stop. Every order here fills only in regular hours, 9:30 to 16:00 New York time, as at a broker, because outside them the feed's price is the last close, which nobody can trade at.",
     mock: "Practice account",
     mockBody:
       "Practice money against real, live prices. The trades are checked against what the market is actually doing, so the result means something. The money does not exist.",
     arena: "Arena",
     arenaBody:
-      "Everybody's results side by side, as percentages. A percentage compares a small account and a large one fairly, and it is all that is shared — nobody sees anyone else's amounts, holdings or trades.",
+      "Only accounts whose owners entered them are ranked, and only people who entered one of their own can see the ranking. Everything is shown as a percentage, which compares a small account and a large one fairly and never reveals an amount of money.",
     timeWeighted: "Why the percentage is not just profit over money in",
     timeWeightedBody:
       "Paying money in makes an account bigger without making it better, and taking money out does the reverse. The percentage here is worked out so that transfers neither flatter nor punish it, which is the only way two people's results can be compared.",
@@ -572,33 +572,33 @@ const en = {
 
   records: {
     stepsTitle: "Recording deposits, step by step",
-    step1: "In the moomoo app, open your account's transfer history — every deposit and withdrawal, with its date.",
-    step2: "Add each one here: the date the money arrived and the amount. A withdrawal is money out.",
+    step1: "In the moomoo app, open your account's transfer history, which lists every deposit and withdrawal with its date.",
+    step2: "Add each one here with the date the money arrived and the amount. A withdrawal is money out.",
     step3: "When the list is complete, confirm it as reviewed further down. From then on, returns and the Arena measure against exactly what you paid in.",
     stepsNote: "Until then, Total invested shows “Not recorded” and returns are worked out from your holdings alone. Nothing is guessed.",
     title: "Records",
     subtitle: "The few things this site cannot work out on its own.",
     whyTitle: "Why this page has to exist",
     whyBody:
-      "Your broker tells us every trade you make. It never tells us when you move money in or out of the account — that is a bank transfer, and it happens outside the market.",
+      "Your broker tells us every trade you make. It never tells us when you move money in or out of the account, because that is a bank transfer and it happens outside the market.",
     whyExample:
-      "So picture this. On Monday the account is worth $10,000. On Tuesday it is worth $20,000. Did you have the best day of your life, or did you just transfer $10,000 in? From the outside those two look identical. Without being told, the site has to guess, and it guesses wrong: your return for the day reads +100%.",
+      "So picture this. On Monday the account is worth $10,000. On Tuesday it is worth $20,000. Did you have the best day of your life, or did you just transfer $10,000 in? From the outside those two look identical. Without being told, the site has to guess, and it guesses wrong, so your return for the day reads +100%.",
     whySo:
       "That one number then spreads. It goes into your total return, into the chart, into the comparison against the S&P 500, and into the Arena leaderboard where it flatters you against everybody else. One unrecorded transfer quietly poisons every percentage on the site.",
     whyFix:
-      "Recording it takes ten seconds and fixes all of them at once. The date and the amount are enough — the site then subtracts that money before working out how the investments did, so paying money in makes the account bigger without making the percentage better. That is the honest answer, and it is the only one that lets two people with different account sizes be compared at all.",
+      "Recording it takes ten seconds and fixes all of them at once. The date and the amount are enough. The site then subtracts that money before working out how the investments did, so paying money in makes the account bigger without making the percentage better. That is the honest answer, and it is the only one that lets two people with different account sizes be compared at all.",
     whyReview:
       "Confirming a period is the second half. Saying \u201cI have checked May to September and every transfer is here\u201d is what lets the site trust the ledger enough to draw the chart. Until a period is confirmed it holds back the figures rather than publishing numbers it cannot stand behind.",
     transfer: "Record a transfer",
     transferHint:
-      "Money you paid into the account or took out of it. Not a stock purchase — that is a trade, and the broker already reports those.",
+      "Money you paid into the account or took out of it. A stock purchase is not one of these, because that is a trade and the broker already reports those.",
   },
 
   feed: {
     follow: "Follow",
     following: "Following",
     followHint:
-      "Get a bell when they trade or post. It shows you nothing new — a portfolio you cannot open stays closed — it only tells you when something happened.",
+      "Get a bell when they trade or post. It shows you nothing new, because an account you cannot open stays closed. It only tells you when something happened.",
   },
 
   portfolios: {
@@ -729,17 +729,17 @@ const en = {
     month: "Month",
     year: "Year",
     max: "All time",
-    indexedTo: "Indexed to 100 at the start of the",
+    indexedTo: "Indexed to 100 at the start of the {period}",
     cabinet: "Trophy cabinet",
     cabinetNote: "Finished periods only. Nothing here can change.",
     wins: "wins",
     commentary: "The commentary box",
     commentaryNote:
       "Opinionated, occasionally rude, and working only from the percentages above.",
-    report: "Report on the",
+    report: "Report on {period}",
     writing: "Writing…",
     again: "Again",
-    sources: "Read the news it used:",
+    sources: "The news it used",
     disclaimer: "Commentary, not advice. It can be wrong, and it is trying to be funny.",
     commentaryFailed: "Could not write the report.",
   },
@@ -782,7 +782,7 @@ const en = {
     filledAt: "Filled at",
     cashNow: "Cash now",
     nothingYetOwner:
-      "Nothing bought yet. Press Trade, type a ticker and a number of shares — real prices, practice money.",
+      "Nothing bought yet. Press Trade and type a ticker and a number of shares. The prices are real and the money is practice money.",
     nothingYet: "Nothing bought yet.",
     onlyOwnerCanTrade: "can trade in this account.",
     onlyOwnerCanTradeGeneric: "Only this account's owner can trade in it.",
@@ -846,7 +846,7 @@ const zh: Dictionary = {
     show: "查看提示",
     yourHint: "你的提示",
     noHint: "这个用户名没有设置提示。",
-    askOwner: "还是想不起来？请联系 {owner} 重置密码——你会拿到一个临时密码用于登录，登录后可以马上修改。",
+    askOwner: "还是想不起来？请联系 {owner} 重置密码。你会拿到一个临时密码用于登录，登录后可以马上修改。",
     back: "返回登录",
     tooMany: "尝试次数过多，请几分钟后再试。",
   },
@@ -861,7 +861,7 @@ const zh: Dictionary = {
     invalid: "用户名或密码不正确",
     tooMany: "尝试次数过多，请几分钟后再试。",
     unavailable:
-      "暂时无法登录：这个站点连不上数据库。在修复之前，输入什么都不会成功——问题不在你的密码。",
+      "暂时无法登录，因为这个站点连不上数据库。在修复之前，输入什么都不会成功，问题不在你的密码。",
     unreachable: "无法连接服务器，请检查网络。",
     showPassword: "显示密码",
     hidePassword: "隐藏密码",
@@ -904,7 +904,7 @@ const zh: Dictionary = {
     notRecorded: "未记录",
     notRecordedBody: "这个账户还没有记录任何入金",
     addTransfers: "记录入金",
-    fromHoldingsOnly: "仅按持仓计算——未记录入金",
+    fromHoldingsOnly: "仅按持仓计算，因为没有记录入金",
     fromTransfers: "来自「记录」页面里的入金和出金",
   },
 
@@ -930,7 +930,7 @@ const zh: Dictionary = {
     returnByPositionNote: "已实现与浮动并列显示；已清仓的持仓合并为一项，因此各条之和等于总收益。",
     closedPositions: "已清仓",
     unattributed: "股息、利息与赠股",
-    noMovementToday: "今日无变动 —— 市场休市，或自上次收盘以来价格未变。",
+    noMovementToday: "今日无变动。市场休市，或自上次收盘以来价格未变。",
     other: "其他",
   },
 
@@ -1001,10 +1001,10 @@ const zh: Dictionary = {
   performance: {
     title: "业绩表现",
     basedOn: "基于",
-    subtitle: "这笔钱本身做得怎么样——计算时已剔除转入转出",
+    subtitle: "这笔钱本身做得怎么样，计算时已剔除转入转出",
     sinceStart: "这两张卡片算的是什么",
     sinceStartBody:
-      "从开户至今，这类持仓总共赚了或亏了多少，按此刻的价格计算——包括还握在手里的浮动盈亏，加上已经卖出落袋的部分。百分比是相对这些持仓的成本。下面的曲线算的是另一回事：账户本身在两个日期之间怎么走，且已剔除转入转出。卡片绿、曲线红并不矛盾——通常说明这笔钱是在那段糟糕的行情之后才进来的，只赶上了后面好的一段",
+      "从开户至今，这类持仓总共赚了或亏了多少，按此刻的价格计算。它包括还握在手里的浮动盈亏，加上已经卖出落袋的部分，百分比是相对这些持仓的成本。下面的曲线算的是另一回事，即账户本身在两个日期之间怎么走，并且已剔除转入转出。卡片绿、曲线红并不矛盾，通常说明这笔钱是在那段糟糕的行情之后才进来的，只赶上了后面好的一段",
     snapshots: "个每日快照",
     notEnough: "历史数据不足",
     notEnoughHint: "每个交易日美股收盘后记录一次快照。",
@@ -1103,7 +1103,7 @@ const zh: Dictionary = {
     market: "市价单",
     limit: "限价单",
     stop: "止损单",
-    marketHint: "在常规交易时段（纽约时间 9:30–16:00）按当前价格成交",
+    marketHint: "在常规交易时段（纽约时间 9:30 至 16:00）按当前价格成交",
     limitHint: "买入不高于你的价格、卖出不低于你的价格才成交，否则一直等待",
     stopHint: "等价格穿过你的触发价后，按市价成交",
     outsideHours: "现在不在常规交易时段。此时下单，会等到纽约时间 9:30 开盘",
@@ -1136,8 +1136,8 @@ const zh: Dictionary = {
     lastChecked: "最近检查",
     neverChecked: "尚未检查",
     restingNote:
-      "订单只在常规交易时段（纽约时间 9:30–16:00）内、按下单之后出现的价格成交。开市期间约每三秒检查一次挂单",
-    perContract: "按每股报价——一张合约等于一百股",
+      "订单只在常规交易时段（纽约时间 9:30 至 16:00）内、按下单之后出现的价格成交。开市期间约每三秒检查一次挂单",
+    perContract: "按每股报价，一张合约等于一百股",
     quoteUnavailable: "找不到这个代码的报价。请从下拉列表里选择公司，或检查代码",
     symbolPlaceholder: "代码或公司名，如 NVDA 或 Micron",
     gettingPrice: "正在获取报价…",
@@ -1245,7 +1245,7 @@ const zh: Dictionary = {
     changing: "修改中…",
     displayName: "你的名字",
     displayNameNote:
-      "其他人看到的名字——侧边栏、排行榜，以及你的组合标题都用它。用户名不变，因为网址是根据用户名生成的。",
+      "其他人看到的名字，侧边栏、排行榜和你的组合标题都用它。用户名不变，因为网址是根据用户名生成的。",
     saveName: "保存名字",
     nameSaved: "已保存，所有显示位置都会更新。",
     nameFailed: "无法保存这个名字。",
@@ -1300,7 +1300,7 @@ const zh: Dictionary = {
   help: {
     portfolioValue: "总市值",
     portfolioValueBody:
-      "账户现在值多少钱：所有持仓按今天的市场价格计算，加上账户里的现金。今天全部卖出，大致就能拿到这个数。",
+      "账户现在值多少钱，也就是所有持仓按今天的市场价格计算，再加上账户里的现金。今天全部卖出，大致就能拿到这个数。",
     today: "今日盈亏",
     todayBody:
       "相对昨天收盘价，账户今天涨跌了多少。这里只算今天。一只持有一年、已经赚了很多的股票，在这里也只显示它从昨天到现在的变化。",
@@ -1309,7 +1309,7 @@ const zh: Dictionary = {
       "从开户至今赚到或亏掉的全部金额，合成一个数字。它把还握在手里的持仓的浮动盈亏，和已经卖出落袋的盈亏加在一起。",
     totalInvested: "累计投入",
     totalInvestedBody:
-      "转入这个账户的钱，减去转出的钱：也就是「记录」页面里所有入金和出金的合计。这里没有任何估算——没记录的转账就不计入，而券商不会把你的转账告诉本站，所以需要手动录入。赚到后留在账户里的利润不在这个数字里，因为那不是你投入的本金。",
+      "转入这个账户的钱减去转出的钱，也就是「记录」页面里所有入金和出金的合计。这里没有任何估算。没记录的转账就不计入，而券商不会把你的转账告诉本站，所以需要手动录入。赚到后留在账户里的利润不在这个数字里，因为那不是你投入的本金。",
     unrealized: "浮动盈亏",
     unrealizedBody:
       "还没卖出的持仓上的盈亏。它每天都在变，卖出之前都不算真正到手。一只股票可以在这里显示一大笔浮盈，最后一分也没落袋。",
@@ -1321,7 +1321,7 @@ const zh: Dictionary = {
       "钱在各个持仓之间是怎么分配的。按买入成本计算，而不是按现价，这样一只翻倍的股票不会看起来像当初下了两倍的注。期权价差按整组的净成本只计入一次。",
     concentration: "集中度",
     concentrationBody:
-      "最大的几个持仓占了多少比重。数字高，说明整个账户的表现基本由一两只票决定——主动这样配置没问题，事后才发现就危险了。",
+      "你持有的最大几家公司占了多少比重。数字高，说明整个账户的表现基本由一两只票决定。主动这样配置没问题，事后才发现就危险了。",
     breakEven: "盈亏平衡点",
     breakEvenBody:
       "正股要涨到这个价，这组期权才刚好值回当初付出的成本。高于这条线是赚，低于就是亏。所以正股现价就放在它下面。",
@@ -1330,16 +1330,16 @@ const zh: Dictionary = {
       "现在真正能花出去的钱。只要有挂单在等着成交，它就会低于现金余额，因为那部分钱已经被挂单预留了。没有这个机制，十张挂单会各自花掉同一笔钱。",
     orderKinds: "订单类型",
     orderKindsBody:
-      "市价单：按当前价格成交。限价单：等价格至少达到你指定的水平才成交，也可能一直不成交。止损单：等价格穿过你设定的水平后按市价成交——设在现价之下的卖出止损用来控制亏损，设在现价之上的买入止损用来追突破。想在下跌时买入，请用限价单而不是止损单。和券商一样，这里所有订单只在常规交易时段（纽约时间 9:30–16:00）成交：休市时行情里的价格只是上一次收盘价，没人能按它成交。",
+      "市价单按当前价格成交。限价单要等价格至少达到你指定的水平才成交，也可能一直不成交。止损单要等价格穿过你设定的水平，然后按市价成交。设在现价之下的卖出止损用来控制亏损，设在现价之上的买入止损用来追突破。想在下跌时买入，请用限价单而不是止损单。和券商一样，这里所有订单只在常规交易时段（纽约时间 9:30 至 16:00）成交，因为休市时行情里的价格只是上一次收盘价，没人能按它成交。",
     mock: "模拟账户",
     mockBody:
       "用模拟的钱，对着真实的实时行情交易。成交与否是按市场真实走势判断的，所以结果有意义；只是钱是假的。",
     arena: "竞技场",
     arenaBody:
-      "所有人的成绩并排比较，用百分比。百分比让大账户和小账户可以公平比较，而且分享的也只有百分比——谁都看不到别人的金额、持仓和交易。",
+      "只有账户主人主动参赛的账户才会被排名，也只有自己参赛了的人才能看到排名。显示的都是百分比，这样大小账户可以公平比较，也永远不会透露金额。",
     timeWeighted: "为什么收益率不是简单的「赚的钱 ÷ 投入的钱」",
     timeWeightedBody:
-      "转入资金会让账户变大，但不代表做得更好；转出则相反。这里的收益率经过处理，让转入转出既不美化也不拖累成绩——只有这样，两个人的结果才谈得上比较。",
+      "转入资金会让账户变大，但不代表做得更好；转出则相反。这里的收益率经过处理，让转入转出既不美化也不拖累成绩，只有这样，两个人的结果才谈得上比较。",
     optionPrice: "期权价格",
     optionPriceBody:
       "期权按每股报价，但每张合约对应一百股，所以报价 19.48 的一张合约实际是 1,948 元。黑色是现在的价格，下面灰色的是当初买入的价格。",
@@ -1369,32 +1369,32 @@ const zh: Dictionary = {
 
   records: {
     stepsTitle: "记录入金的步骤",
-    step1: "在 moomoo App 里打开你账户的转账记录——每一笔入金和出金，以及日期。",
-    step2: "在这里逐笔添加：钱到账的日期和金额。出金记为转出。",
+    step1: "在 moomoo App 里打开你账户的转账记录，上面有每一笔入金和出金及其日期。",
+    step2: "在这里逐笔添加钱到账的日期和金额。出金记为转出。",
     step3: "全部录完后，在下方确认「已核对」。从那以后，收益和竞技场排名都会按你实际投入的钱来计算。",
     stepsNote: "在此之前，「累计投入」会显示「未记录」，收益只按持仓计算。这里不做任何猜测。",
     title: "记录",
     subtitle: "少数几件这个网站自己算不出来的事。",
     whyTitle: "为什么需要这一页",
     whyBody:
-      "券商会告诉我们你的每一笔交易，但永远不会告诉我们你什么时候往账户里转钱、或者把钱转出去——那是银行转账，发生在市场之外。",
+      "券商会告诉我们你的每一笔交易，但永远不会告诉我们你什么时候往账户里转钱、或者把钱转出去，因为那是银行转账，发生在市场之外。",
     whyExample:
-      "举个例子。周一账户值 1 万美元，周二值 2 万美元。是你人生中最赚的一天，还是你只是转进来了 1 万？从外面看，这两件事一模一样。没人告诉它，网站只能猜，而且会猜错：那天的收益率会显示 +100%。",
+      "举个例子。周一账户值 1 万美元，周二值 2 万美元。是你人生中最赚的一天，还是你只是转进来了 1 万？从外面看，这两件事一模一样。没人告诉它，网站只能猜，而且会猜错，那天的收益率会显示 +100%。",
     whySo:
-      "这个错误的数字会继续扩散：进入你的总收益、进入曲线图、进入和标普 500 的对比，还会进入竞技场排行榜，让你相对别人虚高。一笔没记录的转账，会悄悄污染全站每一个百分比。",
+      "这个错误的数字会继续扩散，进入你的总收益、进入曲线图、进入和标普 500 的对比，还会进入竞技场排行榜，让你相对别人虚高。一笔没记录的转账，会悄悄污染全站每一个百分比。",
     whyFix:
-      "记录它只要十秒，而且一次修好全部。填日期和金额就够了——网站会先把这笔钱扣掉，再计算投资本身做得怎么样。于是「转入资金」只会让账户变大，不会让收益率变好。这才是诚实的答案，也是两个规模不同的账户能够放在一起比较的唯一前提。",
+      "记录它只要十秒，而且一次修好全部。填日期和金额就够了。网站会先把这笔钱扣掉，再计算投资本身做得怎么样。于是「转入资金」只会让账户变大，不会让收益率变好。这才是诚实的答案，也是两个规模不同的账户能够放在一起比较的唯一前提。",
     whyReview:
       "确认区间是另一半。你说一句「五月到九月我都检查过了，转账都在这里」，网站才敢用这份账本来画图。在区间被确认之前，它宁可不显示，也不会给出自己无法负责的数字。",
     transfer: "记录一笔转账",
-    transferHint: "你转入或转出账户的钱。不是买股票——那是交易，券商已经报过了。",
+    transferHint: "你转入或转出账户的钱。买股票不算，因为那是交易，券商已经报过了。",
   },
 
   feed: {
     follow: "关注",
     following: "已关注",
     followHint:
-      "他们交易或发帖时会收到提醒。这不会让你看到任何新东西——看不了的组合依然看不了——只是告诉你什么时候发生了事情。",
+      "他们交易或发帖时会收到提醒。这不会让你看到任何新东西，看不了的账户依然看不了，只是告诉你什么时候发生了事情。",
   },
 
   portfolios: {
@@ -1508,16 +1508,16 @@ const zh: Dictionary = {
     month: "月",
     year: "年",
     max: "全部",
-    indexedTo: "以本期起点为 100 计算的指数：",
+    indexedTo: "以所选区间（{period}）的起点为 100",
     cabinet: "荣誉陈列",
     cabinetNote: "仅统计已结束的周期，此处的结果不会再变动。",
     wins: "次冠军",
     commentary: "解说席",
     commentaryNote: "带点毒舌，而且只依据上面的百分比说话。",
-    report: "生成本期点评：",
+    report: "生成点评（{period}）",
     writing: "撰写中…",
     again: "再来一次",
-    sources: "它参考的新闻：",
+    sources: "它参考的新闻",
     disclaimer: "这是点评，不是投资建议。它可能出错，而且它在努力搞笑。",
     commentaryFailed: "无法生成点评。",
   },
@@ -1558,7 +1558,7 @@ const zh: Dictionary = {
     failed: "无法完成交易。",
     filledAt: "成交价",
     cashNow: "当前现金",
-    nothingYetOwner: "还没有买入。点击“交易”，输入股票代码和股数——真实报价，模拟资金。",
+    nothingYetOwner: "还没有买入。点击“交易”，输入股票代码和股数。报价是真实的，资金是模拟的。",
     nothingYet: "还没有买入。",
     onlyOwnerCanTrade: "才能在此账户交易。",
     onlyOwnerCanTradeGeneric: "只有该账户的拥有者才能交易。",

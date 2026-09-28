@@ -133,7 +133,7 @@ export function ArenaBoard({
             <IndexLine
               key={standing.slug}
               title={`${standing.displayName} · ${pct(standing.returnPercent)}`}
-              note={`${t.arena.indexedTo} ${LABEL[period]}`}
+              note={t.arena.indexedTo.replace("{period}", LABEL[period])}
               data={standing.curve}
               colorIndex={index}
             />

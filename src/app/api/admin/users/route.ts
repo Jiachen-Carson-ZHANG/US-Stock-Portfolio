@@ -95,7 +95,7 @@ export async function DELETE(request: Request) {
     return Response.json(
       {
         error:
-          "That account owns a portfolio following a real brokerage account. Move or remove the portfolio first — it holds trade history that cannot be fetched again.",
+          "That account owns a portfolio following a real brokerage account. Move or remove the portfolio first, because it holds trade history that cannot be fetched again.",
       },
       { status: 409 },
     );

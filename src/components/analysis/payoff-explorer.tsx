@@ -277,8 +277,8 @@ export function PayoffExplorer({
           {hypothetical ? say("What this trade could make or lose", "这笔交易可能的盈亏") : say("Option position", "期权持仓")}
           <Help title={say("How to read this", "怎么看这一块")}>
             {say(
-              "The table is what you paid for each contract and what it is worth now, per share — one contract is 100 shares, so 43.80 is $4,380 a contract. Below it: where the share has to finish for the position to break even, the best and worst it can do if held to the last day, and how it moves today. The chart shows profit or loss at every share price: the solid line is holding to the last day, the dashed line is selling on the day you pick instead, and the gap between them is time value — what somebody will pay for the chance it keeps going. That gap shrinks every day and is gone at expiry, which the faint lines show. Only contracts on the same share, expiring the same day, are combined. Held to expiry; no early assignment, no tax.",
-              "表格列出每张合约你买入（或卖出）时的价格和现在的价格，均为每股价格——一张合约是 100 股，所以 43.80 就是每张 4,380 美元。下面是：正股到期时要到什么价位才保本、持有到最后一天最多赚多少和最多亏多少，以及今天它随股价变动的幅度。图表画出每个股价下的盈亏：实线是持有到最后一天，虚线是在你选的那天卖出，两者之间的差距就是时间价值——别人愿意为「后面还有机会」多付的钱。这个差距每天都在缩小，到期归零，浅色的线画的就是这个过程。只合并同一只正股、同一天到期的合约。假设持有到期，不考虑提前行权和税费。",
+              "The table shows what you paid for each contract and what it is worth now, per share. One contract is 100 shares, so 43.80 is $4,380 a contract. Below it you see where the share has to finish for the position to break even, the best and worst it can do if held to the last day, and how it moves today. The chart shows profit or loss at every share price. The solid line is holding to the last day, the dashed line is selling on the day you pick instead, and the gap between them is time value, which is what somebody will pay for the chance it keeps going. That gap shrinks every day and is gone at expiry, as the faint lines show. Only contracts on the same share and expiring the same day are combined. It assumes holding to expiry, with no early assignment and no tax.",
+              "表格列出每张合约你买入（或卖出）时的价格和现在的价格，均为每股价格。一张合约是 100 股，所以 43.80 就是每张 4,380 美元。下面列出正股到期时要到什么价位才保本、持有到最后一天最多赚多少和最多亏多少，以及今天它随股价变动的幅度。图表画出每个股价下的盈亏。实线是持有到最后一天，虚线是在你选的那天卖出，两者之间的差距就是时间价值，也就是别人愿意为「后面还有机会」多付的钱。这个差距每天都在缩小，到期归零，浅色的线画的就是这个过程。只合并同一只正股、同一天到期的合约。假设持有到期，不考虑提前行权和税费。",
             )}
           </Help>
         </h2>
@@ -357,8 +357,8 @@ export function PayoffExplorer({
             {say("What you paid, and what it is worth now", "买入价与现价")}
             <Help title={say("Opened at, and now", "开仓价与现价")}>
               {say(
-                "\"Opened\" is what one share's worth of the contract cost when you bought it — or brought in when you sold it. \"Now\" is the broker's latest price for it; for a contract you sold, that is what buying it back would cost. Both are per share: a contract is 100 shares, so 43.80 is $4,380 a contract. The opening price comes from the broker and can be changed under Adjust.",
-                "「开仓」是买入时每股付出的价格，或卖出时每股收到的价格。「现价」是券商给出的最新价格；对于你卖出的合约，这是现在把它买回来要花的钱。两者都是每股价格：一张合约是 100 股，所以 43.80 就是每张 4,380 美元。开仓价来自券商，可在「调整」里修改。",
+                "\"Opened\" is what one share's worth of the contract cost when you bought it, or brought in when you sold it. \"Now\" is the broker's latest price for it; for a contract you sold, that is what buying it back would cost. Both are per share, and a contract is 100 shares, so 43.80 is $4,380 a contract. The opening price comes from the broker.",
+                "「开仓」是买入时每股付出的价格，或卖出时每股收到的价格。「现价」是券商给出的最新价格，对于你卖出的合约，这是现在把它买回来要花的钱。两者都是每股价格，一张合约是 100 股，所以 43.80 就是每张 4,380 美元。开仓价来自券商。",
               )}
             </Help>
           </p>
@@ -430,8 +430,8 @@ export function PayoffExplorer({
           <Figure
             label={say("Worst case at expiry", "到期最多亏")}
             help={say(
-              "The most this can lose if held to the last day. \"No limit\" means the loss keeps growing for as long as the share keeps rising — the risk of a sold call with nothing behind it.",
-              "持有到最后一天最多会亏多少。「无上限」表示只要正股一直涨，亏损就一直扩大——这是裸卖看涨期权的风险。",
+              "The most this can lose if held to the last day. \"No limit\" means the loss keeps growing for as long as the share keeps rising, which is the risk of a sold call with nothing behind it.",
+              "持有到最后一天最多会亏多少。「无上限」表示只要正股一直涨，亏损就一直扩大，这是裸卖看涨期权的风险。",
             )}
             value={profile.maxLoss === -Infinity ? say("No limit", "无上限") : signed(profile.maxLoss)}
             className={profile.maxLoss === -Infinity ? "text-negative" : tone(profile.maxLoss)}
@@ -440,8 +440,8 @@ export function PayoffExplorer({
             <Figure
               label={say(`If ${underlying} moves $1`, `${underlying} 每变动 1 美元`)}
               help={say(
-                `How much the position gains or loses today for each dollar ${underlying} moves — it behaves like ${Math.abs(totals.delta).toFixed(0)} shares. This is its delta, added up across the contracts, and it changes as the share moves and as time passes.`,
-                `${underlying} 每涨跌 1 美元，这组期权今天大约赚亏多少——相当于持有 ${Math.abs(totals.delta).toFixed(0)} 股。这就是各合约的 Delta 加总，会随股价和时间变化。`,
+                `How much the position gains or loses today for each dollar ${underlying} moves, so it behaves like ${Math.abs(totals.delta).toFixed(0)} shares. This is its delta, added up across the contracts, and it changes as the share moves and as time passes.`,
+                `${underlying} 每涨跌 1 美元，这组期权今天大约赚亏多少，相当于持有 ${Math.abs(totals.delta).toFixed(0)} 股。这就是各合约的 Delta 加总，会随股价和时间变化。`,
               )}
               value={`±${money(Math.abs(totals.delta))}`}
               sub={say(
@@ -454,8 +454,8 @@ export function PayoffExplorer({
             <Figure
               label={say("Each day that passes", "每过一天")}
               help={say(
-                "What one more day does to the position if the share price does not move (its theta). Bought options lose a little value every day; sold ones gain it — which is why a spread can earn from waiting.",
-                "如果股价不动，每多过一天这组期权会赚或亏多少（Theta）。买入的期权每天都会损耗一点价值，卖出的则相反——所以价差组合有时靠「等」也能赚钱。",
+                "What one more day does to the position if the share price does not move (its theta). Bought options lose a little value every day and sold ones gain it, which is why a spread can earn from waiting.",
+                "如果股价不动，每多过一天这组期权会赚或亏多少（Theta）。买入的期权每天都会损耗一点价值，卖出的则相反，所以价差组合有时靠「等」也能赚钱。",
               )}
               value={signed(totals.theta)}
               className={tone(totals.theta)}

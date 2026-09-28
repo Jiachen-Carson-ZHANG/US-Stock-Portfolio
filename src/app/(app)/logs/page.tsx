@@ -87,7 +87,7 @@ export default async function LogsPage() {
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">Errors, last 24 hours</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Every failure, wherever it happened — including in somebody&rsquo;s
+          Every failure, wherever it happened, including in somebody&rsquo;s
           browser, which is where a frozen page actually breaks. Grouped by
           where, newest first.
         </p>
@@ -125,12 +125,12 @@ export default async function LogsPage() {
       <section className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-medium">Slowest operations, last 24 hours</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Median rather than average: one cold start of nine seconds drags an
+          Median rather than average, because one cold start of nine seconds drags an
           average somewhere no request actually was. &ldquo;Database&rdquo; and
-          &ldquo;broker&rdquo; are the time spent inside calls of each kind —
-          added up across calls, so where several ran at once they can total
-          more than the operation itself took, and that is the point: it says
-          the waiting was overlapped rather than serial.
+          &ldquo;broker&rdquo; are the time spent inside calls of each kind,
+          added up across calls. Where several ran at once they can total
+          more than the operation itself took, and that is the point, because
+          it shows the waiting was overlapped rather than serial.
         </p>
 
         {paths.length === 0 ? (

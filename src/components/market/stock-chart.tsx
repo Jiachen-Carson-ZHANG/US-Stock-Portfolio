@@ -33,11 +33,11 @@ const RANGE_LABEL: Record<ChartRange, { en: string; zh: string }> = {
 };
 
 const CANDLE_LABEL: Record<BarInterval, { en: string; zh: string }> = {
-  "5m": { en: "each candle: 5 minutes", zh: "每根K线：5分钟" },
-  "30m": { en: "each candle: 30 minutes", zh: "每根K线：30分钟" },
-  day: { en: "each candle: a day", zh: "每根K线：1天" },
-  week: { en: "each candle: a week", zh: "每根K线：1周" },
-  month: { en: "each candle: a month", zh: "每根K线：1个月" },
+  "5m": { en: "one candle per 5 minutes", zh: "每根K线代表5分钟" },
+  "30m": { en: "one candle per 30 minutes", zh: "每根K线代表30分钟" },
+  day: { en: "one candle per day", zh: "每根K线代表1天" },
+  week: { en: "one candle per week", zh: "每根K线代表1周" },
+  month: { en: "one candle per month", zh: "每根K线代表1个月" },
 };
 
 type Loaded = { interval: BarInterval; bars: HistoricalPrice[] };
@@ -223,8 +223,8 @@ export function StockChart({
             {say("Price and trading", "价格与成交")}
             <Help title={say("Reading the candles", "怎么看K线")}>
               {say(
-                "Each candle is one period — the range buttons pick how long. The thin line runs from the lowest to the highest price in that period; the box from where it opened to where it closed. A hollow box closed higher than it opened, a filled one lower. Under the price: how much money changed hands in each period. Beside it: the price bands where most of that money traded — prices where a lot changed hands tend to matter again. Dashed lines mark what you paid, or the price you are typing into an order.",
-                "每根K线代表一个时段，时长由上方按钮决定。细线从该时段的最低价连到最高价；方框从开盘价到收盘价。空心表示收盘高于开盘，实心表示收盘低于开盘。价格下方是每个时段的成交金额；右侧是这段时间成交最集中的价格区间——成交特别多的价位往往会再次起作用。虚线是你的买入均价，或你正在下单填写的价格。",
+                "Each candle is one period, and the range buttons pick how long. The thin line runs from the lowest to the highest price in that period, and the box from where it opened to where it closed. A hollow box closed higher than it opened, and a filled one lower. Under the price you see how much money changed hands in each period. Beside it are the price bands where most of that money traded, and prices where a lot changed hands tend to matter again. Dashed lines mark what you paid, or the price you are typing into an order.",
+                "每根K线代表一个时段，时长由上方按钮决定。细线从该时段的最低价连到最高价，方框从开盘价到收盘价。空心表示收盘高于开盘，实心表示收盘低于开盘。价格下方是每个时段的成交金额，右侧是这段时间成交最集中的价格区间，成交特别多的价位往往会再次起作用。虚线是你的买入均价，或你正在下单填写的价格。",
               )}
             </Help>
           </h2>
@@ -273,7 +273,7 @@ export function StockChart({
           {say("No price history for this range.", "这个区间没有历史价格。")}
         </p>
       ) : (
-        <div className={cn("mt-4 grid gap-4", hasVolume && "lg:grid-cols-[minmax(0,1fr)_13rem]")}>
+        <div className={cn("mt-4 grid gap-4", hasVolume && "lg:grid-cols-[minmax(0,1fr)_14rem]")}>
           <div className="min-w-0">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -380,8 +380,8 @@ export function StockChart({
                   const digits = width < 1 ? 2 : width < 10 ? 1 : 0;
                   return (
                     <li key={band.from} className="flex items-center gap-2 text-[11px]">
-                      <span className="tabular w-24 shrink-0 text-right text-muted-foreground">
-                        {band.from.toFixed(digits)}–{band.to.toFixed(digits)}
+                      <span className="tabular w-28 shrink-0 text-right text-muted-foreground">
+                        {band.from.toFixed(digits)} {say("to", "至")} {band.to.toFixed(digits)}
                       </span>
                       <span className="h-3 flex-1 overflow-hidden rounded-sm bg-muted/40">
                         <span
@@ -397,7 +397,7 @@ export function StockChart({
                 })}
               </ul>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                {say("Blue: the band it is in now", "蓝色：现价所在的区间")}
+                {say("The blue band is where the price is now", "蓝色是现价所在的区间")}
               </p>
             </div>
           )}
