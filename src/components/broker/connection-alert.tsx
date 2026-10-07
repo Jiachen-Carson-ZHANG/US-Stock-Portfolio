@@ -24,7 +24,7 @@ export function ConnectionAlert({
   connection: Status;
   slug: string;
   locale: "en" | "zh";
-  copy: { brokenTitle: string; brokenBody: string; outageBody: string; reconnectNow: string };
+  copy: { brokenTitle: string; brokenBody: string; brokenReason: string; outageBody: string; reconnectNow: string };
   withButton?: boolean;
 }) {
   if (!connection || connection.status === "connected") return null;
@@ -38,14 +38,15 @@ export function ConnectionAlert({
   }
 
   const since = connection.lastRefreshAt ? formatDay(connection.lastRefreshAt, locale) : "";
-  const reason = connection.lastError?.match(/\(([^)]+)\)/)?.[1] ?? connection.lastError ?? "";
+  const reason = connection.lastError?.match(/\(([^)]+)\)/)?.[1] ?? connection.lastError;
   return (
     <section role="alert" className="flex gap-3 rounded-xl border border-negative/40 bg-negative/5 p-4">
       <AlertTriangle className="mt-0.5 size-5 shrink-0 text-negative" aria-hidden="true" />
       <div className="min-w-0 space-y-2">
         <p className="font-medium">{copy.brokenTitle}</p>
         <p className="text-sm text-muted-foreground">
-          {copy.brokenBody.replace("{date}", since).replace("{reason}", `“${reason}”`)}
+          {copy.brokenBody.replace("{date}", since)}
+          {reason ? ` ${copy.brokenReason.replace("{reason}", `“${reason}”`)}` : ""}
         </p>
         {withButton && (
           <Button asChild size="sm">
