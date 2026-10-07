@@ -1,3 +1,4 @@
+import { parseSymbol } from "@/lib/moomoo/symbols";
 import type { OptionGroupDTO } from "./options";
 import type { PositionView } from "@/types/portfolio";
 
@@ -80,51 +81,61 @@ export type ReturnDatum = {
  * `unattributed` carries whatever the fills cannot explain: the gift share and
  * a few dollars of dividends and interest. It is shown rather than dropped, so
  * the bars still sum to the total return on the summary card.
+ *
+ * Every option on one stock is one row, open or closed and whatever its
+ * expiry. Grouping only open spreads left a closed spread as its separate
+ * contracts: the two APP call spreads opened on 30 Sep and closed on 5 Oct
+ * read as −2,808 and −2,494 against +1,544 and +1,254, when what happened was
+ * one loss of 2,504 on APP options. Which strikes and dates made it up is for
+ * the holdings page. Shares keep their own row.
  */
 export function returnByHolding(
   positions: PositionView[],
-  groups: OptionGroupDTO[],
   realizedBySymbol: Record<string, number>,
   unattributed: number,
-  labels: { closed: string; other: string },
+  labels: { closed: string; other: string; options: string },
 ): ReturnDatum[] {
-  const legIds = new Set(
-    groups.flatMap((g) => (g.legs as PositionView[]).map((leg) => leg.id)),
-  );
-  const accounted = new Set<string>();
-
-  const take = (symbol: string) => {
-    accounted.add(symbol);
-    return realizedBySymbol[symbol] ?? 0;
+  const rows = new Map<string, Omit<ReturnDatum, "total"> & { open: boolean }>();
+  const rowFor = (symbol: string, underlying?: string) => {
+    const parsed = parseSymbol(symbol);
+    const stock = parsed.instrumentType === "option" ? (underlying ?? parsed.underlyingSymbol) : undefined;
+    const key = stock ? `option:${stock}` : symbol;
+    let row = rows.get(key);
+    if (!row) {
+      row = {
+        symbol: stock ? labels.options.replace("{symbol}", stock) : symbol,
+        unrealized: 0,
+        realized: 0,
+        open: false,
+      };
+      rows.set(key, row);
+    }
+    return row;
   };
 
-  const rows: Omit<ReturnDatum, "total">[] = [
-    ...positions
-      .filter((p) => p.instrumentType !== "cash" && !legIds.has(p.id))
-      .map((p) => ({
-        symbol: p.symbol,
-        unrealized: Number(p.unrealizedPnL.amount),
-        realized: take(p.symbol),
-      })),
-    ...groups.map((g) => ({
-      symbol: `${g.underlying} ${g.expirationDate ?? ""}`.trim(),
-      unrealized: Number(g.unrealizedPnL.amount),
-      realized: (g.legs as PositionView[]).reduce((n, l) => n + take(l.symbol), 0),
-    })),
-  ];
-
-  // Anything with a realized result and no position left is a name sold out
-  // of. It gets its own row, marked, rather than being bundled away.
-  for (const [symbol, amount] of Object.entries(realizedBySymbol)) {
-    if (accounted.has(symbol) || amount === 0) continue;
-    rows.push({ symbol: `${symbol} · ${labels.closed}`, unrealized: 0, realized: amount });
+  for (const p of positions) {
+    if (p.instrumentType === "cash") continue;
+    const row = rowFor(p.symbol, p.instrumentType === "option" ? p.underlyingSymbol : undefined);
+    row.unrealized += Number(p.unrealizedPnL.amount);
+    row.open = true;
   }
+
+  // Anything with a realized result and no position left was sold out of. It
+  // keeps its own row, marked, rather than being bundled away.
+  for (const [symbol, amount] of Object.entries(realizedBySymbol)) {
+    if (amount !== 0) rowFor(symbol).realized += amount;
+  }
+
+  const out: Omit<ReturnDatum, "total">[] = [...rows.values()].map(({ open, ...row }) => ({
+    ...row,
+    symbol: open ? row.symbol : `${row.symbol} · ${labels.closed}`,
+  }));
 
   if (Math.abs(unattributed) >= 0.005) {
-    rows.push({ symbol: labels.other, unrealized: 0, realized: unattributed });
+    out.push({ symbol: labels.other, unrealized: 0, realized: unattributed });
   }
 
-  return rows
+  return out
     .map((r) => ({ ...r, total: r.unrealized + r.realized }))
     .filter((r) => r.unrealized !== 0 || r.realized !== 0)
     .sort((a, b) => b.total - a.total);

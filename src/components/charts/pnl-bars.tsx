@@ -40,12 +40,10 @@ import {
 
 export function UnrealizedPnLBars({
   positions,
-  optionGroups,
   realizedBySymbol = {},
   unattributed = 0,
 }: {
   positions: PositionView[];
-  optionGroups: OptionGroupDTO[];
   /** Realized per symbol, replayed from the fills. */
   realizedBySymbol?: Record<string, number>;
   /** What the fills cannot explain — dividends, interest, the gift share. */
@@ -57,9 +55,10 @@ export function UnrealizedPnLBars({
   // ignores everything already sold.
   const [show, setShow] = useState<"both" | "unrealized" | "realized">("both");
 
-  const data = returnByHolding(positions, optionGroups, realizedBySymbol, unattributed, {
+  const data = returnByHolding(positions, realizedBySymbol, unattributed, {
     closed: t.charts.closedPositions,
     other: t.charts.unattributed,
+    options: t.charts.optionsOf,
   });
   if (data.length === 0) return null;
 
@@ -136,14 +135,16 @@ export function UnrealizedPnLBars({
                 axisLine={false}
                 tickLine={false}
               />
+              {/* Wider than the other charts and never shortened: a row here
+                  is a name with a word after it, "APP options · closed",
+                  which the ten character cut turned into "APP optio…". */}
               <YAxis
                 type="category"
                 dataKey="symbol"
-                tickFormatter={shortSymbol}
                 tick={AXIS_TICK}
                 axisLine={false}
                 tickLine={false}
-                width={88}
+                width={128}
               />
               <ReferenceLine x={0} stroke={AXIS} />
               <Tooltip

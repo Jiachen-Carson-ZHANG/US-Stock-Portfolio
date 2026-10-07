@@ -120,8 +120,9 @@ const en = {
     noHistory: "No history recorded yet.",
     returnByPosition: "Result by position",
     returnByPositionNote:
-      "Banked and still carried, side by side. Holdings sold in full are grouped, so the bars add up to total return.",
+      "Banked and still carried, side by side. Every option on the same stock counts as one result, whatever its contracts and dates, and the bars add up to total return.",
     closedPositions: "closed",
+    optionsOf: "{symbol} options",
     unattributed: "Dividends, interest and gifts",
     noMovementToday:
       "Nothing moved today. The market is closed or prices have not changed since the last close.",
@@ -959,8 +960,9 @@ const zh: Dictionary = {
     stocksVsOptions: "股票与期权对比",
     noHistory: "暂无历史记录。",
     returnByPosition: "各持仓盈亏构成",
-    returnByPositionNote: "已实现与浮动并列显示；已清仓的持仓合并为一项，因此各条之和等于总收益。",
+    returnByPositionNote: "已实现与浮动并列显示。同一只股票的所有期权合并为一项，不论合约和到期日，各条之和等于总收益。",
     closedPositions: "已清仓",
+    optionsOf: "{symbol} 期权",
     unattributed: "股息、利息与赠股",
     noMovementToday: "今日无变动。市场休市，或自上次收盘以来价格未变。",
     other: "其他",
