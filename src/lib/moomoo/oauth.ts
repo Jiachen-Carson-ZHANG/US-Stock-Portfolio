@@ -68,16 +68,53 @@ export function authorizeUrl(params: {
   return url.toString();
 }
 
+/**
+ * moomoo refusing a grant, with its own reason ("invalid_grant", "sig is
+ * invalid"). Kept apart from a network failure because the two want
+ * different answers: a refusal needs the person to reconnect, an outage only
+ * needs another try.
+ */
+export class TokenEndpointError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string | null,
+    readonly description: string | null,
+  ) {
+    // Worded without the word that the log redaction treats as a secret, so
+    // the reason survives into the logs.
+    super(`moomoo refused the grant with HTTP ${status}${code ? ` (${code}${description ? `: ${description}` : ""})` : ""}`);
+    this.name = "TokenEndpointError";
+  }
+
+  /** True when only reconnecting can fix it. */
+  get permanent(): boolean {
+    return (
+      (this.status === 400 || this.status === 401) &&
+      ["invalid_grant", "invalid_client", "unauthorized_client", "invalid_scope", "access_denied"].includes(this.code ?? "")
+    );
+  }
+}
+
 async function postForm(body: Record<string, string>): Promise<TokenResponse> {
   const response = await fetch(`${MOOMOO_API_BASE}/oauth2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(body).toString(),
+    signal: AbortSignal.timeout(10_000),
   });
 
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`moomoo token endpoint returned ${response.status}`);
+    let code: string | null = null;
+    let description: string | null = null;
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown; error_description?: unknown };
+      code = typeof parsed.error === "string" ? parsed.error.slice(0, 60) : null;
+      description = typeof parsed.error_description === "string" ? parsed.error_description.slice(0, 160) : null;
+    } catch {
+      // Not JSON: the status alone is the reason.
+    }
+    throw new TokenEndpointError(response.status, code, description);
   }
 
   return JSON.parse(text) as TokenResponse;

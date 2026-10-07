@@ -5,6 +5,8 @@ import { requirePortfolio } from "@/lib/portfolios/context";
 import { loadPortfolio, portfolioStart } from "@/lib/portfolio/service";
 import { serverDictionary } from "@/lib/i18n/server";
 import { LiveDashboard } from "@/components/dashboard/live-dashboard";
+import { ConnectionAlert } from "@/components/broker/connection-alert";
+import { readConnectionStatus } from "@/lib/moomoo/tokens";
 import { EmptyState } from "@/components/ui/misc";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +31,10 @@ export default async function DashboardPage({
   // separate waits on the database; asked for together it is one.
   // `since` is what "total" is measured from: the first money in, or failing
   // that the first day on record.
-  const [{ t }, data, since, owner] = await Promise.all([
+  // Its owner is told on the overview if the broker connection has stopped
+  // working, rather than left to notice that prices no longer move.
+  const mine = portfolio.kind === "broker" && canWrite(user, portfolio);
+  const [{ t, locale }, data, since, owner, connection] = await Promise.all([
     serverDictionary(),
     loadPortfolio(portfolio.id),
     portfolioStart(db, portfolio.id),
@@ -38,7 +43,11 @@ export default async function DashboardPage({
           portfolio.ownerUserId,
         ])
       : null,
+    mine ? readConnectionStatus(db, portfolio.id) : null,
   ]);
+  const alert = mine ? (
+    <ConnectionAlert connection={connection} slug={portfolio.slug} locale={locale} copy={t.connection} withButton />
+  ) : null;
 
   const {
     summary,
@@ -55,6 +64,7 @@ export default async function DashboardPage({
     return (
       <div className="space-y-6">
         <h1 className="text-lg font-semibold tracking-tight">{t.nav.overview}</h1>
+        {alert}
         {portfolio.kind === "broker" && <Link href={`/${portfolio.slug}/connection`}>Broker connection</Link>}
         <EmptyState title={t.table.noHoldings} description={t.table.noHoldingsHint} />
       </div>
@@ -63,6 +73,7 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-4">
+    {alert}
     {portfolio.kind === "broker" && <Link className="hidden text-sm underline sm:inline" href={`/${portfolio.slug}/connection`}>Broker connection and refresh</Link>}
     <LiveDashboard
       portfolioSlug={portfolio.slug}

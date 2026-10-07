@@ -355,6 +355,11 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user
 -- Columns introduced after the first release. Postgres supports IF NOT EXISTS
 -- here, so the SQLite era's PRAGMA-driven migration helper is no longer needed.
 ALTER TABLE broker_connections ADD COLUMN IF NOT EXISTS account_id TEXT;
+-- Why the last refresh failed, in moomoo's own words, and when: shown to the
+-- account's owner, and used to stop asking moomoo every few seconds once it
+-- has said no.
+ALTER TABLE broker_connections ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE broker_connections ADD COLUMN IF NOT EXISTS last_error_at TEXT;
 ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_price DOUBLE PRECISION;
 ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_market_value DOUBLE PRECISION;
 ALTER TABLE positions ADD COLUMN IF NOT EXISTS reported_unrealized_pnl DOUBLE PRECISION;

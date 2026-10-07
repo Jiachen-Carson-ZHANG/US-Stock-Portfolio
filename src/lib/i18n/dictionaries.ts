@@ -719,6 +719,12 @@ const en = {
     connectLead:
       "It takes about a minute. You sign in on moomoo's own page, tick two boxes, and come straight back here.",
     connectCardTitle: "Connect now",
+    brokenTitle: "This connection has stopped working",
+    brokenBody:
+      "moomoo stopped accepting it, so holdings and prices have not updated since {date}. The reason moomoo gave was {reason}. Reconnect to restore it, which takes about a minute.",
+    outageBody:
+      "moomoo did not answer the last update. Nothing needs doing, the site tries again by itself.",
+    reconnectNow: "Reconnect moomoo",
   },
 
   sectors: {
@@ -1516,6 +1522,10 @@ const zh: Dictionary = {
     headingConnected: "你的 moomoo 连接",
     connectLead: "大约一分钟就能完成。你在 moomoo 自己的页面登录，勾选两项，然后直接回到这里。",
     connectCardTitle: "现在连接",
+    brokenTitle: "这个连接已经失效",
+    brokenBody: "moomoo 不再接受这个连接，所以持仓和价格从 {date} 起都没有更新。moomoo 给出的原因是 {reason}。重新连接即可恢复，大约一分钟。",
+    outageBody: "上一次更新时 moomoo 没有响应。你不需要做什么，网站会自动重试。",
+    reconnectNow: "重新连接 moomoo",
   },
 
   sectors: {

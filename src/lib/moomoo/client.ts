@@ -2,8 +2,9 @@ import { getDb } from "@/lib/db";
 import { timed } from "@/lib/observe/span";
 import { dedupe } from "@/lib/inflight";
 import { logger } from "@/lib/logger";
-import { MOOMOO_API_BASE, refreshAccessToken, assertReadOnlyScope } from "./oauth";
-import { markRefreshed, markStatus, readConnection } from "./tokens";
+import { MOOMOO_API_BASE, refreshAccessToken, assertReadOnlyScope, TokenEndpointError } from "./oauth";
+import { markRefreshed, readConnection, recordRefreshFailure, replaceRefreshToken } from "./tokens";
+import { notify } from "@/lib/notifications";
 
 /** moomoo's code for "none of the symbols you asked about exist". */
 const UNKNOWN_SYMBOLS = -7;
@@ -67,6 +68,18 @@ function clientId(): string {
   return id;
 }
 
+/** How long a connection moomoo refused is left alone before asking again. */
+const REFUSED_BACKOFF_MS = 30 * 60_000;
+/** And after a failure that was only moomoo not answering. */
+const OUTAGE_BACKOFF_MS = 60_000;
+
+export class MoomooUnavailableError extends Error {
+  constructor() {
+    super("moomoo did not answer just now. Trying again shortly.");
+    this.name = "MoomooUnavailableError";
+  }
+}
+
 async function accessToken(portfolioId: string): Promise<string> {
   const cached = cachedAccessTokens.get(portfolioId);
   if (cached && cached.expiresAt > Date.now() + 60_000) {
@@ -76,6 +89,18 @@ async function accessToken(portfolioId: string): Promise<string> {
   const db = await getDb();
   const connection = await readConnection(db, portfolioId);
   if (!connection) throw new MoomooNotConnectedError();
+
+  // Once moomoo has said no, asking again every few seconds changes nothing
+  // and looks like abuse from its side: the scheduler retried a refused key
+  // up to ten times a second for two days. A refused connection is retried
+  // every half hour, in case the refusal was moomoo's mistake, until the
+  // person reconnects, which clears it at once.
+  const failedAt = connection.lastErrorAt ? Date.parse(connection.lastErrorAt) : NaN;
+  if (Number.isFinite(failedAt)) {
+    const since = Date.now() - failedAt;
+    if (connection.status === "expired" && since < REFUSED_BACKOFF_MS) throw new MoomooAuthExpiredError();
+    if (connection.status === "error" && since < OUTAGE_BACKOFF_MS) throw new MoomooUnavailableError();
+  }
 
   try {
     assertReadOnlyScope(connection.scope);
@@ -94,18 +119,44 @@ async function accessToken(portfolioId: string): Promise<string> {
       token: tokens.access_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
     });
+    if (tokens.refresh_token && tokens.refresh_token !== connection.refreshToken) {
+      await replaceRefreshToken(db, portfolioId, tokens.refresh_token);
+    }
     await markRefreshed(db, portfolioId);
     logger.info("broker.token.refreshed", { provider: "moomoo" });
     return tokens.access_token;
   } catch (error) {
-    await markStatus(db, portfolioId, "expired");
     clearTokenCache(portfolioId);
-    logger.error("broker.token.refresh_failed", {
-      provider: "moomoo",
-      reason: error instanceof Error ? error.message : "unknown",
-    });
-    throw new MoomooAuthExpiredError();
+    // Only moomoo refusing the grant, or a grant that is not read-only,
+    // needs the person to reconnect. A timeout or a 500 is an outage.
+    const refused =
+      (error instanceof TokenEndpointError && error.permanent) ||
+      (error instanceof Error && /permissions/i.test(error.message) && !(error instanceof TokenEndpointError));
+    const reason = error instanceof Error ? error.message : "unknown";
+    await recordRefreshFailure(db, portfolioId, refused ? "expired" : "error", reason);
+    logger.error("broker.token.refresh_failed", { provider: "moomoo", refused, reason });
+
+    // Told once, when it breaks, rather than finding out from stale prices.
+    if (refused && connection.status !== "expired") {
+      await tellOwner(db, portfolioId, reason).catch(() => undefined);
+    }
+    throw refused ? new MoomooAuthExpiredError() : new MoomooUnavailableError();
   }
+}
+
+async function tellOwner(db: Awaited<ReturnType<typeof getDb>>, portfolioId: string, reason: string): Promise<void> {
+  const portfolio = await db.get<{ owner_user_id: string | null; slug: string }>(
+    `SELECT owner_user_id, slug FROM portfolios WHERE id = ?`,
+    [portfolioId],
+  );
+  if (!portfolio?.owner_user_id) return;
+  await notify(db, {
+    userId: portfolio.owner_user_id,
+    kind: "broker_expired",
+    title: "Your moomoo connection needs reconnecting",
+    body: `moomoo stopped accepting it (${reason}). Holdings and prices are not updating until you reconnect.`,
+    link: `/${portfolio.slug}/connection`,
+  });
 }
 
 /**

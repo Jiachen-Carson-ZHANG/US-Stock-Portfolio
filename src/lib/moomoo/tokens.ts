@@ -23,6 +23,9 @@ export type BrokerConnection = {
   status: ConnectionStatus;
   connectedAt: string;
   lastRefreshAt: string | null;
+  /** moomoo's reason the last refresh failed, cleared by the next success. */
+  lastError: string | null;
+  lastErrorAt: string | null;
 };
 
 type Row = {
@@ -34,6 +37,8 @@ type Row = {
   status: ConnectionStatus;
   connected_at: string;
   last_refresh_at: string | null;
+  last_error: string | null;
+  last_error_at: string | null;
 };
 
 function encryptionKey(): Buffer {
@@ -66,7 +71,9 @@ export async function saveConnection(
        scope = excluded.scope,
        account_id = excluded.account_id,
        last_refresh_at = excluded.last_refresh_at,
-       status = 'connected'`,
+       status = 'connected',
+       last_error = NULL,
+       last_error_at = NULL`,
     [
       connectionId(portfolioId),
       payload.ciphertext,
@@ -105,6 +112,8 @@ export async function readConnection(
     status: row.status,
     connectedAt: row.connected_at,
     lastRefreshAt: row.last_refresh_at,
+    lastError: row.last_error ?? null,
+    lastErrorAt: row.last_error_at ?? null,
   };
 }
 
@@ -114,7 +123,7 @@ export async function readConnectionStatus(
   portfolioId: string,
 ): Promise<Omit<BrokerConnection, "refreshToken"> | null> {
   const row = await db.get<Row>(
-    `SELECT scope, account_id, status, connected_at, last_refresh_at
+    `SELECT scope, account_id, status, connected_at, last_refresh_at, last_error, last_error_at
        FROM broker_connections WHERE id = ?`,
     [connectionId(portfolioId)],
   );
@@ -127,6 +136,8 @@ export async function readConnectionStatus(
     status: row.status,
     connectedAt: row.connected_at,
     lastRefreshAt: row.last_refresh_at,
+    lastError: row.last_error ?? null,
+    lastErrorAt: row.last_error_at ?? null,
   };
 }
 
@@ -147,8 +158,37 @@ export async function markRefreshed(
   now: Date = new Date(),
 ): Promise<void> {
   await db.run(
-    `UPDATE broker_connections SET last_refresh_at = ?, status = 'connected' WHERE id = ?`,
+    `UPDATE broker_connections
+        SET last_refresh_at = ?, status = 'connected', last_error = NULL, last_error_at = NULL
+      WHERE id = ?`,
     [now.toISOString(), connectionId(portfolioId)],
+  );
+}
+
+/** A failed refresh, with moomoo's reason. Never holds a token. */
+export async function recordRefreshFailure(
+  db: DB,
+  portfolioId: string,
+  status: "expired" | "error",
+  reason: string,
+  now: Date = new Date(),
+): Promise<void> {
+  await db.run(
+    `UPDATE broker_connections SET status = ?, last_error = ?, last_error_at = ? WHERE id = ?`,
+    [status, reason.slice(0, 300), now.toISOString(), connectionId(portfolioId)],
+  );
+}
+
+/**
+ * Keeps a refresh token moomoo sends back with a refresh. Its documentation
+ * says it never does, but if that changes, discarding the new one would
+ * leave the old one to expire under us.
+ */
+export async function replaceRefreshToken(db: DB, portfolioId: string, refreshToken: string): Promise<void> {
+  const payload = encrypt(refreshToken, encryptionKey());
+  await db.run(
+    `UPDATE broker_connections SET encrypted_refresh_token = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+    [payload.ciphertext, payload.iv, payload.authTag, connectionId(portfolioId)],
   );
 }
 

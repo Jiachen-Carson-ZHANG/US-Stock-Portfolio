@@ -6,6 +6,7 @@ import { MoomooConnection, SyncButton } from "@/components/layout/settings-actio
 import { OwnBrokerageButton } from "@/components/broker/own-brokerage";
 import { Badge } from "@/components/ui/misc";
 import { Clock } from "@/components/ui/clock";
+import { ConnectionAlert } from "@/components/broker/connection-alert";
 import { serverDictionary } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export default async function ConnectionPage({
   searchParams: Promise<{ moomoo?: string }>;
 }) {
   const { user, portfolio } = await requirePortfolio((await params).portfolio);
-  const { t } = await serverDictionary();
+  const { t, locale } = await serverDictionary();
   const owns = portfolio.ownerUserId === user.id;
 
   const outcomes: Record<string, { tone: "ok" | "bad"; message: string }> = {
@@ -83,6 +84,10 @@ export default async function ConnectionPage({
         >
           {outcome.message}
         </p>
+      )}
+
+      {owns && (
+        <ConnectionAlert connection={connection} slug={portfolio.slug} locale={locale} copy={t.connection} />
       )}
 
       {!owns ? (
