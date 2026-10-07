@@ -291,9 +291,13 @@ async function pricedPositions(portfolioId: string, now: Date): Promise<{
   // option's break-even is a share price, so it only means something next to
   // where the share actually trades — and the underlying is usually not held
   // itself, so nothing else would have fetched it.
+  //
+  // Cash is left out. It is valued by its balance, the feed never prices it,
+  // and its cached row from the 18th kept the whole account marked stale, so
+  // no evening snapshot was taken after the 21st.
   const symbols = [
     ...new Set([
-      ...stored.map((p) => p.symbol),
+      ...stored.filter((p) => p.instrumentType !== "cash").map((p) => p.symbol),
       ...stored.flatMap((p) =>
         p.instrumentType === "option" && p.underlyingSymbol ? [p.underlyingSymbol] : [],
       ),

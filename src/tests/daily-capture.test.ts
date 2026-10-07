@@ -6,6 +6,7 @@ import { captureDailySnapshots } from "@/lib/portfolio/daily-capture";
 import { readSnapshots } from "@/lib/portfolio/snapshots";
 import { readAnalysis } from "@/lib/analysis/store";
 import { rebuildHistory } from "@/lib/portfolio/rebuild";
+import { loadPortfolio } from "@/lib/portfolio/service";
 
 /**
  * Nothing had been recorded since the 21st, and practice accounts had never
@@ -62,6 +63,34 @@ describe("the evening snapshot", () => {
     const again = await captureDailySnapshots(new Date(EVENING.getTime() + 600_000));
     expect(again.results.every((r) => !r.captured)).toBe(true);
     expect(await readSnapshots(db, practice)).toHaveLength(1);
+  });
+});
+
+describe("a real account holding cash", () => {
+  it("is recorded although cash never gets a fresh price", async () => {
+    // The broker reports cash as USD.CASH. It was asked for a quote with the
+    // holdings, the feed never answers for cash, and its cached row from the
+    // 18th marked the account stale every evening, so carson stopped at the 21st.
+    const at = (when: Date) => when.toISOString();
+    for (const [symbol, type, quantity] of [["NVDA", "stock", 10], ["USD.CASH", "cash", 500]] as const) {
+      await db.run(
+        `INSERT INTO positions
+           (id, broker, instrument_type, symbol, quantity, average_cost, currency, synced_at, portfolio_id)
+         VALUES (?, 'moomoo', ?, ?, ?, 100, 'USD', ?, ?)`,
+        [`${symbol}-row`, type, symbol, quantity, at(EVENING), TEST_PORTFOLIO_ID],
+      );
+    }
+    for (const [symbol, cachedAt] of [["NVDA", new Date(EVENING.getTime() - 5_000)], ["USD.CASH", new Date("2026-09-18T09:25:10Z")]] as const) {
+      await db.run(
+        `INSERT INTO quote_cache (symbol, price, previous_close, change, change_percent, market_status, data_timestamp, source, cached_at)
+         VALUES (?, 1, 1, 0, 0, 'closed', ?, 'test', ?)`,
+        [symbol, at(cachedAt), at(cachedAt)],
+      );
+    }
+
+    const { summary } = await loadPortfolio(TEST_PORTFOLIO_ID, EVENING);
+    expect(summary.isStale).toBe(false);
+    expect((await readSnapshots(db, TEST_PORTFOLIO_ID)).map((s) => s.snapshotDate)).toEqual(["2026-09-25"]);
   });
 });
 
